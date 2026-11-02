@@ -721,6 +721,8 @@ function lsSet(k, v) { try { localStorage.setItem(k, v); } catch { _mem[k] = v; 
 let DB = null;                       // claude.use('db') の結果
 const cloud = { schedules: null, settings: {} }; // db から届いた最新の内容
 function docId(name) { return btoa(unescape(encodeURIComponent(name))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''); }
+// 利用者情報（アセスメント・手順書など）を名前で探す。名字と名前の間の空白の有無が違っても同じ人として見つける（11/2 清野恵里で取り込んだアセスメントが「清野 恵里」で出なかった）
+function clientDoc(name) { const C = getColl('clients') || {}, n = String(name || '').trim(), k = n.replace(/[\s　]/g, ''); return C[docId(n || ' ')] || (k ? Object.values(C).find(c => c && c.name && String(c.name).replace(/[\s　]/g, '') === k) : null) || undefined; }
 function setSyncStatus(text, cls) {
   const el = document.getElementById('syncStatus'); if (el) { el.textContent = text; el.className = 'sync ' + (cls || ''); }
   const b = document.getElementById('syncBanner'); if (b) b.style.display = (supaOn() && cls === 'local') ? '' : 'none';
@@ -767,7 +769,7 @@ async function setSetting(key, localKey, list, opt = {}) {
 const SUPA = { url: '', key: '' }; // 旧（使わない）
 const GAS = {"url": "https://script.google.com/macros/s/AKfycbxKEAUthQx9wiZKncHZR43jbSKjPfO2lYhlc2K5yXWJNXI_zA8wChdQTFlINEhLTDQO/exec"};           // 保存先（Googleドライブに保存するGAS）。build-site.sh が入れる
 // 版の確認：公開版が新しくなったら知らせ、古い版のままでは記録を保存しない（古い決まりで上書きしないため）
-const APP_VER = '20261102154540';
+const APP_VER = '20261102161359';
 let appOutdated = false;
 async function checkVer() {
   if (APP_VER === 'dev' || appOutdated) return appOutdated;
@@ -948,13 +950,13 @@ async function initCloud() {
 // ---- 区分（介護／障害）: 利用者情報に保存。未設定なら予定表の書き方から推測（身体1生活1・入浴（身体2）など＝介護保険の書き方→介護） ----
 function guessKubun(days) { return (days || []).some(d => dayEntries(normDay(d)).some(e => /身体\s*\d|生活\s*\d/.test(e.type || ''))) ? '介護' : '障害'; }
 function kubunOf(name) {
-  const c = getColl('clients')[docId(name || ' ')];
+  const c = clientDoc(name || ' ');
   if (c && c.kubun) return c.kubun;
   const sc = getStore()[name]; return guessKubun(sc ? sc.days : (state.name === name ? state.days : []));
 }
 async function setKubun(name, kubun) {
   if (!name || !kubun) return;
-  const prev = getColl('clients')[docId(name)] || { name };
+  const prev = clientDoc(name) || { name };
   await putDoc('clients', docId(name), { ...prev, name, kubun, updatedAt: new Date().toISOString() });
   renderKubun(); refreshSavedList(); refreshRecUsers();
 }
@@ -1211,7 +1213,7 @@ async function putDoc(kind, id, data) {
   return true;
 }
 function clientInfoOf(name) {
-  const manual = getColl('clients')[docId(name)];
+  const manual = clientDoc(name);
   const m = getUserMaster().find(u => u.name.replace(/\s/g, '') === String(name).replace(/\s/g, ''));
   const csv = (m && m.info) || {};
   return { address: manual?.address ?? csv.address ?? '', phone: manual?.phone ?? csv.phone ?? '', emergency: manual?.emergency ?? csv.emergency ?? '', memo: manual?.memo ?? '', manual: !!manual };
@@ -1233,7 +1235,7 @@ function renderClientBox(force) {
 async function saveClientInfo() {
   const name = (state.name || '').trim();
   if (!name) { alert('先に利用者名を入力（または選択）してください'); return; }
-  const prevNg = clientNg(name), prevDoc = getColl('clients')[docId(name)] || {};
+  const prevNg = clientNg(name), prevDoc = clientDoc(name) || {};
   const data = { ...prevDoc, name, ng: prevNg, address: document.getElementById('ciAddress').value.trim(), phone: document.getElementById('ciPhone').value.trim(), emergency: document.getElementById('ciEmergency').value.trim(), memo: document.getElementById('ciMemo').value.trim(), updatedAt: new Date().toISOString() };
   const ok = await putDoc('clients', docId(name), data);
   clientEdited = false; renderClientBox(true);
@@ -1331,7 +1333,7 @@ const GOODS_CYCLE = {
 const addDays = (d, n) => { const x = new Date(d + 'T00:00:00'); x.setDate(x.getDate() + n); return ymd(x); };
 const todayYmd = () => ymd(new Date());
 function goodsOf(name) {
-  const c = getColl('clients')[docId(name)] || {}, g = c.goods || {}, R = menuRules(name);
+  const c = clientDoc(name) || {}, g = c.goods || {}, R = menuRules(name);
   return dailyGoods(name).filter(x => !R.ng.some(w => x.includes(w)) && !ngHits(x).length).map(x => {
     const cycle = +(g[x]?.cycle || GOODS_CYCLE[x]?.[0] || 30), last = g[x]?.last || '', next = last ? addDays(last, cycle) : '';
     return { name: x, cycle, last, next, hint: GOODS_CYCLE[x]?.[1] || '', due: !last || next <= addDays(todayYmd(), 7) };
@@ -1339,7 +1341,7 @@ function goodsOf(name) {
 }
 async function setGoods(item, key, val) {
   const name = (state.name || '').trim(); if (!name) return;
-  const c = getColl('clients')[docId(name)] || { name }, g = { ...(c.goods || {}) };
+  const c = clientDoc(name) || { name }, g = { ...(c.goods || {}) };
   g[item] = { ...(g[item] || {}), [key]: key === 'cycle' ? Math.max(1, parseInt(val, 10) || GOODS_CYCLE[item]?.[0] || 30) : val };
   await putDoc('clients', docId(name), { ...c, name, goods: g, updatedAt: new Date().toISOString() });
   renderShop();
@@ -1347,7 +1349,7 @@ async function setGoods(item, key, val) {
 const mdTxt = d => d ? `${+d.slice(5, 7)}/${+d.slice(8, 10)}` : '';
 // 生活に必要な物（予定表の支援・アセスメントから。在庫を見て足りない物だけ買う）
 function dailyGoods(name) {
-  const c = getColl('clients')[docId(name)] || {}, a = c.assessment || {};
+  const c = clientDoc(name) || {}, a = c.assessment || {};
   const t = [1, 2, 3, 4, 5, 6, 0].flatMap(d => dayEntries(state.days[d]) || []).map(e => (e.type || '') + ' ' + (e.detail || '') + ' ' + autoKP(e).join(' ')).join(' ') + ' ' + JSON.stringify(a) + ' ' + (c.memo || '');
   const g = [['トイレットペーパー', 1], ['ティッシュ', 1], ['ゴミ袋', 1]];
   if (/調理|食事|朝食|昼食|夕食|配膳/.test(t)) g.push(['食器用洗剤', 1], ['スポンジ', 1], ['ラップ', 1]);
@@ -1377,7 +1379,7 @@ function menuSlots() {
 }
 // アセスメント・メモ・食べられない物・NG から献立の決まりを作る
 function menuRules(name) {
-  const c = getColl('clients')[docId(name)] || {}, a = c.assessment || {}, all = JSON.stringify(a) + ' ' + (c.memo || '');
+  const c = clientDoc(name) || {}, a = c.assessment || {}, all = JSON.stringify(a) + ' ' + (c.memo || '');
   const food = (document.getElementById('ciFood')?.value ?? c.food ?? '');
   const ngFood = [...new Set([...food.split(/[、,，・\s／/]+/), ...[...(c.memo || '').matchAll(/(?:アレルギー|嫌い|食べられない|禁止)[：:は]?\s*([^。\n]+)/g)].flatMap(m => m[1].split(/[、,，・\s]+/))].map(x => x.trim()).filter(x => x && x.length < 12))];
   const ng = [...new Set([...clientNg(name), ...ngFood])];
@@ -1432,7 +1434,7 @@ function makeMenu() {
   list['乾物・その他'].push(`米 約${(Math.ceil(rice / 330 * 2) / 2).toFixed(1).replace('.0', '')}合（${nRice}食分・残りを確認）`, ...[...stock].map(x => x + '（在庫を確認）'));
   Object.keys(list).forEach(c => { if (!list[c].length) delete list[c]; });
   if (R.avoid.has('塩')) R.notes.push('汁物は1日1回まで（減塩）');
-  const doc = getColl('clients')[docId(name)] || { name };
+  const doc = clientDoc(name) || { name };
   const menu = { created: new Date().toISOString(), plan: plan.map(({ ing, ...p }) => p), list, notes: R.notes };
   putDoc('clients', docId(name), { ...doc, name, food: document.getElementById('ciFood').value.trim(), menu, updatedAt: new Date().toISOString() });
   renderShop();
@@ -1445,19 +1447,19 @@ function refreshShopUsers() {
 }
 async function saveFood() {
   const name = (state.name || '').trim(); if (!name) return;
-  const c = getColl('clients')[docId(name)] || { name };
+  const c = clientDoc(name) || { name };
   await putDoc('clients', docId(name), { ...c, name, food: document.getElementById('ciFood').value.trim(), updatedAt: new Date().toISOString() });
   renderShop();
 }
 // 買い物リストのチェック（献立ごとに保存）
 async function toggleShop(key, on) {
-  const name = (state.name || '').trim(), c = getColl('clients')[docId(name)]; if (!c?.menu) return;
+  const name = (state.name || '').trim(), c = clientDoc(name); if (!c?.menu) return;
   const checked = { ...(c.menu.checked || {}) }; if (on) checked[key] = 1; else delete checked[key];
   await putDoc('clients', docId(name), { ...c, menu: { ...c.menu, checked }, updatedAt: new Date().toISOString() });
   renderShop();
 }
 async function toggleGoods(item, on) {
-  const name = (state.name || '').trim(), c = getColl('clients')[docId(name)] || { name }, g = { ...(c.goods || {}) };
+  const name = (state.name || '').trim(), c = clientDoc(name) || { name }, g = { ...(c.goods || {}) };
   const prev = g[item] || {};
   g[item] = on ? { ...prev, last: todayYmd(), prevLast: prev.last || '' } : { ...prev, last: prev.prevLast || '' };
   await putDoc('clients', docId(name), { ...c, name, goods: g, updatedAt: new Date().toISOString() });
@@ -1465,7 +1467,7 @@ async function toggleGoods(item, on) {
 }
 function renderShop() {
   const v = document.getElementById('shopView'), rules = document.getElementById('menuRules'); if (!v) return;
-  const name = (state.name || '').trim(), c = name ? getColl('clients')[docId(name)] || {} : {}, m = c.menu;
+  const name = (state.name || '').trim(), c = name ? clientDoc(name) || {} : {}, m = c.menu;
   const food = document.getElementById('ciFood'); if (food && document.activeElement !== food) food.value = c.food || '';
   const su = document.getElementById('shopUser'); if (su && su.value !== name) { if (![...su.options].some(o => o.value === name)) refreshShopUsers(); su.value = name; }
   if (rules) rules.textContent = name ? '配慮：' + (menuRules(name).notes.join('／') || '特になし（アセスメントに食事の制限なし）') : '';
@@ -1492,7 +1494,7 @@ function renderShop() {
 }
 const renderMenu = renderShop;
 function menuText(name) {
-  const m = getColl('clients')[docId(name)]?.menu, due = goodsDueText(name); if (!m && !due) return '';
+  const m = clientDoc(name)?.menu, due = goodsDueText(name); if (!m && !due) return '';
   return (m ? `【${name} 様　献立（1人分）】\n` + m.plan.map(p => `${DAYS[p.dow]}　${p.meal}：${p.dishes.join('・')}${p.amounts ? `\n　　${p.amounts.join('／')}` : ''}`).join('\n') + '\n\n' : '') + '【買い物リスト】\n' + (m ? Object.entries(m.list).map(([c, xs]) => `${c}：${xs.join('、')}`).join('\n') : '') + (due ? `\n日用品（今週）：${due}` : '');
 }
 function copyMenu(btn) { const t = menuText((state.name || '').trim()); if (!t) { alert('先に「献立と買い物リストを作成」を押してください'); return; } copyText(t, btn); }
@@ -1718,7 +1720,7 @@ function fitLen(r, name) {
 function menuFor(row, meal) {
   { const kd = kdMenu(row); if (kd) return kd; }
   { const pm = planMenu(row, meal); if (pm) return pm; }
-  const m = getColl('clients')[docId((state.name || '').trim())]?.menu; if (!m) return '';
+  const m = clientDoc((state.name || '').trim())?.menu; if (!m) return '';
   // 🛒の献立表は作った日から1週間分（前は何か月分の記録にも同じ曜日の献立が使われていた）
   if (m.created) { const c0 = new Date(ymd(new Date(Date.parse(m.created) + 9 * 36e5)) + 'T00:00:00'), dd = (row.date - c0) / 864e5; if (dd < 0 || dd >= 7) return ''; }
   const p = m.plan.find(x => x.dow === row.date.getDay() && x.meal === meal); return p ? p.dishes.filter(d => d !== 'ご飯' || meal === '朝食').join('・') : '';
@@ -1788,7 +1790,7 @@ async function saveRecords(opt = {}) {
   if (!name || !rows.length) { if (!opt.quiet) alert('保存する記録がありません（「記録を生成」してチェックを入れてください）'); return; }
   if (!opt.quiet && !dupConfirm()) return;
   // 記録に買った日用品が書いてあれば「前回買った日」を更新
-  { const c = getColl('clients')[docId(name)] || { name }, g = { ...(c.goods || {}) }; let ch = false;
+  { const c = clientDoc(name) || { name }, g = { ...(c.goods || {}) }; let ch = false;
     rows.forEach(r => { if (!/買|購入/.test(r.text || '')) return; Object.keys(GOODS_CYCLE).forEach(x => { const key = x.split(/[（・]/)[0]; if ((r.text || '').includes(key) && (!g[x]?.last || g[x].last < ymd(r.date))) { g[x] = { ...(g[x] || {}), last: ymd(r.date) }; ch = true; } }); });
     if (ch) await putDoc('clients', docId(name), { ...c, name, goods: g, updatedAt: new Date().toISOString() }); }
   const byMonth = {};
@@ -1992,7 +1994,7 @@ function parseAssessment(lines) {
   A.ng = [...new Set(A.ng)];
   return A;
 }
-function assessOf(name) { const d = getColl('clients')[docId(name || ' ')]; return (d && d.assessment) || null; }
+function assessOf(name) { const d = clientDoc(name || ' '); return (d && d.assessment) || null; }
 // 文字読み取りの前処理：大きさを300dpi相当にそろえ、白黒にして、表の罫線（長い縦線・横線）を消す（罫線があると字を読み違えるため）
 function ocrPrep(src) {
   const k = Math.min(3, Math.max(1, 2480 / Math.min(src.width, src.height)));
@@ -2066,7 +2068,7 @@ async function importAssessment(input, opt = {}) {
         : [`病名・症状：${A.diseases.join('・') || 'なし'}`, `要援助：${A.needs.join('・') || 'なし'}`, `特記の要点：${A.notes.join('・') || 'なし'}`, A.itemNotes ? `項目の備考：${Object.entries(A.itemNotes).map(([k, v]) => k + '＝' + v).join('／') || 'なし'}` : '', A.goals && A.goals.length ? '本人の目標：自分のことは自分で' : ''].filter(Boolean);
       if (!confirm(`「${name}」様の${A.form === 'plan' ? '計画書' : 'アセスメント'}として取り込みます。\n\n${sum.join('\n')}\n\nよろしいですか？`)) { paperMsg(''); return; }
     }
-    const prev = getColl('clients')[docId(name)] || { name }, info = clientInfoOf(name);
+    const prev = clientDoc(name) || { name }, info = clientInfoOf(name);
     const doc = { ...prev, name, updatedAt: new Date().toISOString() };
     if (A.form === 'plan') {
       doc.plan = { wish: A.wish, goal: A.goal, importedAt: new Date().toISOString() };
@@ -2092,7 +2094,7 @@ async function importAssessment(input, opt = {}) {
 function renderAssessBox() {
   const el = document.getElementById('assessSummary'); if (!el) return;
   const a = assessOf((state.name || '').trim());
-  const pl = (getColl('clients')[docId((state.name || '').trim() || ' ')] || {}).plan;
+  const pl = (clientDoc((state.name || '').trim() || ' ') || {}).plan;
   el.innerHTML = !a ? 'まだ取り込んでいません' : [pl && pl.wish ? `本人の希望：${pl.wish}` : '', pl && pl.goal ? `援助目標：${pl.goal}` : '', a.itemNotes && Object.keys(a.itemNotes).length ? `項目の備考：${Object.entries(a.itemNotes).map(([k, v]) => k + '＝' + v).join('／')}` : '', a.goals && a.goals.length ? '本人の目標：自分のことは自分で' : '', `病名・症状：${a.diseases.join('・') || '—'}`, `義歯：${a.dentures ? 'あり' : 'なし'}`, a.walkAid ? `移動：${a.walkAid}` : '', `要援助：${a.needs.join('・') || '—'}`, `特記の要点：${a.notes.join('・') || '—'}`, `（${a.importedAt.slice(0, 10)} 取込）`].filter(Boolean).map(esc).join('<br>');
 }
 // 1. 記録の文章をアセスメントに合わせる
@@ -2137,7 +2139,7 @@ function toiletByKubun(kp, name) {
   ['自立支援|声掛け・見守り', '自立支援|排泄・食事'].forEach(k => { if (!out.includes(k)) out.push(k); });
   return out;
 }
-function proceduresOf(name) { const c = getColl('clients')[docId(name || ' ')]; return (c && c.procedures) || []; }
+function proceduresOf(name) { const c = clientDoc(name || ' '); return (c && c.procedures) || []; }
 // 訪問・手順の「中身の種類」（調理・掃除・洗濯・入浴…）で合わせる
 const PROC_FEAT = { 調理: /調理|朝食|昼食|夕食|食事|配膳|メニュー/, 掃除: /掃除|清掃|片付|片づけ|整理整頓/, 洗濯: /洗濯|シーツ/, 入浴: /入浴|全身浴|洗身|湯舟|湯船|シャワー/, 買物: /買い物|買物|代行|スーパ/, 起床: /起床|起き/, 就寝: /就寝|眠前|寝る/, 服薬: /服薬|薬/, 衣類: /衣類|タンス/, 通院: /通院|受診|病院|クリニック/, 洗面: /洗面|洗顔|顔洗い|顔を(洗|拭)|歯磨き|口腔/, 身支度: /身支度|更衣|着替|洗面|洗顔|顔洗い|顔を(洗|拭)|歯磨き|口腔/ };
 const featOf = t => Object.keys(PROC_FEAT).filter(k => PROC_FEAT[k].test(t));
@@ -3359,7 +3361,7 @@ const tmplTod = st => { const h = Math.floor((hm(st) || 720) / 60); return h < 1
 const GEN_FEAT = [[/^調理\||^自立支援\|一般的な調理/, /調理|食事|朝食|昼食|夕食|準備|提供|配膳/], [/^清掃\||^自立支援\|掃除/, /掃除|清掃|片付|片づけ|整理/], [/^洗濯\||^自立支援\|洗濯/, /洗濯|干/], [/^衣類・寝具\|(衣類|被服)|^自立支援\|衣類/, /衣類|整理/], [/^衣類・寝具\|(ベッド|シーツ|布団)|^自立支援\|ベッド/, /シーツ|ベッド|布団/], [/^買物等\||^自立支援\|買い物/, /買い物|買物|代行/], [/^移動\|(通院|外出準備|帰宅受入)|^服薬・医療\|院内|^自立支援\|通院/, /通院|受診|病院/]];
 // アセスメントで外す：その支援が要らない（できる・自立）と書いてある項目／NGの言葉を含む項目
 function assessBlock(name, k) {
-  const c = getColl('clients')[docId(name || ' ')] || {}, a = c.assessment || {}, needs = a.needs || [], notes = a.notes || [], items = a.itemNotes || {}, it = k.split('|')[1];
+  const c = clientDoc(name || ' ') || {}, a = c.assessment || {}, needs = a.needs || [], notes = a.notes || [], items = a.itemNotes || {}, it = k.split('|')[1];
   const can = key => { const v = Object.entries(items).find(([n]) => n.includes(key)); return v && /^\s*(できる|自立|ひとりでできる|一人でできる|自分でできる)/.test(v[1]) && !/できない|支援|介助|必要|一緒|声掛け|促し|見守|不安|困難/.test(v[1]); };
   if (!Object.keys(a).length) return '';
   if (/^(服薬・医療\|(服薬介助・確認|見守り)|自立支援\|服薬)$/.test(k) && !needs.some(n => /服用|服薬/.test(n)) && !notes.includes('服薬忘れ')) return 'アセスメントに服用の支援が無い';
@@ -4102,7 +4104,7 @@ async function importShiftCsv(input) {
 const DEFAULT_NG = ['変化なし', '変化はな', '変化がな', '変わりな', 'お変わりな', '特変', '異常なし', '異常はな', '異常は見られ', 'いつも通り', 'いつもどおり', '特に問題な', '問題なし', '特記事項なし', '特になし'];
 function getNgList() { return getSetting('ng', 'smilewan_ng_list', DEFAULT_NG.slice()); }
 // 利用者ごとのNG（利用者情報 clients の ng に保存）
-function clientNg(name) { const d = getColl('clients')[docId(name || ' ')]; return (d && Array.isArray(d.ng)) ? d.ng : []; }
+function clientNg(name) { const d = clientDoc(name || ' '); return (d && Array.isArray(d.ng)) ? d.ng : []; }
 function renderNgBox() {
   const c = document.getElementById('ngCommon'); if (!c) return;
   if (document.activeElement === c || document.activeElement === document.getElementById('ngClient')) return;
@@ -4115,7 +4117,7 @@ async function saveNgLists() {
   const lines = id => document.getElementById(id).value.split('\n').map(x => x.trim()).filter(Boolean);
   await setSetting('ng', 'smilewan_ng_list', lines('ngCommon'));
   const name = (state.name || '').trim();
-  if (name) { const prev = getColl('clients')[docId(name)] || { name }; await putDoc('clients', docId(name), { ...prev, name, ng: lines('ngClient'), updatedAt: new Date().toISOString() }); }
+  if (name) { const prev = clientDoc(name) || { name }; await putDoc('clients', docId(name), { ...prev, name, ng: lines('ngClient'), updatedAt: new Date().toISOString() }); }
   if (recRows.length) renderRecordView();
   alert('NG表現を保存しました' + (name ? `（共通＋${name} 様）` : '（共通）'));
 }
@@ -6155,7 +6157,7 @@ async function importScheduleXlsx(input) {
   for (const r of list) {
     paperMsg(`📗 保存中…（${ok + 1}/${list.length}）${r.name}`);
     if (await saveSchedule(r.name, { name: r.name, days: r.days })) ok++;
-    const prev = getColl('clients')[docId(r.name)]; if (!prev || !prev.kubun) await putDoc('clients', docId(r.name), { ...(prev || {}), name: r.name, kubun: r.kubun, updatedAt: new Date().toISOString() });
+    const prev = clientDoc(r.name); if (!prev || !prev.kubun) await putDoc('clients', docId(r.name), { ...(prev || {}), name: r.name, kubun: r.kubun, updatedAt: new Date().toISOString() });
   }
   paperMsg('');
   refreshSavedList(); refreshUserPick();
