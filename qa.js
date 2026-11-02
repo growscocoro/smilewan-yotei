@@ -5,7 +5,7 @@ window.qaCheckRows = function (name) {
   const out = [], add = (r, kind, msg) => out.push({ name, date: ymd(r.date), start: r.e.start || entryTime(r.e).s || '', type: r.e.type || '', kind, msg });
   const K = kubunOf(name) === '介護', NG = [...getNgList(), ...clientNg(name)];
   const rows = recRows.filter(r => r.on && r.text).slice().sort((a, b) => (a.date - b.date) || (entryTime(a.e).s || '').localeCompare(entryTime(b.e).s || ''));
-  const seen = new Set(); let dup = 0, sents = 0;
+  const seen = new Set(), seenYm = new Set(); let dup = 0, sents = 0;
   rows.forEach(r => {
     const t = String(r.text), kp = kpAll(r), v = vOf(r), tm = tmplFor(r), dow = r.date.getDay();
     // 1. 見本どおりか（見本がある訪問）
@@ -60,6 +60,7 @@ window.qaCheckRows = function (name) {
     // 8.6 献立・買い物支援で選んだ料理・保存した買い物の品物が文章にあるか
     if (typeof withKd === 'function' && !r.sick && withKd(r, t) !== t) add(r, '献立アプリ', '献立（献立アプリ・手順書のメニュー）や買った品物が文章に無い');
     { const mx = typeof TEXT_MAX !== 'undefined' ? TEXT_MAX : 500; if (t.length > mx) add(r, '文字数', `文章が${t.length}字（${mx}字まで）`); }
+    if (typeof sickNeed === 'function') { const ym = ymd(r.date).slice(0, 7); if (!seenYm.has(ym)) { seenYm.add(ym); const sn = sickNeed(recRows, name, ym); if (sn.have < sn.want) add(r, '体調不良の日数', `${ym.replace('-', '年')}月の体調不良の日が${sn.have}日（${sn.want}日にする）`); } }
     // 9. 同じ文が2回（同じ訪問の中）・空の文
     const ss = t.split(/(?<=。)/).filter(x => x.trim()); const inRow = new Set();
     ss.forEach(x => { sents++; if (inRow.has(x)) add(r, '重複', `同じ訪問に同じ文：${x.slice(0, 30)}`); inRow.add(x); if (seen.has(x)) dup++; seen.add(x); });
