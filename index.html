@@ -771,7 +771,7 @@ async function setSetting(key, localKey, list, opt = {}) {
 const SUPA = { url: '', key: '' }; // 旧（使わない）
 const GAS = {"url": "https://script.google.com/macros/s/AKfycbxKEAUthQx9wiZKncHZR43jbSKjPfO2lYhlc2K5yXWJNXI_zA8wChdQTFlINEhLTDQO/exec"};           // 保存先（Googleドライブに保存するGAS）。build-site.sh が入れる
 // 版の確認：公開版が新しくなったら知らせ、古い版のままでは記録を保存しない（古い決まりで上書きしないため）
-const APP_VER = '20261103131128';
+const APP_VER = '20261103132609';
 let appOutdated = false;
 async function checkVer() {
   if (APP_VER === 'dev' || appOutdated) return appOutdated;
@@ -3119,6 +3119,8 @@ function vOf(r) { const a = vAuto(r), m = r.vin || {}, v = { ...a, ...m }, t = t
     if (!m.整容) v.整容 = on('身体整容|整容') ? (t.seiyo || []) : [];
     if (!m.部分浴 && (t.bubunyoku || []).length) v.部分浴 = t.bubunyoku[0]; if (!m.清拭 && (t.seishiki || []).length && !r.sick) v.清拭 = t.seishiki[0]; if (!m.摂食 && t.sesshoku) v.摂食 = t.sesshoku; }
   { const sb = seiyoBathOf(), kp = kpAll(r); if (sb && !m.整容 && !(v.整容 || []).length && kp.includes('身体整容|整容') && kp.some(k => /^入浴・清拭\|(入浴介助|シャワー浴)$/.test(k))) v.整容 = [...sb]; } // お風呂のときの整容（利用者情報）
+  // 整容にチェックがあるのに細目（髭・髪など）が空のとき：利用者情報の「お風呂のときの整容」→ 同じ人の見本の整容の細目を使う（11/3「チェック入ってないところもある」：見本の無い訪問で空になっていた）
+  { const kp = kpAll(r); if (!m.整容 && !(v.整容 || []).length && kp.includes('身体整容|整容')) { const nm = (state.name || '').trim(), own = tmplList().find(x => x.name === nm && (x.checked || []).includes('身体整容|整容') && (x.seiyo || []).length), pick = seiyoBathOf() || (own && own.seiyo); if (pick) v.整容 = [...pick]; } }
   v.その他 = ['環境整備', '相談援助', '情報収集・提供', '記録']; return v; } // その他は毎回4つとも（事業所の決まり）
 function shopGuess(r, v) {
   let seed = 0; for (const ch of seedName(state.name || '') + ymd(r.date) + (r.e.start || '')) seed = (seed * 31 + ch.charCodeAt(0)) >>> 0;
