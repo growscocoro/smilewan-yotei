@@ -435,6 +435,7 @@
       <div class="hint" style="margin:2px 0 4px">Wordは、1訪問を1ページにぎっしり書き出します（特記事項の欄をページの下まで伸ばして、空白を残しません）。チェックリストだけが欲しいときは「✅ チェックリスト」から。</div>
       <input type="file" id="paperFile" accept="application/pdf,image/*" style="display:none" onchange="importPaper(this)">
       <div id="paperStatus" class="hint" style="display:none"></div>
+      <div id="autoQaInfo" class="hint" style="font-size:12px"></div>
       <details id="recSchedQa" class="hint" style="display:none;color:#b26b00"><summary style="font-weight:bold;cursor:pointer"></summary><ul style="margin:4px 0 0;padding-left:18px"></ul></details>
       <details id="recQa" class="hint" style="display:none;color:var(--danger)"><summary style="font-weight:bold;cursor:pointer"></summary><ul style="margin:4px 0 0;padding-left:18px"></ul></details>
       <label>期間</label>
@@ -601,7 +602,7 @@
       <p><b>同じ文を書かない</b>：同じ利用者・同じ月の中で一度使った文は、2回目からは意味を変えずに言い回しを変える（例：「退室前に戸締まりや火の元を確認し、安全を確かめた」→「帰る前に火の元や戸締まりを確認し、危険がないことを確かめた」）。言い回しが尽きた様子・会話などの付け足しの文は、同じ種類のまだ使っていない文に替える。</p>
       <p><b>訪問記録タブの選び方</b>：いちばん上で「👤 利用者から選ぶ」か「🧑 担当者から選ぶ」を選ぶ（前回の選び方を覚えておく）。利用者から選ぶ＝利用者と保存した月を選んで記録を開く。担当者から選ぶ＝担当者と月を選ぶと、その月に入った利用者が回数つきで並び、右にその人の訪問が全員分出る（見るだけ）。「📄 Wordに書き出し」で、その担当者の1か月分を1訪問1ページのWordにできる（日付・時刻の順、利用者の書き出しと同じ形）。利用者を押すとその人の記録が開き、「← 担当者の一覧に戻る」で戻れる。</p>
       <p><b>担当者で絞り込み（予定表タブ）</b>：予定表タブの「担当者」で選ぶと、その人が訪問記録の担当者に入っている利用者だけが、予定表タブの保存済み利用者の一覧に出る（訪問記録タブでは「🧑 担当者から選ぶ」を使う）（介護／障害の絞り込みと一緒に使える）。</p>
-      <p><b>毎朝の点検</b>：毎朝6:30に事業所のMacで全員・全月を点検して直す。Macが動いていなかった日は、7:30以降に最初にツールを開いた人の画面の裏（見えない枠）で同じ点検をする（その人の操作には影響しない）。</p>
+      <p><b>毎朝の点検・開いている間の点検</b>：毎朝6:30に事業所のMacで全員・全月を点検して直す。7:30以降は、ツールを開いている間30分ごとに、開いている人の画面の裏（見えない枠）で全員・全月を点検して直す（何人開いていても動くのは1か所だけ・操作している間は少し待つ・その人の画面の内容は変わらない）。開いている記録は、手が止まっている間3分ごとに点検して直す。点検では、シフトにあるのに記録が無い訪問を足し、時刻のずれ・空の担当者もシフトに合わせる（同じ時刻の記録がある時は担当者を書き足すだけ）。記録タブに「最後の点検」を出す。</p>
       <p><b>予定表の確認</b>：記録を作ったとき、予定表の時刻欄が空・時刻なし・種別が空や不明・シフトにあって予定表に無い訪問・予定表にあってシフトに無い予定・似た名前を「⚠ 予定表の確認」に出す（作るのは止めない）。</p>
       <p><b>二重登録の注意</b>：予定表・利用者情報・訪問記録を新しい名前で保存するとき、空白や全角半角の違い・1文字違い・名字と名前の1文字目が同じ名前がすでにあれば確認を出す。名前が読めていない（記号で始まる等）ときも確認を出す。一覧では似た名前に「⚠似た名前あり」を付ける。</p>
       <p><b>見張り・自動で直す</b>：記録を作ったとき・開いたとき・保存したときに点検し、決まりと合わない所はその場で正しい形に直して自動保存する（チェックに合わせて文章を足す／チェックの無い支援の文を外す・順番・NG・呼び方・重複・見本の項目・ゴミ出し・完食・共に行う・体調不良）。直せなかった所だけ「⚠」で一覧を出す。「🔍 全件点検」で保存してある全員・全月をまとめて点検して直す。画面で起きたエラーは保存先（Googleドライブ）に記録する。</p>
@@ -771,7 +772,7 @@ async function setSetting(key, localKey, list, opt = {}) {
 const SUPA = { url: '', key: '' }; // 旧（使わない）
 const GAS = {"url": "https://script.google.com/macros/s/AKfycbxKEAUthQx9wiZKncHZR43jbSKjPfO2lYhlc2K5yXWJNXI_zA8wChdQTFlINEhLTDQO/exec"};           // 保存先（Googleドライブに保存するGAS）。build-site.sh が入れる
 // 版の確認：公開版が新しくなったら知らせ、古い版のままでは記録を保存しない（古い決まりで上書きしないため）
-const APP_VER = '20261103134246';
+const APP_VER = '20261103153952';
 let appOutdated = false;
 async function checkVer() {
   if (APP_VER === 'dev' || appOutdated) return appOutdated;
@@ -888,28 +889,47 @@ function changePass() {
   document.getElementById('passInput').focus();
 }
 
-// ===== 毎朝の点検の代わり：その日にまだ点検されていなければ、最初にツールを開いた人の画面の裏（見えない枠）で点検して直す =====
-const AUTOQA = /[?&]autoqa=1/.test(location.search);
-let _morningTried = false;
-async function maybeMorningQa() {
-  if (AUTOQA || _morningTried || !DB || !GAS.url) return; _morningTried = true;
-  const now = new Date(), jst = new Date(now.getTime() + 9 * 3600e3), today = jst.toISOString().slice(0, 10);
+// ===== 裏の点検：ツールを開いている間は、画面の裏（見えない枠）で全員・全月を点検して直す（毎朝6:30のMacの点検の代わりも兼ねる） =====
+//   11/3 ユーザー指示「開いてる間はチェックが動いてるようにして」：前は1日1回（その日まだ点検されていない時だけ）→ 30分ごと。
+//   何人が開いていても、保存先の記録（直近25分に誰かが始めた・終えた）を見て1か所だけで動かす。見えない枠の中で動くので、開いている人の画面の内容は変わらない。
+//   操作している間（キー・マウス）は枠の中の点検を少し待たせる
+const AUTOQA = /[?&]autoqa=1/.test(location.search), BGQA_GAP = 25 * 60e3;
+let _bgQaFrame = null, _bgQaStart = 0; window._lastInput = Date.now();
+['keydown', 'mousedown', 'touchstart', 'input', 'wheel'].forEach(ev => document.addEventListener(ev, () => { window._lastInput = Date.now(); }, true));
+async function maybeBgQa() {
+  if (AUTOQA || !DB || !GAS.url || navigator.webdriver || window._bulkQa) return; // 毎朝のMacの点検（自動で動かすブラウザ）や全件点検の最中は立ち上げない
+  if (_bgQaFrame) { // 枠からの知らせが届かなかったとき：保存先に「点検を終えた」記録があれば枠を片付ける
+    try { const st = await gasCall({ pass: (lsGet('smilewan_pass') || '').trim(), op: 'status' }); if ((st.log || []).some(x => x.where === 'morning' && new Date(x.t).getTime() > _bgQaStart)) { _bgQaFrame.remove(); _bgQaFrame = null; showBgQaInfo(st); } } catch (e) {}
+    return;
+  }
+  const jst = new Date(Date.now() + 9 * 3600e3);
   if (jst.getUTCHours() < 7 || (jst.getUTCHours() === 7 && jst.getUTCMinutes() < 30)) return; // 6:30のMacの点検を待つ
   try {
-    const pass = (lsGet('smilewan_pass') || '').trim(), st = await gasCall({ pass, op: 'status' });
-    const jstDay = t => new Date(new Date(t).getTime() + 9 * 3600e3).toISOString().slice(0, 10);
-    const done = (st.log || []).some(x => (x.where === 'morning' || (x.where === 'morning-start' && Date.now() - new Date(x.t).getTime() < 30 * 60e3)) && jstDay(x.t) === today);
-    if (done) return;
-    await gasCall({ pass, op: 'log', item: { where: 'morning-start', ver: APP_VER, msg: '朝の点検をこの画面の裏で始めました' } });
+    const pass = (lsGet('smilewan_pass') || '').trim(), st = await gasCall({ pass, op: 'status' }); showBgQaInfo(st);
+    if (document.hidden || (st.log || []).some(x => /^(morning|morning-start|autoqa-start)$/.test(x.where) && Date.now() - new Date(x.t).getTime() < BGQA_GAP)) return;
+    await gasCall({ pass, op: 'log', item: { where: 'autoqa-start', ver: APP_VER, msg: '点検をこの画面の裏で始めました' } });
     const f = document.createElement('iframe'); f.style.cssText = 'position:fixed;width:1px;height:1px;left:-9999px;top:-9999px;border:0'; f.src = location.pathname + '?autoqa=1';
-    document.body.appendChild(f); setTimeout(() => f.remove(), 40 * 60e3);
-  } catch (e) { reportError('maybeMorningQa: ' + (e && e.message || e), 'morning'); }
+    _bgQaFrame = f; _bgQaStart = Date.now(); document.body.appendChild(f); showBgQaInfo(null, true);
+    setTimeout(() => { if (_bgQaFrame === f) { f.remove(); _bgQaFrame = null; } }, 40 * 60e3);
+  } catch (e) { reportError('maybeBgQa: ' + (e && e.message || e), 'morning'); }
+}
+window._bgQaDone = res => { if (_bgQaFrame) { _bgQaFrame.remove(); _bgQaFrame = null; } showBgQaInfo({ log: [{ where: 'morning', t: new Date().toISOString(), msg: res && !res.error ? `${res.months}か月分を点検・${res.fixed}訪問を自動で直した・直せなかった所${res.left}件` : '点検できませんでした' }] }); };
+// 記録タブに「最後の点検」を出す
+function showBgQaInfo(st, running) {
+  const el = document.getElementById('autoQaInfo'); if (!el) return;
+  if (running) { el.textContent = '🔍 いま画面の裏で全員の記録を点検しています（操作はそのまま続けられます）'; return; }
+  const last = ((st && st.log) || []).filter(x => x.where === 'morning').sort((a, b) => String(b.t).localeCompare(String(a.t)))[0]; if (!last) return;
+  const t = new Date(last.t), hhmm = `${t.getHours()}:${String(t.getMinutes()).padStart(2, '0')}`, md = `${t.getMonth() + 1}/${t.getDate()}`;
+  el.textContent = `🔍 全員の点検：最後は ${md} ${hhmm}（${String(last.msg || '').replace(/^朝の点検：|^点検：/, '')}）。開いている間は30分ごとに裏で点検して直します`;
 }
 async function runAutoQa() { // 見えない枠の中：全員・全月を点検して直す
   for (let i = 0; i < 120 && !(DB && Object.keys(getStore()).length); i++) await new Promise(r => setTimeout(r, 1000));
   window.confirm = () => true; window.alert = () => {}; window.dupConfirm = () => true;
-  try { setMode('record'); await qaAllSaved({ auto: true }); } catch (e) { reportError('runAutoQa: ' + (e && e.message || e), 'morning'); }
+  let res = null; try { setMode('record'); res = await qaAllSaved({ auto: true }); } catch (e) { reportError('runAutoQa: ' + (e && e.message || e), 'morning'); }
+  try { if (window.parent !== window && window.parent._bgQaDone) window.parent._bgQaDone(res); } catch (e) {}
 }
+// 開いている記録は、手が止まっている間（1分以上）3分ごとに点検して直す（11/3）
+setInterval(() => { try { if (AUTOQA || window._bulkQa || mode !== 'record' || !recRows.length || document.hidden || Date.now() - window._lastInput < 60e3) return; showRecQa(); } catch (e) {} }, 3 * 60e3);
 async function initCloud() {
   try { if (window.claude && typeof window.claude.use === 'function') DB = await window.claude.use('db'); } catch { DB = null; }
   if (!DB && supaOn()) { setSyncStatus('☁ 保存先に接続中…', 'wait'); DB = await supaConnect(); }
@@ -933,7 +953,7 @@ async function initCloud() {
     snap.docs.forEach(d => { cloud.settings[d.id] = d.data(); });
     if (document.getElementById('recStaff').options.length) refreshStaffSelect();
     refreshUserPick(); if (recRows.length) renderRecordView(); renderClientBox(true); renderNgBox();
-    if (AUTOQA) { if (!window._autoQaStarted) { window._autoQaStarted = true; setTimeout(runAutoQa, 3000); } } else setTimeout(maybeMorningQa, 20000);
+    if (AUTOQA) { if (!window._autoQaStarted) { window._autoQaStarted = true; setTimeout(runAutoQa, 3000); } } else if (!window._bgQaTimer) { setTimeout(maybeBgQa, 20000); window._bgQaTimer = setInterval(maybeBgQa, 5 * 60e3); } // 5分ごとに「点検の番か」を見る
   }, () => {});
   // 利用者情報・訪問記録（この端末にだけある分は初回に共有側へ送る）
   ['clients', 'records'].forEach(kind => {
@@ -1669,7 +1689,7 @@ function withMedNext(r, t) {
 //   削る順：様子・会話・安全への配慮などの決まり文句（長い文から）→ ほかの文と言い回しが似た文 → そのほかの文（後ろから）
 //   削らない文：最初の文・入力欄から入れた文（スタッフが入れた内容）・前後の訪問とのつなぎの文。チェック・手順書・献立・眠前薬の文は点検が守る
 const BROKEN_FIX = [[/と発言ありる/g, 'と話される'], [/との言葉がありる/g, 'と話される'], [/(^|。)(本人|利用者様)と(確認|確かめ)した。/g, '$1'],
-  [/と話され。/g, 'と話された。'], [/(^|。)[^。、「」]{1,8}(の間に|時|の際|際に)。/g, '$1']]; // 11/3 抜けの点検で見つけた切れ端（「〜と話され。」「洗濯の間に。」「訪問時。」：文の後ろ半分だけ外して残っていた） // 10/31 までの言い換えで崩れた言い回し／11/3 何を確認したかが抜けた「本人と確認した。」だけの文（家事の訪問の服薬の文から薬の部分だけ外して残っていた）
+  [/と話され。/g, 'と話された。'], [/(^|。)[^。、「」]{1,8}(の間に|時|の際|際に)。/g, '$1'], [/(^|。)[^。、「」]{1,10}(に|で|を|が|は|時|際|(?<!こ)と)。/g, '$1']]; // 11/3 抜けの点検で見つけた切れ端（「〜と話され。」「洗濯の間に。」「訪問時。」：文の後ろ半分だけ外して残っていた） // 10/31 までの言い換えで崩れた言い回し／11/3 何を確認したかが抜けた「本人と確認した。」だけの文（家事の訪問の服薬の文から薬の部分だけ外して残っていた）
 const TEXT_MAX = 500;
 const FILLER_RE = /様子|穏やか|落ち着|表情|顔色|声の調子|話を|話され|話題|お話|近況|相づち|傾聴|耳を傾|「|安全|転倒|つまず|ペース|急か|急が|配慮|丁寧|意向|了承|了解|分かりやすい|安心|気持ち|迷わない|一つずつ|戸締ま|火の元|手の届く|過ごしやすい|室温|温度|空気の入れ替え|困りの|お困り|希望を聞き|次回の/;
 // その訪問の文章を x にしたときの点検の指摘（その訪問と前後の日の行だけで点検する。文字数は数えない）
@@ -1852,7 +1872,7 @@ function openSavedRecords() {
   const [y, m] = month.split('-').map(Number);
   document.getElementById('recFrom').value = `${month}-01`; document.getElementById('recTo').value = `${month}-${String(new Date(y, m, 0).getDate()).padStart(2, '0')}`;
   recRows.forEach(r => { if (!r.staff) r.staffEdited = false; }); // 担当者が空の記録はシフトから入れる
-  renderRecordView(); fillStaffFromShift(); showRecQa(); markNoShift();
+  renderRecordView(); fillStaffFromShift(); showRecQa(); markNoShift(); shiftSyncOpen(name, month);
 }
 // ===== アセスメント取込（全社協様式などの PDF。文字データ入りのPDFを読み、要点だけ保存） =====
 // 保存するのは判断に使う要点のみ（病名・義歯・要援助の項目・入浴介助・移動の補助具・特記の要点）。原文は保存しない
@@ -4119,6 +4139,65 @@ async function markNoShift() {
     if (!!r.noShift !== no) { r.noShift = no; ch = true; } });
   if (ch) { renderRecordView(); showSchedQa(name); }
 }
+// ===== シフトに合わせる（点検の一部）：シフト（業務日誌＋取り込んだCSV）にあるのに記録が無い訪問を足し、時刻のずれた記録をシフトの時刻に、空の担当者をシフトから入れる =====
+//   今ある訪問の文章はそのまま。予定表にあってシフトに無い訪問は⚠だけ（11/2）。11/3 ユーザー指示「抜けてるところを訂正」「開いてる間はチェックが動いてるように」
+//   開いている1か月分（recRows）を直す。直した物は res.log、足した訪問は res.added、時刻を直した訪問の元の時刻は res.oldKeys（保存の前に dropOldKeys で外す）
+async function shiftSync(name, month) {
+  const res = { log: [], added: [], oldKeys: new Set() }, rows0 = recRows;
+  let shift; try { shift = await loadShift(month); } catch (e) { return res; }
+  if ((state.name || '').trim() !== name || recRows !== rows0 || !shift || !shift.length) return res; // シフトを読む間に別の利用者を開いた
+  let any = false; for (let dd = 1; dd <= 31 && !any; dd++) if (shiftRowsFor(shift, name, dd).length) any = true; if (!any) return res;
+  const K = kubunOf(name) === '介護', days = ((getStore()[name] || {}).days) || state.days || [];
+  const allEntries = [0, 1, 2, 3, 4, 5, 6].flatMap(w => dayEntries(days[w]) || []).filter(e => entryTime(e).s);
+  const tOf = r => hm(entryTime(r.e).s), tod = x => x < 660 ? 0 : x < 960 ? 1 : x < 1080 ? 2 : 3;
+  const setShift = (r, g, why) => { const was = (r.e.start || '') + '-' + (r.e.end || ''), st0 = r.staff;
+    const clash = r.e.start !== g.s && recRows.some(x => x !== r && ymd(x.date) === ymd(r.date) && (x.e.start || '') === g.s); // 同じ日・同じ開始時刻の記録が別にある（記録は日付＋開始時刻で1つ）→ 時刻は直さない
+    if (!clash && (r.e.start !== g.s || (g.e && r.e.end !== g.e))) { res.oldKeys.add(ymd(r.date) + ' ' + (r.e.start || '')); r.e = { ...r.e, start: g.s, end: g.e || r.e.end }; }
+    if (!String(r.staff || '').trim()) { r.staff = g.helpers.join('・'); r.staffFromShift = true; r.staffEdited = true; }
+    if (was !== r.e.start + '-' + r.e.end || st0 !== r.staff) res.log.push(`${ymd(r.date)} ${why}`); };
+  const [y, m] = month.split('-').map(Number), last = new Date(y, m, 0).getDate();
+  for (let dd = 1; dd <= last; dd++) {
+    const gs = shiftRowsFor(shift, name, dd); if (!gs.length) continue;
+    const date = new Date(y, m - 1, dd), dk = ymd(date), rows = recRows.filter(r => ymd(r.date) === dk && r.on !== false), used = new Set(), un = [];
+    for (const g of gs) { // 近い時刻の記録と組にする（buildRecords と同じ：サービス内容が合う物を45分以内→何でも30分以内）
+      const st = hm(g.s), fam = svcFam(g.v);
+      const near = (lim, same) => rows.filter(r => tOf(r) != null && !used.has(r) && Math.abs(tOf(r) - st) <= lim && (!same || !g.v || entFam(r.e) === fam)).sort((a, b) => Math.abs(tOf(a) - st) - Math.abs(tOf(b) - st));
+      const c = near(45, true).length ? near(45, true) : near(30, false);
+      if (c[0]) { used.add(c[0]); setShift(c[0], g, '時刻・担当者をシフトに'); } else un.push(g);
+    }
+    for (const g of un) {
+      const st = hm(g.s), fam = svcFam(g.v);
+      // 同じ種類で組にならなかった記録（時刻が大きくずれた・時刻の無い通院など）は、その記録をシフトの時刻に直す（身体は朝・昼・夕・夜が同じ時だけ：文章に時間帯の言葉があるため）
+      const c = rows.filter(r => !used.has(r) && entFam(r.e) === fam && (tOf(r) == null || fam !== '身体' || tod(tOf(r)) === tod(st)));
+      if (c[0]) { used.add(c[0]); setShift(c[0], g, '時刻のずれた記録をシフトの時刻に'); continue; }
+      // 同じ開始時刻の記録がもうある（同じ時間に2人で入った：例 西村 9/14 13:00 家事と身体）→ 足さずに、その記録の担当者に書き足す（記録は日付＋開始時刻で1つ。足すと上書きになる：11/3）
+      { const same = recRows.find(x => ymd(x.date) === dk && (x.e.start || '') === g.s); if (same) { const hs = String(same.staff || '').split(/[・,、\/]+/).map(x => x.trim()).filter(Boolean), add = g.helpers.filter(h => !hs.map(nmz).includes(nmz(h))); if (add.length) { same.staff = [...hs, ...add].join('・'); res.log.push(`${dk} ${g.s} 担当者を書き足した`); } continue; } }
+      // 記録が無い訪問を足す（予定表のその曜日の近い予定→ほかの曜日の近い予定を手本に。buildRecords と同じ）
+      const entries = dayEntries(days[date.getDay()]).filter(e => entryTime(e).s), dist = x => Math.abs(hm(entryTime(x).s) - st);
+      let e = entries.filter(x => entFam(x) === fam && dist(x) <= 45).sort((a, b) => dist(a) - dist(b))[0], flag = '';
+      if (!e) { const tpl = allEntries.filter(x => !g.v || entFam(x) === fam).sort((a, b) => dist(a) - dist(b))[0]; e = tpl && dist(tpl) <= 60 ? tpl : { ...emptyEntry(), type: fam === '家事' ? '家事' : fam === '通院' ? '通院介助' : '身体', detail: '' }; flag = '予定表に無い訪問（シフトから）'; }
+      const row = { date: new Date(date), e: { ...e, start: g.s, end: g.e || e.end }, kind: kindOf(e.type), staff: g.helpers.join('・'), on: true, flag, staffFromShift: true, staffEdited: true };
+      row.kp = (tmplItems(row) || genItems(row) || autoKPFor(row.e, name)).filter(k => k !== '食事|完食');
+      recRows.push(row); row.text = uniqueText(row, recRows.filter(r => r.on && r !== row));
+      if (rows.some(r => r.sick || r.sickDay)) { if (isPureBath(row)) { row.sick = true; let t = SICK_BATH[dd % SICK_BATH.length]; if (K) t = t.replace(/本人/g, '利用者様'); row.text = t; row.kpText = null; } else sickMarkRow(row, K, dd); } // 体調不良の日は足した訪問も体調不良
+      res.added.push(row); res.log.push(`${dk} ${g.s} 記録が無い訪問を足した`);
+    }
+  }
+  recRows.forEach(r => { if (r.on === false || String(r.staff || '').trim()) return; const st = shiftStaffFor(shift, name, r.date, r.e.start); if (st) { r.staff = st; r.staffFromShift = true; r.staffEdited = true; res.log.push(`${ymd(r.date)} 担当者をシフトから`); } });
+  if (res.added.length) res.added.forEach(r => { recRows.filter(x => x !== r && x.on && x.text && ymd(x.date) === ymd(r.date) && hm(entryTime(x.e).e) != null && hm(entryTime(x.e).e) <= hm(r.e.start) && hm(r.e.start) - hm(entryTime(x.e).e) <= 5).forEach(p => { p.text = nextLink(p, p.text); }); r.text = nextLink(r, r.text); });
+  if (res.log.length) { recRows.forEach(r => { if (r.on && r.text) r.text = withMedNext(r, r.text); }); res.added.forEach(r => mentionFix(r, recRows.indexOf(r))); res.added.forEach(r => orderFlow(r)); }
+  return res;
+}
+// 時刻を直した訪問の元の時刻の行を、保存してある記録から外す（保存したときに同じ訪問が二重にならないように）
+function dropOldKeys(name, month, keys) { if (!keys || !keys.size) return; const doc = getColl('records')[docId(name) + '_' + month]; if (doc && doc.rows) doc.rows = doc.rows.filter(x => !keys.has(x.date + ' ' + (x.start || ''))); }
+// 記録を開いたときもシフトに合わせる（直した物があれば自動保存）
+async function shiftSyncOpen(name, month) {
+  if (window._bulkQa || !name || !month) return; const rows0 = recRows;
+  let sy; try { sy = await shiftSync(name, month); } catch (e) { reportError('shiftSyncOpen: ' + (e && e.message || e), 'qa'); return; }
+  if (recRows !== rows0 || !sy.log.length) return;
+  dropOldKeys(name, month, sy.oldKeys); renderRecordView(); markRecDirty(); showRecQa(); markNoShift();
+  const info = document.getElementById('shiftInfo'); if (info) info.textContent = `シフトに合わせて直しました（${sy.log.length}件：記録が無かった訪問を足す・時刻・担当者）。`;
+}
 async function fillStaffFromShift(force) {
   const name = (state.name || '').trim(), info = document.getElementById('shiftInfo'), rows0 = recRows; if (!name || !recRows.length || window._bulkQa) return; // 全件点検の間は入れ直さない
   const yms = [...new Set(recRows.map(r => ymd(r.date).slice(0, 7)))];
@@ -4873,7 +4952,8 @@ const MENTION_NOT = [
 ];
 // 体調不良の日（シャワー浴）は、入浴の決まりだけ当てはめない（入浴をやめた日の文があるため）。ほかの決まりは同じ
 // 家事援助の訪問だけ：トイレ・浴室の掃除の文があるのにチェックが無い（10/31 高山治女の朝の家事の掃除を手順書に合わせて外したため）
-const MN_HOUSE = [[['清掃|トイレ', '自立支援|掃除'], /トイレ[^。]*(掃除|清掃|拭)|便器/], [['清掃|浴室', '自立支援|掃除'], /(浴室|お風呂|浴槽)[^。]*(掃除|清掃|汚れ|水気を拭)|(掃除|清掃)[^。]*(浴室|お風呂)/]];
+const MN_HOUSE = [[['調理|調理', '調理|下拵え', '調理|配・下膳', '自立支援|一般的な調理・配下膳'], /(朝食|昼食|夕食)[^。]*(調理|配膳|を用意し)|調理(を|し|・|後|に使)|下拵え|下ごしらえ/], // 11/3 調理の無い家事の訪問に調理の文（時刻を直して見本が変わった訪問など）
+  [['清掃|トイレ', '自立支援|掃除'], /トイレ[^。]*(掃除|清掃|拭)|便器/], [['清掃|浴室', '自立支援|掃除'], /(浴室|お風呂|浴槽)[^。]*(掃除|清掃|汚れ|水気を拭)|(掃除|清掃)[^。]*(浴室|お風呂)/]];
 // 入浴の訪問だけ：調理・配膳・食事の用意の文があっても、入浴の訪問には調理の欄を付けないので外す（11/3「入浴の時に配膳食事はいらない」。「朝食後の服薬」などはそのまま）
 const MN_BATH = [[['調理|調理', '調理|下拵え', '調理|配・下膳', '自立支援|一般的な調理・配下膳'], /調理|配膳|下膳|下拵え|下ごしらえ|献立|(朝食|昼食|夕食|朝ごはん|昼ごはん|夕ごはん)(（|に[^。]*を用意|を(用意|準備|整え|作)|の(支度|準備|用意)|は[^。]*(作|用意|準備))|食事を(調理|用意|準備|作)/]];
 const bathVisit = r => { const k = kpAll(r); return k.includes('入浴・清拭|入浴介助') || k.includes('入浴・清拭|シャワー浴'); };
@@ -5196,21 +5276,24 @@ async function qaAllSaved(opt = {}) {
     const docs = Object.values(getColl('records')).filter(d => d.rows && d.rows.length).sort((a, b) => (a.name + a.month).localeCompare(b.name + b.month, 'ja'));
     let lastName = null;
     for (const d0 of docs) {
+      // 見えない枠の中の点検は、開いている人が操作している間（15秒以内にキー・マウス）は待つ（画面が重くならないように）
+      if (opt.auto) { for (let k = 0; k < 600; k++) { let li = 0; try { li = window.parent !== window ? (window.parent._lastInput || 0) : 0; } catch (e) {} if (Date.now() - li > 15000) break; await new Promise(r => setTimeout(r, 1000)); } }
       // 直す直前にその人の記録を読み直す（点検中にほかの人が保存した内容を、古い写しで上書きしない）
       if (d0.name !== lastName) { lastName = d0.name; try { await DB.loadRecords(d0.name); } catch (e) { reportError('qaAllSaved reload: ' + (e && e.message || e), 'qa'); continue; } }
       const d = Object.values(getColl('records')).find(x => x.name === d0.name && x.month === d0.month) || d0;
       state.name = d.name; refreshSavedMonths(); const sel = document.getElementById('recSavedMonth'); sel.value = d.month; if (sel.value !== d.month) continue;
       const stored = new Map(d.rows.map(x => [x.date + ' ' + (x.start || ''), [x.text, (x.kpOn || []).join(','), (x.kpOff || []).join(','), x.on === false ? 0 : 1].join('\u0001')]));
       const c = window.confirm; window.confirm = () => true; try { openSavedRecords(); } finally { window.confirm = c; } // 開いた時点で自動で直る
-      clearTimeout(recTimer); const rp = autoRepair(d.name);
+      clearTimeout(recTimer); let sy = null; try { sy = await shiftSync(d.name, d.month); } catch (e) { reportError('shiftSync: ' + (e && e.message || e), 'qa'); } // シフトにあるのに記録が無い訪問・時刻のずれ・空の担当者（11/3）
+      const rp = autoRepair(d.name);
       recRows.forEach(r => { if (r.on && r.text) { r.text = shortenText(r, d.name); if (r.text.length > TEXT_MAX) r.text = fitLen(r, d.name); } }); // 文を少しずつ短く（10/31〜）
-      const ch = recRows.filter(r => { const k = ymd(r.date) + ' ' + (r.e.start || ''); return stored.has(k) && stored.get(k) !== [r.text, (r.kpOn || []).join(','), (r.kpOff || []).join(','), r.on === false ? 0 : 1].join('\u0001'); }).length;
-      if (ch) { await saveRecords({ quiet: true }); clearTimeout(recTimer); fixedN += ch; }
+      const ch = recRows.filter(r => { const k = ymd(r.date) + ' ' + (r.e.start || ''); return stored.has(k) && stored.get(k) !== [r.text, (r.kpOn || []).join(','), (r.kpOff || []).join(','), r.on === false ? 0 : 1].join('\u0001'); }).length + (sy ? sy.added.length : 0);
+      if (ch || (sy && sy.log.length)) { if (sy) dropOldKeys(d.name, d.month, sy.oldKeys); await saveRecords({ quiet: true }); clearTimeout(recTimer); fixedN += Math.max(ch, sy ? sy.log.length : 0); }
       const q = qaCheckRows(d.name); q.out.forEach(i => all.push({ ...i, name: d.name })); items.push(...qaItemsFor(d.name).filter(x => x.month === d.month));
       btn.textContent = `点検中…${docs.indexOf(d0) + 1}/${docs.length}`; await new Promise(r => setTimeout(r, 0));
     }
     gasCall({ pass: (lsGet('smilewan_pass') || '').trim(), op: 'qa', items }).catch(() => {});
-    if (opt.auto) gasCall({ pass: (lsGet('smilewan_pass') || '').trim(), op: 'log', item: { where: 'morning', ver: APP_VER, msg: `朝の点検：${items.length}か月分を点検・${fixedN}訪問を自動で直した・直せなかった所${all.length}件` } }).catch(() => {});
+    if (opt.auto) gasCall({ pass: (lsGet('smilewan_pass') || '').trim(), op: 'log', item: { where: 'morning', ver: APP_VER, msg: `${new Date(Date.now() + 9 * 3600e3).getUTCHours() < 9 ? '朝の点検' : '点検'}：${items.length}か月分を点検・${fixedN}訪問を自動で直した・直せなかった所${all.length}件` } }).catch(() => {});
   } catch (e) { reportError('qaAllSaved: ' + (e && e.message || e), 'qa'); if (opt.auto) return { error: String(e && e.message || e) }; alert('点検の途中でエラーになりました：' + (e && e.message || e)); }
   finally { window._bulkQa = false; btn.disabled = false; btn.textContent = label; recRows = []; renderRecordView(); }
   if (opt.auto) return { months: items.length, fixed: fixedN, left: all.length, leftList: all.slice(0, 50).map(i => `${i.name} ${i.date} ${i.start}【${i.kind}】${i.msg}`) };
