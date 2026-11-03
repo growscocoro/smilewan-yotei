@@ -769,7 +769,7 @@ async function setSetting(key, localKey, list, opt = {}) {
 const SUPA = { url: '', key: '' }; // 旧（使わない）
 const GAS = {"url": "https://script.google.com/macros/s/AKfycbxKEAUthQx9wiZKncHZR43jbSKjPfO2lYhlc2K5yXWJNXI_zA8wChdQTFlINEhLTDQO/exec"};           // 保存先（Googleドライブに保存するGAS）。build-site.sh が入れる
 // 版の確認：公開版が新しくなったら知らせ、古い版のままでは記録を保存しない（古い決まりで上書きしないため）
-const APP_VER = '20261103105440';
+const APP_VER = '20261103110147';
 let appOutdated = false;
 async function checkVer() {
   if (APP_VER === 'dev' || appOutdated) return appOutdated;
@@ -2408,7 +2408,7 @@ function mnFix(kp, e) { if (!mnBody(e)) return kp; return [...new Set([...kp.fil
 function autoKPFor(e, name) { return kpFinal(mnFix(autoKPFor0(e, name), e), e); }
 // どの決まりで付いても最後にそろえる：家事の訪問に身体の項目は付けない／入浴は更衣介助も／服薬の見守りは「服薬・医療：見守り」に一本化
 const NO_KP = '自立支援|声掛け・見守り';
-const BATH_NO = /^(清掃\||移動\|移動介助|洗濯\||自立支援\|洗濯)/; // 入浴の訪問には清掃と移動介助を付けない（事業所の決まり）
+const BATH_NO = /^(清掃\||移動\|移動介助|洗濯\||自立支援\|洗濯|調理\||自立支援\|一般的な調理)/; // 入浴の訪問には清掃と移動介助・調理（配膳）を付けない（事業所の決まり／11/3 ユーザー指示「入浴の時に配膳食事はいらない」）
 const BODY_ONLY = /^(排泄|入浴・清拭|身体整容|起床・就寝|服薬・医療|食事\|(摂食介助|姿勢の確保)|移動\|(体位変換|移乗介助|移動介助)|自立支援\|(声掛け・見守り|排泄・食事|清拭・入浴・身体整容|起床就寝介助))/;
 function kpFinal(kp, e) {
   let out = kp.map(k => k === '自立支援|服薬' ? '服薬・医療|見守り' : k).filter(k => k !== NO_KP); // 「自立支援：声掛け・見守り」は付けない（事業所の決まり）
@@ -4843,7 +4843,10 @@ const MENTION_NOT = [
 // 体調不良の日（シャワー浴）は、入浴の決まりだけ当てはめない（入浴をやめた日の文があるため）。ほかの決まりは同じ
 // 家事援助の訪問だけ：トイレ・浴室の掃除の文があるのにチェックが無い（10/31 高山治女の朝の家事の掃除を手順書に合わせて外したため）
 const MN_HOUSE = [[['清掃|トイレ', '自立支援|掃除'], /トイレ[^。]*(掃除|清掃|拭)|便器/], [['清掃|浴室', '自立支援|掃除'], /(浴室|お風呂|浴槽)[^。]*(掃除|清掃|汚れ|水気を拭)|(掃除|清掃)[^。]*(浴室|お風呂)/]];
-const mnRules = r => (r && r.sick ? MENTION_NOT.filter(([keys]) => !keys.some(k => /^入浴・清拭\|/.test(k))) : MENTION_NOT).concat(r && r.kind === '家事援助' ? MN_HOUSE : []);
+// 入浴の訪問だけ：調理・配膳・食事の用意の文があっても、入浴の訪問には調理の欄を付けないので外す（11/3「入浴の時に配膳食事はいらない」。「朝食後の服薬」などはそのまま）
+const MN_BATH = [[['調理|調理', '調理|下拵え', '調理|配・下膳', '自立支援|一般的な調理・配下膳'], /調理|配膳|下膳|下拵え|下ごしらえ|献立|(朝食|昼食|夕食|朝ごはん|昼ごはん|夕ごはん)(（|に[^。]*を用意|を(用意|準備|整え|作)|の(支度|準備|用意)|は[^。]*(作|用意|準備))|食事を(調理|用意|準備|作)/]];
+const bathVisit = r => { const k = kpAll(r); return k.includes('入浴・清拭|入浴介助') || k.includes('入浴・清拭|シャワー浴'); };
+const mnRules = r => (r && r.sick ? MENTION_NOT.filter(([keys]) => !keys.some(k => /^入浴・清拭\|/.test(k))) : MENTION_NOT).concat(r && r.kind === '家事援助' ? MN_HOUSE : []).concat(r && r.kind !== '家事援助' && r.e && bathVisit(r) ? MN_BATH : []);
 function mentionNotFix(r) {
   if (!r || !r.text || r.on === false) return;
   const kp = kpAll(r), keep = sickKeep(), rules = mnRules(r);
