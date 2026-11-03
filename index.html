@@ -769,7 +769,7 @@ async function setSetting(key, localKey, list, opt = {}) {
 const SUPA = { url: '', key: '' }; // 旧（使わない）
 const GAS = {"url": "https://script.google.com/macros/s/AKfycbxKEAUthQx9wiZKncHZR43jbSKjPfO2lYhlc2K5yXWJNXI_zA8wChdQTFlINEhLTDQO/exec"};           // 保存先（Googleドライブに保存するGAS）。build-site.sh が入れる
 // 版の確認：公開版が新しくなったら知らせ、古い版のままでは記録を保存しない（古い決まりで上書きしないため）
-const APP_VER = '20261103110147';
+const APP_VER = '20261103111230';
 let appOutdated = false;
 async function checkVer() {
   if (APP_VER === 'dev' || appOutdated) return appOutdated;
@@ -3475,11 +3475,27 @@ function sickNeed(rows, name, ym) { // 足せる日（体調不良の日・次�
 function sickMarkDays(on, sick, seed, K) {
   const base = seed % SICK_BATH.length; on.filter(r => sick.has(ymd(r.date)) && isPureBath(r)).sort((a, b) => a.date - b.date).forEach((r, i) => { r.sick = true; let t = SICK_BATH[(base + i) % SICK_BATH.length]; if (K) t = t.replace(/本人/g, '利用者様'); r.text = t; r.kpText = null; });
   // 同じ日の入浴以外の訪問：体調不良の様子の文を先頭に（顔色は不良）
-  let di = seed % 5; on.filter(r => sick.has(ymd(r.date)) && !r.sick).forEach(r => {
-    const h = Math.floor((hm(entryTime(r.e).s) || 720) / 60), key = r.kind === '家事援助' ? '家事' : h < 11 ? '朝' : h < 17 ? '昼' : '夜';
-    let s = SICK_DAY[key][di++ % SICK_DAY[key].length]; if (K) s = s.replace(/本人/g, '利用者様');
-    r.text = s + String(r.text || '').replace(/^訪問時、[^。]*体調[^。]*。/, '').replace(/[^。]*(顔色(は|が)?良|体調(は|に|面)?(は)?(良好|安定|変わり|問題|特に)|(訴え|不調)[^。]*(聞かれな|見られな|なかった|無く|なく|ない|無い|なし)|特に(変わ|問題|異常))[^。]*。/g, '');
-    r.sickDay = true; r.kpText = null; });
+  let di = seed % 5; on.filter(r => sick.has(ymd(r.date)) && !r.sick).forEach(r => sickMarkRow(r, K, di++));
+}
+function sickMarkRow(r, K, di) {
+  const h = Math.floor((hm(entryTime(r.e).s) || 720) / 60), key = r.kind === '家事援助' ? '家事' : h < 11 ? '朝' : h < 17 ? '昼' : '夜';
+  let s = SICK_DAY[key][di % SICK_DAY[key].length]; if (K) s = s.replace(/本人/g, '利用者様');
+  r.text = s + String(r.text || '').replace(/^訪問時、[^。]*体調[^。]*。/, '').replace(/[^。]*(顔色(は|が)?良|体調(は|に|面)?(は)?(良好|安定|変わり|問題|特に)|(訴え|不調)[^。]*(聞かれな|見られな|なかった|無く|なく|ない|無い|なし)|特に(変わ|問題|異常)|普段(と同じ|どおり|通り)の?様子)[^。]*。/g, '');
+  r.sickDay = true; r.kpText = null;
+}
+// 体調不良の訪問から続けて入った訪問（前の訪問の終わりから5分以内に始まる）も体調不良にする（11/3 ユーザー指示「2時間連続の場合はその後も体調不良にして」）
+function sickPrev(r) {
+  if (!r || !r.e || r.on === false) return null; const s = hm(entryTime(r.e).s); if (s == null) return null; const d = ymd(r.date);
+  return recRows.find(x => x !== r && x.on !== false && x.e && ymd(x.date) === d && (x.sick || x.sickDay) && hm(entryTime(x.e).e) != null && s >= hm(entryTime(x.e).e) && s - hm(entryTime(x.e).e) <= 5) || null;
+}
+function sickCarry(rows, name) {
+  const K = kubunOf(name) === '介護', on = rows.filter(r => r.on !== false && r.e && hm(entryTime(r.e).s) != null).sort((a, b) => (a.date - b.date) || hm(entryTime(a.e).s) - hm(entryTime(b.e).s)); let n = 0;
+  const nextRe = new RegExp('^(' + SICK_NEXT.map(x => (K ? x.replace(/本人/g, '利用者様') : x).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|') + ')');
+  on.forEach(r => { if (r.sick || r.sickDay || !sickPrev(r)) return;
+    if (r.sickNext) { r.text = String(r.text || '').replace(nextRe, ''); r.sickNext = false; } // 同じ日の前の訪問が体調不良なら「前日の体調不良について確認」の文は外す
+    if (isPureBath(r)) { r.sick = true; let t = SICK_BATH[n % SICK_BATH.length]; if (K) t = t.replace(/本人/g, '利用者様'); r.text = t; r.kpText = null; } else sickMarkRow(r, K, n);
+    n++; });
+  return n;
 }
 // 体調不良の次の日の最初の訪問（前日の体調不良について確認した文）
 function sickMarkNext(on, sick, seed, K) {
@@ -5088,6 +5104,7 @@ window.qaCheckRows = function (name) {
       if (/清拭/.test(t)) add(r, '体調不良', '文章に清拭');
     }
     if (r.kind === '家事援助' && (r.sick || kp.includes('入浴・清拭|シャワー浴') || /シャワー浴/.test(t))) add(r, '体調不良', '家事の訪問にシャワー浴（シャワー浴は身体の訪問だけ）');
+    if (!r.sick && !r.sickDay && typeof sickPrev === 'function' && sickPrev(r)) add(r, '体調不良', '続けて入った前の訪問が体調不良なのに、体調不良になっていない');
     // 6. 共に行う：共にの訪問以外で共に行う項目／共に行う項目と同じ家事が普通の欄にも
     const tog = kp.filter(k => TOGETHER_RE.test(k) && !(tm && (tm.checked || []).includes(k)));
     if (tog.length && !visTogether(r.e) && !(tm && /共に/.test(tm.type || ''))) add(r, '共に行う', `共にの訪問でないのに「${tog.map(k => k.split('|')[1]).join('・')}」`);
@@ -5195,7 +5212,7 @@ function autoRepair(name) {
   const sig = r => [r.text, (r.kpOn || []).join(','), (r.kpOff || []).join(','), r.sick ? 1 : 0].join('\u0001'), before = new Map(recRows.map(r => [r, sig(r)]));
   const addOn = (r, k) => { r.kpOn = [...new Set([...(r.kpOn || []), k])]; r.kpOff = (r.kpOff || []).filter(x => x !== k); };
   const addOff = (r, k) => { r.kpOff = [...new Set([...(r.kpOff || []), k])]; r.kpOn = (r.kpOn || []).filter(x => x !== k); };
-  const textRows = new Set(), orderRows = new Set(), planRows = new Set(), moreSick = new Set(); let needVary = false, needSick = false;
+  const textRows = new Set(), orderRows = new Set(), planRows = new Set(), moreSick = new Set(); let needVary = false, needSick = false, needCarry = false;
   q.out.forEach(i => {
     const r = map.get(i.date + ' ' + i.start); if (!r) return;
     const m = (i.msg.match(/「([^」]+)」/) || [])[1];
@@ -5207,6 +5224,7 @@ function autoRepair(name) {
     else if (i.kind === '共に行う') kpAll(r).filter(k => TOGETHER_RE.test(k)).forEach(k => addOff(r, k));
     else if (i.kind === '呼び方') r.text = K ? String(r.text).replace(/本人/g, '利用者様') : String(r.text).replace(/利用者様/g, '本人');
     else if (i.kind === '体調不良' && /家事の訪問にシャワー浴/.test(i.msg)) { r.sick = false; r.kpOff = [...new Set([...(r.kpOff || []), '入浴・清拭|シャワー浴'])]; r.kpOn = (r.kpOn || []).filter(x => x !== '入浴・清拭|シャワー浴'); r.text = String(r.text).split(/(?<=。)/).filter(x => !/シャワー浴|入浴は(控え|見合わせ)/.test(x)).join('') || uniqueText(r, recRows.filter(x => x !== r && x.on)); needSick = true; }
+    else if (i.kind === '体調不良' && /続けて入った/.test(i.msg)) needCarry = true;
     else if (i.kind === '体調不良') { if (/文章に清拭/.test(i.msg)) r.text = String(r.text).split(/(?<=。)/).filter(x => !/清拭/.test(x)).join(''); else needSick = true; }
     else if (i.kind === '重複') { const seen = new Set(); r.text = String(r.text).split(/(?<=。)/).filter(x => { if (!x.trim() || seen.has(x)) return false; seen.add(x); return true; }).join(''); }
     else if (i.kind === '文章' && /崩れ/.test(i.msg)) BROKEN_FIX.forEach(([re, to]) => { r.text = String(r.text).replace(re, to); });
@@ -5222,6 +5240,7 @@ function autoRepair(name) {
   });
   if (needSick) [...new Set(recRows.map(r => ymd(r.date).slice(0, 7)))].forEach(ym => applySick(recRows, name, ym));
   else [...moreSick].forEach(ym => addSickDays(recRows, name, ym)); // 体調不良の日が足りない月は、今の日はそのまま足りない分だけ足す
+  if (needCarry || needSick || moreSick.size) sickCarry(recRows, name); // 体調不良の訪問から続けて入った訪問も体調不良に
   [...textRows].forEach((r, i) => mentionFix(r, i));
   [...planRows].forEach(r => { _curRow = r; r.text = withMedNext(r, withKd(r, withPlan(r, r.text))); });
   [...textRows, ...orderRows, ...planRows].forEach(r => orderFlow(r));
