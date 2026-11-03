@@ -771,7 +771,7 @@ async function setSetting(key, localKey, list, opt = {}) {
 const SUPA = { url: '', key: '' }; // 旧（使わない）
 const GAS = {"url": "https://script.google.com/macros/s/AKfycbxKEAUthQx9wiZKncHZR43jbSKjPfO2lYhlc2K5yXWJNXI_zA8wChdQTFlINEhLTDQO/exec"};           // 保存先（Googleドライブに保存するGAS）。build-site.sh が入れる
 // 版の確認：公開版が新しくなったら知らせ、古い版のままでは記録を保存しない（古い決まりで上書きしないため）
-const APP_VER = '20261103115515';
+const APP_VER = '20261103122459';
 let appOutdated = false;
 async function checkVer() {
   if (APP_VER === 'dev' || appOutdated) return appOutdated;
@@ -3554,6 +3554,8 @@ function kpAll(r) {
   const o = sickFix(r, kpAll0(r)).filter(k => k !== '食事|完食' || (r.kpOn || []).includes(k));
   // 家事の訪問で清掃があるときは、居室も必ず付ける（事業所の決まり・手で外したときだけ外す）。見本の無い「身体○生活○」の訪問も同じ（11/3 介護の4人：居室が文章に出た日だけ付いていた）
   if (roomAlways(r) && o.some(k => k.startsWith('清掃|')) && !o.includes('清掃|居室') && !(r.kpOff || []).includes('清掃|居室')) o.push('清掃|居室');
+  // 起床介助・就寝介助があるときは、自立支援の「起床就寝介助」も必ず付ける（11/3 ユーザー指示「起床介助入ってるのに就寝起床介助が入ってない」・手で外したときだけ外す）
+  if (o.some(k => k === '起床・就寝|起床介助' || k === '起床・就寝|就寝介助') && !o.includes('自立支援|起床就寝介助') && !(r.kpOff || []).includes('自立支援|起床就寝介助')) o.push('自立支援|起床就寝介助');
   // 利用者情報の「お風呂のときの整容」（例：髭）がある人は、入浴（シャワー浴）の訪問に整容を付ける
   if (seiyoBathOf() && o.some(k => /^入浴・清拭\|(入浴介助|シャワー浴)$/.test(k)) && !o.includes('身体整容|整容') && !(r.kpOff || []).includes('身体整容|整容')) o.push('身体整容|整容');
   return o;
