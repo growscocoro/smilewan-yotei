@@ -602,7 +602,7 @@
       <p><b>同じ文を書かない</b>：同じ利用者・同じ月の中で一度使った文は、2回目からは意味を変えずに言い回しを変える（例：「退室前に戸締まりや火の元を確認し、安全を確かめた」→「帰る前に火の元や戸締まりを確認し、危険がないことを確かめた」）。言い回しが尽きた様子・会話などの付け足しの文は、同じ種類のまだ使っていない文に替える。</p>
       <p><b>訪問記録タブの選び方</b>：いちばん上で「👤 利用者から選ぶ」か「🧑 担当者から選ぶ」を選ぶ（前回の選び方を覚えておく）。利用者から選ぶ＝利用者と保存した月を選んで記録を開く。担当者から選ぶ＝担当者と月を選ぶと、その月に入った利用者が回数つきで並び、右にその人の訪問が全員分出る（見るだけ）。「📄 Wordに書き出し」で、その担当者の1か月分を1訪問1ページのWordにできる（日付・時刻の順、利用者の書き出しと同じ形）。利用者を押すとその人の記録が開き、「← 担当者の一覧に戻る」で戻れる。</p>
       <p><b>担当者で絞り込み（予定表タブ）</b>：予定表タブの「担当者」で選ぶと、その人が訪問記録の担当者に入っている利用者だけが、予定表タブの保存済み利用者の一覧に出る（訪問記録タブでは「🧑 担当者から選ぶ」を使う）（介護／障害の絞り込みと一緒に使える）。</p>
-      <p><b>毎朝の点検・開いている間の点検</b>：毎朝6:30に事業所のMacで全員・全月を点検して直す。7:30以降は、ツールを開いている間30分ごとに、開いている人の画面の裏（見えない枠）で全員・全月を点検して直す（何人開いていても動くのは1か所だけ・操作している間は少し待つ・その人の画面の内容は変わらない）。開いている記録は、手が止まっている間3分ごとに点検して直す。点検では、シフトにあるのに記録が無い訪問を足し、時刻のずれ・空の担当者もシフトに合わせる（同じ時刻の記録がある時は担当者を書き足すだけ）。記録タブに「最後の点検」を出す。</p>
+      <p><b>毎朝の点検・開いている間の点検</b>：毎朝6:30に事業所のMacで全員・全月を点検して直す。ツールを開いている間は、画面の裏（見えない枠）で1分に1人ずつ順に点検して直す（前に点検した後に保存された人が先・今開いている人と3分以内に保存された人は飛ばす・操作している間は待つ・その人の画面の内容は変わらない）。開いている記録は、手が止まっている間3分ごとに点検して直す。点検では、シフトにあるのに記録が無い訪問を足し、時刻のずれ・空の担当者もシフトに合わせる（同じ時刻の記録がある時は担当者を書き足すだけ）。記録タブに裏の点検の様子を出す。</p>
       <p><b>予定表の確認</b>：記録を作ったとき、予定表の時刻欄が空・時刻なし・種別が空や不明・シフトにあって予定表に無い訪問・予定表にあってシフトに無い予定・似た名前を「⚠ 予定表の確認」に出す（作るのは止めない）。</p>
       <p><b>二重登録の注意</b>：予定表・利用者情報・訪問記録を新しい名前で保存するとき、空白や全角半角の違い・1文字違い・名字と名前の1文字目が同じ名前がすでにあれば確認を出す。名前が読めていない（記号で始まる等）ときも確認を出す。一覧では似た名前に「⚠似た名前あり」を付ける。</p>
       <p><b>見張り・自動で直す</b>：記録を作ったとき・開いたとき・保存したときに点検し、決まりと合わない所はその場で正しい形に直して自動保存する（チェックに合わせて文章を足す／チェックの無い支援の文を外す・順番・NG・呼び方・重複・見本の項目・ゴミ出し・完食・共に行う・体調不良）。直せなかった所だけ「⚠」で一覧を出す。「🔍 全件点検」で保存してある全員・全月をまとめて点検して直す。画面で起きたエラーは保存先（Googleドライブ）に記録する。</p>
@@ -772,7 +772,7 @@ async function setSetting(key, localKey, list, opt = {}) {
 const SUPA = { url: '', key: '' }; // 旧（使わない）
 const GAS = {"url": "https://script.google.com/macros/s/AKfycbxKEAUthQx9wiZKncHZR43jbSKjPfO2lYhlc2K5yXWJNXI_zA8wChdQTFlINEhLTDQO/exec"};           // 保存先（Googleドライブに保存するGAS）。build-site.sh が入れる
 // 版の確認：公開版が新しくなったら知らせ、古い版のままでは記録を保存しない（古い決まりで上書きしないため）
-const APP_VER = '20261103153952';
+const APP_VER = '20261105100119';
 let appOutdated = false;
 async function checkVer() {
   if (APP_VER === 'dev' || appOutdated) return appOutdated;
@@ -889,45 +889,60 @@ function changePass() {
   document.getElementById('passInput').focus();
 }
 
-// ===== 裏の点検：ツールを開いている間は、画面の裏（見えない枠）で全員・全月を点検して直す（毎朝6:30のMacの点検の代わりも兼ねる） =====
-//   11/3 ユーザー指示「開いてる間はチェックが動いてるようにして」：前は1日1回（その日まだ点検されていない時だけ）→ 30分ごと。
-//   何人が開いていても、保存先の記録（直近25分に誰かが始めた・終えた）を見て1か所だけで動かす。見えない枠の中で動くので、開いている人の画面の内容は変わらない。
-//   操作している間（キー・マウス）は枠の中の点検を少し待たせる
-const AUTOQA = /[?&]autoqa=1/.test(location.search), BGQA_GAP = 25 * 60e3;
-let _bgQaFrame = null, _bgQaStart = 0; window._lastInput = Date.now();
+// ===== 裏の点検：ツールを開いている間、画面の裏（見えない枠）で1人ずつ順に点検して直す（毎朝6:30のMacの全員の点検とは別） =====
+//   11/3 ユーザー指示「開いてる間はチェックが動いてるようにして」。11/4 作り直し：全員を一度に読む形（30分ごと）は、操作中に待ったり裏のタブで遅くなったりして、40分の制限内に1回も終わらなかった
+//   → 1分に1人。読むのはその人の記録だけなので軽く、途中で閉じてもそこまでは直っている。何人が開いていても、それぞれ別の所から順に回る
+//   順番：前に点検した後に保存された人を先に → あとは順番どおり。今この画面で開いている人・3分以内に保存された人（誰かが作業中）は飛ばす
+//   操作している間（15秒以内にキー・マウス）は待つ。別のタブを見ている間は動く
+const AUTOQA = /[?&]autoqa=1/.test(location.search), BGQA_TICK = 60e3, BGQA_QUIET = 3 * 60e3, BGQA_STUCK = 5 * 60e3;
+let _bgFrame = null, _bgBusy = 0, _bgInfoDone = false; window._lastInput = Date.now();
 ['keydown', 'mousedown', 'touchstart', 'input', 'wheel'].forEach(ev => document.addEventListener(ev, () => { window._lastInput = Date.now(); }, true));
-async function maybeBgQa() {
-  if (AUTOQA || !DB || !GAS.url || navigator.webdriver || window._bulkQa) return; // 毎朝のMacの点検（自動で動かすブラウザ）や全件点検の最中は立ち上げない
-  if (_bgQaFrame) { // 枠からの知らせが届かなかったとき：保存先に「点検を終えた」記録があれば枠を片付ける
-    try { const st = await gasCall({ pass: (lsGet('smilewan_pass') || '').trim(), op: 'status' }); if ((st.log || []).some(x => x.where === 'morning' && new Date(x.t).getTime() > _bgQaStart)) { _bgQaFrame.remove(); _bgQaFrame = null; showBgQaInfo(st); } } catch (e) {}
-    return;
-  }
-  const jst = new Date(Date.now() + 9 * 3600e3);
-  if (jst.getUTCHours() < 7 || (jst.getUTCHours() === 7 && jst.getUTCMinutes() < 30)) return; // 6:30のMacの点検を待つ
-  try {
-    const pass = (lsGet('smilewan_pass') || '').trim(), st = await gasCall({ pass, op: 'status' }); showBgQaInfo(st);
-    if (document.hidden || (st.log || []).some(x => /^(morning|morning-start|autoqa-start)$/.test(x.where) && Date.now() - new Date(x.t).getTime() < BGQA_GAP)) return;
-    await gasCall({ pass, op: 'log', item: { where: 'autoqa-start', ver: APP_VER, msg: '点検をこの画面の裏で始めました' } });
-    const f = document.createElement('iframe'); f.style.cssText = 'position:fixed;width:1px;height:1px;left:-9999px;top:-9999px;border:0'; f.src = location.pathname + '?autoqa=1';
-    _bgQaFrame = f; _bgQaStart = Date.now(); document.body.appendChild(f); showBgQaInfo(null, true);
-    setTimeout(() => { if (_bgQaFrame === f) { f.remove(); _bgQaFrame = null; } }, 40 * 60e3);
-  } catch (e) { reportError('maybeBgQa: ' + (e && e.message || e), 'morning'); }
+function bgQaFrameOff() { if (_bgFrame) { _bgFrame.remove(); _bgFrame = null; } _bgBusy = 0; }
+async function bgQaTick() {
+  if (AUTOQA || !DB || !GAS.url || navigator.webdriver || window._bulkQa) return; // 毎朝のMacの点検（自動で動かすブラウザ）や全件点検の最中は動かさない
+  if (_bgBusy) { if (Date.now() - _bgBusy > BGQA_STUCK) bgQaFrameOff(); return; } // 前の1人がまだ（止まっていたら作り直す）
+  const jst = new Date(Date.now() + 9 * 3600e3), hm0 = jst.getUTCHours() * 60 + jst.getUTCMinutes(); if (hm0 >= 385 && hm0 < 450) return; // 6:25〜7:30 はMacの点検を待つ
+  if (!_bgInfoDone) { _bgInfoDone = true; gasCall({ pass: (lsGet('smilewan_pass') || '').trim(), op: 'status' }).then(st => showBgQaInfo(null, st)).catch(() => {}); }
+  if (!document.hidden && Date.now() - window._lastInput < 15000) return;
+  if (!_bgFrame) { const f = document.createElement('iframe'); f.style.cssText = 'position:fixed;width:1px;height:1px;left:-9999px;top:-9999px;border:0'; f.src = location.pathname + '?autoqa=1'; _bgFrame = f; document.body.appendChild(f); return; }
+  const w = _bgFrame.contentWindow; if (!w || !w._bgReady) return; // 枠の読み込み中
+  _bgBusy = Date.now();
+  try { const r = await w._bgQaOne(recRows.length ? (state.name || '').trim() : ''); if (r) { showBgQaInfo(r); if (r.cycleEnd) { bgQaFrameOff(); return; } } } // 一巡したら枠を作り直す（読んだ記録を手放す）
+  catch (e) { reportError('bgQaTick: ' + (e && e.message || e), 'qa'); bgQaFrameOff(); }
+  _bgBusy = 0;
 }
-window._bgQaDone = res => { if (_bgQaFrame) { _bgQaFrame.remove(); _bgQaFrame = null; } showBgQaInfo({ log: [{ where: 'morning', t: new Date().toISOString(), msg: res && !res.error ? `${res.months}か月分を点検・${res.fixed}訪問を自動で直した・直せなかった所${res.left}件` : '点検できませんでした' }] }); };
-// 記録タブに「最後の点検」を出す
-function showBgQaInfo(st, running) {
+// 記録タブに裏の点検の様子を出す
+function showBgQaInfo(r, st) {
   const el = document.getElementById('autoQaInfo'); if (!el) return;
-  if (running) { el.textContent = '🔍 いま画面の裏で全員の記録を点検しています（操作はそのまま続けられます）'; return; }
+  if (r) { el.textContent = `🔍 裏で点検中：${r.done}/${r.total}人${r.fixed ? `・この一巡で ${r.fixed} 訪問を直しました` : '・直す所なし'}（開いている間、1分に1人ずつ点検して直します）`; return; }
   const last = ((st && st.log) || []).filter(x => x.where === 'morning').sort((a, b) => String(b.t).localeCompare(String(a.t)))[0]; if (!last) return;
-  const t = new Date(last.t), hhmm = `${t.getHours()}:${String(t.getMinutes()).padStart(2, '0')}`, md = `${t.getMonth() + 1}/${t.getDate()}`;
-  el.textContent = `🔍 全員の点検：最後は ${md} ${hhmm}（${String(last.msg || '').replace(/^朝の点検：|^点検：/, '')}）。開いている間は30分ごとに裏で点検して直します`;
+  const t = new Date(last.t);
+  el.textContent = `🔍 前回の全員の点検：${t.getMonth() + 1}/${t.getDate()} ${t.getHours()}:${String(t.getMinutes()).padStart(2, '0')}（${String(last.msg || '').replace(/^朝の点検：|^点検：/, '')}）。開いている間は1分に1人ずつ点検して直します`;
 }
-async function runAutoQa() { // 見えない枠の中：全員・全月を点検して直す
+// ----- ここから見えない枠の中 -----
+let _bgSeen = {}, _bgOrder = null, _bgPos = 0, _bgCycle = { done: 0, fixed: 0, left: 0 };
+async function runAutoQa() {
   for (let i = 0; i < 120 && !(DB && Object.keys(getStore()).length); i++) await new Promise(r => setTimeout(r, 1000));
   window.confirm = () => true; window.alert = () => {}; window.dupConfirm = () => true;
-  let res = null; try { setMode('record'); res = await qaAllSaved({ auto: true }); } catch (e) { reportError('runAutoQa: ' + (e && e.message || e), 'morning'); }
-  try { if (window.parent !== window && window.parent._bgQaDone) window.parent._bgQaDone(res); } catch (e) {}
+  try { setMode('record'); await kdLoad(true); } catch (e) { reportError('runAutoQa: ' + (e && e.message || e), 'qa'); }
+  window._bgReady = true;
 }
+// 次に点検する人を選んで1人分を点検する
+window._bgQaOne = async skip => {
+  if (window._bulkQa || !DB) return null;
+  const pass = (lsGet('smilewan_pass') || '').trim(), meta = (await gasCall({ pass, op: 'meta' })).meta || {}, last = {}, now = Date.now();
+  Object.entries(meta).forEach(([id, m]) => { if (id.startsWith('records/') && m.n && (!last[m.n] || String(m.u) > last[m.n])) last[m.n] = String(m.u); });
+  const names = Object.keys(last).sort((a, b) => a.localeCompare(b, 'ja')); if (!names.length) return null;
+  if (!_bgOrder) { const at = Math.floor(Math.random() * names.length); _bgOrder = [...names.slice(at), ...names.slice(0, at)]; } // 何人が開いていても同じ人ばかり見ないように、始める所を変える
+  const free = n => last[n] && n !== skip && now - new Date(last[n]).getTime() >= BGQA_QUIET;
+  let name = names.find(n => _bgSeen[n] && free(n) && last[n] > _bgSeen[n]), turn = false; // 前に点検した後に保存された人が先
+  if (!name) { for (let k = 0; k < _bgOrder.length && _bgPos < _bgOrder.length && !name; k++) { const n = _bgOrder[_bgPos++]; if (free(n)) { name = n; turn = true; } else _bgCycle.done++; } }
+  if (name) { const r = await qaOneClient(name); _bgSeen[name] = new Date().toISOString(); _bgCycle.fixed += r.fixed; _bgCycle.left += r.left; if (turn) _bgCycle.done++;
+    if (r.fixed) gasCall({ pass, op: 'log', item: { where: 'bgqa', ver: APP_VER, msg: `${r.months}か月分を点検・${r.fixed}訪問を自動で直した` } }).catch(() => {}); }
+  const total = _bgOrder.length, cycleEnd = _bgPos >= total, res = { name, done: Math.min(_bgCycle.done, total), total, fixed: _bgCycle.fixed, cycleEnd };
+  if (cycleEnd) await gasCall({ pass, op: 'log', item: { where: 'morning', ver: APP_VER, msg: `点検：裏で一巡（${total}人）・${_bgCycle.fixed}訪問を自動で直した・直せなかった所${_bgCycle.left}件` } });
+  return res;
+};
 // 開いている記録は、手が止まっている間（1分以上）3分ごとに点検して直す（11/3）
 setInterval(() => { try { if (AUTOQA || window._bulkQa || mode !== 'record' || !recRows.length || document.hidden || Date.now() - window._lastInput < 60e3) return; showRecQa(); } catch (e) {} }, 3 * 60e3);
 async function initCloud() {
@@ -953,7 +968,7 @@ async function initCloud() {
     snap.docs.forEach(d => { cloud.settings[d.id] = d.data(); });
     if (document.getElementById('recStaff').options.length) refreshStaffSelect();
     refreshUserPick(); if (recRows.length) renderRecordView(); renderClientBox(true); renderNgBox();
-    if (AUTOQA) { if (!window._autoQaStarted) { window._autoQaStarted = true; setTimeout(runAutoQa, 3000); } } else if (!window._bgQaTimer) { setTimeout(maybeBgQa, 20000); window._bgQaTimer = setInterval(maybeBgQa, 5 * 60e3); } // 5分ごとに「点検の番か」を見る
+    if (AUTOQA) { if (!window._autoQaStarted) { window._autoQaStarted = true; setTimeout(runAutoQa, 3000); } } else if (!window._bgQaTimer) { setTimeout(bgQaTick, 20000); window._bgQaTimer = setInterval(bgQaTick, BGQA_TICK); }
   }, () => {});
   // 利用者情報・訪問記録（この端末にだけある分は初回に共有側へ送る）
   ['clients', 'records'].forEach(kind => {
@@ -4147,7 +4162,7 @@ async function shiftSync(name, month) {
   let shift; try { shift = await loadShift(month); } catch (e) { return res; }
   if ((state.name || '').trim() !== name || recRows !== rows0 || !shift || !shift.length) return res; // シフトを読む間に別の利用者を開いた
   let any = false; for (let dd = 1; dd <= 31 && !any; dd++) if (shiftRowsFor(shift, name, dd).length) any = true; if (!any) return res;
-  const K = kubunOf(name) === '介護', days = ((getStore()[name] || {}).days) || state.days || [];
+  const K = kubunOf(name) === '介護', days = ((getStore()[name] || {}).days) || []; // 予定表の無い人（前に開いた人の予定を使わない）
   const allEntries = [0, 1, 2, 3, 4, 5, 6].flatMap(w => dayEntries(days[w]) || []).filter(e => entryTime(e).s);
   const tOf = r => hm(entryTime(r.e).s), tod = x => x < 660 ? 0 : x < 960 ? 1 : x < 1080 ? 2 : 3;
   const setShift = (r, g, why) => { const was = (r.e.start || '') + '-' + (r.e.end || ''), st0 = r.staff;
@@ -5266,6 +5281,34 @@ function reportQa(name) {
   try { if (!DB || !GAS.url || !name || !recRows.length) return; gasCall({ pass: (lsGet('smilewan_pass') || '').trim(), op: 'qa', items: qaItemsFor(name) }).catch(() => {}); } catch (e) { reportError('reportQa: ' + (e && e.message || e), 'qa'); }
 }
 // 保存してある全員・全月を点検（重いので押したときだけ）
+// 1か月分を点検して直す（全件点検・裏の点検で共通）。直した訪問の数を返す
+async function qaOneMonth(d, all, items) {
+  let fixed = 0; state.name = d.name; refreshSavedMonths(); const sel = document.getElementById('recSavedMonth'); sel.value = d.month; if (sel.value !== d.month) return 0;
+  const stored = new Map(d.rows.map(x => [x.date + ' ' + (x.start || ''), [x.text, (x.kpOn || []).join(','), (x.kpOff || []).join(','), x.on === false ? 0 : 1].join('\u0001')]));
+  const c = window.confirm; window.confirm = () => true; try { openSavedRecords(); } finally { window.confirm = c; } // 開いた時点で自動で直る
+  clearTimeout(recTimer); let sy = null; try { sy = await shiftSync(d.name, d.month); } catch (e) { reportError('shiftSync: ' + (e && e.message || e), 'qa'); } // シフトにあるのに記録が無い訪問・時刻のずれ・空の担当者（11/3）
+  const rp = autoRepair(d.name);
+  recRows.forEach(r => { if (r.on && r.text) { r.text = shortenText(r, d.name); if (r.text.length > TEXT_MAX) r.text = fitLen(r, d.name); } }); // 文を少しずつ短く（10/31〜）
+  const ch = recRows.filter(r => { const k = ymd(r.date) + ' ' + (r.e.start || ''); return stored.has(k) && stored.get(k) !== [r.text, (r.kpOn || []).join(','), (r.kpOff || []).join(','), r.on === false ? 0 : 1].join('\u0001'); }).length + (sy ? sy.added.length : 0);
+  if (ch || (sy && sy.log.length)) { if (sy) dropOldKeys(d.name, d.month, sy.oldKeys); await saveRecords({ quiet: true }); clearTimeout(recTimer); fixed = Math.max(ch, sy ? sy.log.length : 0); }
+  const q = qaCheckRows(d.name); q.out.forEach(i => all.push({ ...i, name: d.name })); items.push(...qaItemsFor(d.name).filter(x => x.month === d.month));
+  return fixed;
+}
+// 1人分（全部の月）を点検して直す（裏の点検）。その人の記録だけ読む
+async function qaOneClient(name) {
+  const all = [], items = []; let fixed = 0, months = 0; window._bulkQa = true;
+  const yieldUI = () => new Promise(r => { const c = new MessageChannel(); c.port1.onmessage = () => r(); c.port2.postMessage(0); }); // 裏のタブでも遅くならない休み方
+  try {
+    await DB.loadRecords(name);
+    const docs = Object.values(getColl('records')).filter(x => x.name === name && x.rows && x.rows.length).sort((a, b) => a.month.localeCompare(b.month)); months = docs.length;
+    for (const d of docs) {
+      if (!document.hidden) { for (let k = 0; k < 30; k++) { let li = 0; try { li = window.parent !== window ? (window.parent._lastInput || 0) : 0; } catch (e) {} if (Date.now() - li > 15000) break; await new Promise(r => setTimeout(r, 1000)); } } // 開いている人が操作している間は待つ
+      fixed += await qaOneMonth(d, all, items); await yieldUI();
+    }
+    if (items.length) gasCall({ pass: (lsGet('smilewan_pass') || '').trim(), op: 'qa', items }).catch(() => {});
+  } finally { window._bulkQa = false; recRows = []; }
+  return { name, months, fixed, left: all.length };
+}
 async function qaAllSaved(opt = {}) {
   if (!DB || !DB.loadAllRecords) { if (!opt.auto) alert('共有に接続してから押してください'); return { error: 'not connected' }; }
   if (!opt.auto && recRows.length && !confirm('今開いている表は閉じます（保存済みの内容は消えません）。全件点検をしますか？')) return;
@@ -5276,20 +5319,10 @@ async function qaAllSaved(opt = {}) {
     const docs = Object.values(getColl('records')).filter(d => d.rows && d.rows.length).sort((a, b) => (a.name + a.month).localeCompare(b.name + b.month, 'ja'));
     let lastName = null;
     for (const d0 of docs) {
-      // 見えない枠の中の点検は、開いている人が操作している間（15秒以内にキー・マウス）は待つ（画面が重くならないように）
-      if (opt.auto) { for (let k = 0; k < 600; k++) { let li = 0; try { li = window.parent !== window ? (window.parent._lastInput || 0) : 0; } catch (e) {} if (Date.now() - li > 15000) break; await new Promise(r => setTimeout(r, 1000)); } }
       // 直す直前にその人の記録を読み直す（点検中にほかの人が保存した内容を、古い写しで上書きしない）
       if (d0.name !== lastName) { lastName = d0.name; try { await DB.loadRecords(d0.name); } catch (e) { reportError('qaAllSaved reload: ' + (e && e.message || e), 'qa'); continue; } }
       const d = Object.values(getColl('records')).find(x => x.name === d0.name && x.month === d0.month) || d0;
-      state.name = d.name; refreshSavedMonths(); const sel = document.getElementById('recSavedMonth'); sel.value = d.month; if (sel.value !== d.month) continue;
-      const stored = new Map(d.rows.map(x => [x.date + ' ' + (x.start || ''), [x.text, (x.kpOn || []).join(','), (x.kpOff || []).join(','), x.on === false ? 0 : 1].join('\u0001')]));
-      const c = window.confirm; window.confirm = () => true; try { openSavedRecords(); } finally { window.confirm = c; } // 開いた時点で自動で直る
-      clearTimeout(recTimer); let sy = null; try { sy = await shiftSync(d.name, d.month); } catch (e) { reportError('shiftSync: ' + (e && e.message || e), 'qa'); } // シフトにあるのに記録が無い訪問・時刻のずれ・空の担当者（11/3）
-      const rp = autoRepair(d.name);
-      recRows.forEach(r => { if (r.on && r.text) { r.text = shortenText(r, d.name); if (r.text.length > TEXT_MAX) r.text = fitLen(r, d.name); } }); // 文を少しずつ短く（10/31〜）
-      const ch = recRows.filter(r => { const k = ymd(r.date) + ' ' + (r.e.start || ''); return stored.has(k) && stored.get(k) !== [r.text, (r.kpOn || []).join(','), (r.kpOff || []).join(','), r.on === false ? 0 : 1].join('\u0001'); }).length + (sy ? sy.added.length : 0);
-      if (ch || (sy && sy.log.length)) { if (sy) dropOldKeys(d.name, d.month, sy.oldKeys); await saveRecords({ quiet: true }); clearTimeout(recTimer); fixedN += Math.max(ch, sy ? sy.log.length : 0); }
-      const q = qaCheckRows(d.name); q.out.forEach(i => all.push({ ...i, name: d.name })); items.push(...qaItemsFor(d.name).filter(x => x.month === d.month));
+      fixedN += await qaOneMonth(d, all, items);
       btn.textContent = `点検中…${docs.indexOf(d0) + 1}/${docs.length}`; await new Promise(r => setTimeout(r, 0));
     }
     gasCall({ pass: (lsGet('smilewan_pass') || '').trim(), op: 'qa', items }).catch(() => {});
