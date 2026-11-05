@@ -20,7 +20,7 @@ window.qaCheckRows = function (name) {
     const tNoLink = t.split(/(?<=。)/).filter(x => !LINK_RE.test(x)).join('');
     [['入浴・清拭|入浴介助', /入浴介助を行|浴槽への出入り|浴槽に/], ['入浴・清拭|洗髪', /洗髪/], ['起床・就寝|起床介助', /起床介助|起き上がり/], ['起床・就寝|就寝介助', /就寝介助|就寝の準備を手伝/]].forEach(([k, re]) => {
       if (!kp.includes(k) && re.test(tNoLink) && !r.sick) add(r, '文章とチェック', `文章に「${tNoLink.match(re)[0]}」があるのに「${k.split('|')[1]}」にチェックが無い`); });
-    if (typeof MENTION_NOT !== 'undefined') { const keepS = typeof sickKeep === 'function' ? sickKeep() : () => false, rules = typeof mnRules === 'function' ? mnRules(r) : (r.sick ? [] : MENTION_NOT); t.split(/(?<=。)/).filter(x => x.trim() && !LINK_RE.test(x) && !keepS(x.trim())).forEach(x => rules.forEach(([keys, re]) => { if (re.test(x) && !keys.some(k => kp.includes(k))) add(r, '文章とチェック', `チェックが無いのに文章に「${x.match(re)[0]}」：${x.slice(0, 30)}`); })); }
+    if (typeof MENTION_NOT !== 'undefined') { const keepS = typeof sickKeep === 'function' ? sickKeep() : () => false, rules = typeof mnRules === 'function' ? mnRules(r) : (r.sick ? [] : MENTION_NOT); t.split(/(?<=。)/).filter(x => x.trim() && !LINK_RE.test(x) && !keepS(x.trim()) && !(typeof MED_FIXED !== 'undefined' && MED_FIXED.includes(x.trim()))).forEach(x => rules.forEach(([keys, re]) => { if (re.test(x) && !keys.some(k => kp.includes(k))) add(r, '文章とチェック', `チェックが無いのに文章に「${x.match(re)[0]}」：${x.slice(0, 30)}`); })); }
     // 3. NG・完食
     NG.forEach(w => { if (w && t.includes(w)) add(r, 'NG表現', `「${w}」`); });
     if (kp.includes('食事|完食') && !(r.kpOn || []).includes('食事|完食')) add(r, '完食', '完食にチェック');
