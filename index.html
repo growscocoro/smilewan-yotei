@@ -322,6 +322,7 @@
       <button onclick="if(event.shiftKey)paperSelfTest();else document.getElementById('paperFile').click()">📄 紙(PDF)から取込</button>
       <input type="file" id="userCsv" accept=".csv,text/csv" style="display:none" onchange="importUserCsv(this)">
     </div>
+    <details class="hint" ontoggle="if(this.open)aiKeyShow()" style="margin:4px 0"><summary style="cursor:pointer">🤖 AI読み取りの設定</summary><div id="aiKeyInfo" style="margin:4px 0"></div><div class="row"><input id="aiKeyInput" type="password" autocomplete="off" placeholder="APIキー（sk-ant-…）" style="flex:1;font:inherit;padding:5px;border:1px solid var(--line);border-radius:5px;background:transparent;color:inherit"><button class="small fixed" onclick="aiKeySave()">登録</button></div><div style="margin-top:4px">写真・スキャンの予定表と計画書・アセスメントをAIで読みます。写真に写った氏名や介護の内容がAnthropicのAPIへ送られます。画像は保存しません。読んだ結果は保存の前に確かめてください。</div></details>
     <div id="paperStatus2" class="hint" style="display:none;margin-bottom:8px"></div>
     <details id="sbBox" style="display:none">
       <summary>🗄 Supabase バックアップ <span id="sbStatus" class="sync local">未設定</span></summary>
@@ -789,7 +790,7 @@ async function setSetting(key, localKey, list, opt = {}) {
 const SUPA = { url: '', key: '' }; // 旧（使わない）
 const GAS = {"url": "https://script.google.com/macros/s/AKfycbxKEAUthQx9wiZKncHZR43jbSKjPfO2lYhlc2K5yXWJNXI_zA8wChdQTFlINEhLTDQO/exec"};           // 保存先（Googleドライブに保存するGAS）。build-site.sh が入れる
 // 版の確認：公開版が新しくなったら知らせ、古い版のままでは記録を保存しない（古い決まりで上書きしないため）
-const APP_VER = '20261106114408';
+const APP_VER = '20261106125846';
 let appOutdated = false;
 async function checkVer() {
   if (APP_VER === 'dev' || appOutdated) return appOutdated;
@@ -2177,6 +2178,7 @@ async function ocrPages(file) {
       await page.render({ canvasContext: x, viewport: vp }).promise; canvases.push(c);
     }
   }
+  if (await aiReady()) { try { return await aiPages(canvases); } catch (e) { reportError('aiRead: ' + (e && e.message || e), 'ocr'); window._aiNote = aiOff(e); } } else window._aiNote = AI_NOKEY;
   const ocr = await getOcr(), pages = [];
   for (let i = 0; i < canvases.length; i++) {
     paperMsg(`📷 写真・スキャンの文字を読み取り中…（${i + 1}/${canvases.length}ページ）少し時間がかかります`);
@@ -2195,7 +2197,7 @@ async function ocrPages(file) {
 }
 async function importAssessment(input, opt = {}) {
   const files = [...input.files]; input.value = ''; if (!files.length) return;
-  const done = [], skipped = [];
+  const done = [], skipped = []; window._aiNote = '';
   // 写真を何枚か選んだときは、1人分の計画書の各ページとしてまとめて読む（1枚目に名前、2枚目以降に手順書…のため）
   const isImg = f => /^image\//.test(f.type) || /\.(heic|heif|jpe?g|png|webp)$/i.test(f.name);
   const groups = files.length > 1 && files.every(isImg) ? [files.slice().sort((a, b) => a.name.localeCompare(b.name, 'ja', { numeric: true }))] : files.map(f => [f]);
@@ -6202,7 +6204,7 @@ function ocrType(t) {
 const OCR_PHRASES = [...new Set([...DETAIL_PRESETS, '起床介助等', '服薬介助', '朝食準備', '昼食準備', '夕食準備', '調理・代行・掃除', '調理・洗濯・掃除', '共に行う片付け', '就寝準備・服薬', '買い物代行', '通院介助', '洗濯', '入浴介助'])];
 function bigrams(s) { const a = []; for (let i = 0; i < s.length - 1; i++) a.push(s.slice(i, i + 2)); return a; }
 function similar(a, b) { const x = bigrams(a), y = bigrams(b); if (!x.length || !y.length) return a === b ? 1 : 0; let n = 0; const yy = [...y]; x.forEach(g => { const k = yy.indexOf(g); if (k >= 0) { n++; yy.splice(k, 1); } }); return 2 * n / (x.length + y.length); }
-function ocrPhrase(t) { let best = t, sc = 0; OCR_PHRASES.forEach(p => { const s = similar(t, p); if (s > sc) { sc = s; best = p; } }); return sc >= 0.6 ? best : t; }
+function ocrPhrase(t) { let best = t, sc = 0; OCR_PHRASES.forEach(p => { const s = similar(t, p); if (s > sc) { sc = s; best = p; } }); return sc >= 0.6 && Math.abs(best.length - t.length) <= 1 ? best : t; } // 長さの違う候補に変えない（11/6「調理・掃除」が紙に無い「調理・代行・掃除」になっていた）
 function guessType(detail, start) {
   if (/通院/.test(detail)) return '通院介助';
   if (/共に|一緒|起床|服薬|薬|就寝|排泄|更衣|食事介助/.test(detail)) return '身体';
@@ -6233,7 +6235,7 @@ function parseColumn(lines, exact = false) {
     const apart = exact && pending && pendingY - lastY >= 3;
     if (pending && cur && cur.start && !cur.detail.length && !apart) { cur.detail.push(pending); pending = ''; }
     if (!cur || (pending && (cur.detail.length || apart))) { cur = { type: pending, start: '', end: '', detail: [], note: '', y }; list.push(cur); pending = ''; }
-    if (/月\d?回|月[1-9１-９]|週に|隔週|のみ/.test(t)) cur.note = t; else cur.detail.push(exact ? t : ocrPhrase(t));
+    if (/月\d?回|月[1-9１-９]|週に|隔週|のみ/.test(t)) cur.note = t; else if (exact || /[ぁ-んァ-ヶ一-龠]/.test(t)) cur.detail.push(exact ? t : ocrPhrase(t));
     lastY = y;
   });
   if (pending) {
@@ -6356,7 +6358,40 @@ async function flattenTable(src) {
   sIn.delete(); out.delete(); from.delete(); to.delete(); M.delete();
   return c;
 }
+// ===== AI読み取り（11/6）：写真・スキャンは保存先のGAS経由でClaudeに読ませる。キー未登録や失敗のときは今までの読み取り（Tesseract）に戻す =====
+let _aiOk = null;
+const gasPass = () => (lsGet('smilewan_pass') || '').trim();
+async function aiReady(force) { if (!DB || !GAS.url) return false; if (_aiOk !== null && !force) return _aiOk; try { _aiOk = !!(await gasCall({ pass: gasPass(), op: 'aiStatus' })).set; } catch (e) { return false; } return _aiOk; }
+function aiJpeg(src) { // AIが読める上限（長い辺2576px・375万画素）に収める
+  const k = Math.min(1, 2576 / Math.max(src.width, src.height), Math.sqrt(3.7e6 / (src.width * src.height))), c = document.createElement('canvas'); c.width = Math.round(src.width * k); c.height = Math.round(src.height * k);
+  const x = c.getContext('2d'); x.fillStyle = '#fff'; x.fillRect(0, 0, c.width, c.height); x.imageSmoothingQuality = 'high'; x.drawImage(src, 0, 0, c.width, c.height); return c.toDataURL('image/jpeg', 0.88).split(',')[1];
+}
+const aiTime = t => { const m = z2h(t).match(/(\d{1,2}):(\d{2})/); return m ? m[1].padStart(2, '0') + ':' + m[2] : ''; };
+const aiOff = e => `AIで読めなかったので（${(e && e.message) || e}）、いつもの読み取りで読みました。読み違いが多くなります。`, AI_NOKEY = 'AIのキーが未登録なので、いつもの読み取りで読みました（🤖 AI読み取りの設定 から登録できます）。';
+async function readScheduleAI(file) {
+  if (!await aiReady()) { window._aiNote = AI_NOKEY; return null; }
+  paperMsg('🤖 AIで読み取り中…（30秒〜1分ほど）');
+  const R = (await gasCall({ pass: gasPass(), op: 'aiRead', mode: 'schedule', image: aiJpeg(await paperCanvas(file)) })).result, days = DAYS.map(emptyDay); let count = 0;
+  (R.days || []).forEach(d => { const k = DAYS.indexOf(d.dow); if (k < 0) return; (d.entries || []).forEach(e => { const b = BLOCKS.includes(e.block) ? e.block : 'upper'; days[k][b].push({ ...emptyEntry(), type: String(e.type || '').trim() || '身体', start: aiTime(e.start), end: aiTime(e.end), detail: (e.detail || []).map(x => String(x).trim()).filter(Boolean).join('\n'), note: String(e.note || '').trim() }); count++; }); });
+  const m = matchUserName(String(R.name || '').trim()); return { name: m.name, readName: m.readName, matched: m.matched, count, days, by: 'ai', unclear: R.unclear || [], notes: R.notes || [] };
+}
+// 計画書・アセスメント：PDFの文字データと同じ形（x・y・文字）にして返す（今までの読み取り方の続きはそのまま使う）
+async function aiPages(canvases) {
+  const pages = [];
+  for (let i = 0; i < canvases.length; i++) {
+    paperMsg(`🤖 AIで読み取り中…（${i + 1}/${canvases.length}ページ・1ページ1分ほど）`);
+    const ask = c => gasCall({ pass: gasPass(), op: 'aiRead', mode: 'layout', image: aiJpeg(c) }).then(j => j.result);
+    let c = canvases[i], R = await ask(c); if (R.rotation) { c = rotateCanvas(c, R.rotation); R = await ask(c); }
+    const W = c.width > c.height ? 842 : 595, H = W * c.height / c.width, ws = []; // PDFと同じ大きさ（A4のポイント）にそろえる
+    (R.lines || []).forEach(l => (l.cells || []).forEach(x => { const t = String(x.text || '').trim().replace(/\(/g, '（').replace(/\)/g, '）'); if (t) ws.push({ x: x.x / 1000 * W, y: l.y / 1000 * H, s: t }); }));
+    pages.push(ws.sort((p, q) => (p.y - q.y) || (p.x - q.x)));
+  }
+  return pages;
+}
+async function aiKeyShow() { const el = document.getElementById('aiKeyInfo'); el.textContent = '確かめています…'; try { const j = await gasCall({ pass: gasPass(), op: 'aiStatus' }); _aiOk = !!j.set; el.textContent = j.set ? `登録済み（末尾 ${j.tail}）。写真・スキャンはAIで読みます。` : '未登録です。今はいつもの読み取りで読みます。'; } catch (e) { el.textContent = '確かめられませんでした'; } }
+async function aiKeySave() { const inp = document.getElementById('aiKeyInput'), el = document.getElementById('aiKeyInfo'), v = inp.value.trim(); if (!v) return; el.textContent = '登録しています…'; try { const j = await gasCall({ pass: gasPass(), op: 'aiKey', key: v }); inp.value = ''; _aiOk = true; el.textContent = `登録しました（末尾 ${j.tail}）。写真・スキャンはAIで読みます。`; } catch (e) { el.textContent = '登録できませんでした：' + ((e && e.message) || e); } }
 async function readSchedulePaper(file) {
+  if (!readSchedulePaper._inner && !readSchedulePaper._noAi) { try { const r = await readScheduleAI(file); if (r && r.count) return r; if (r) window._aiNote = 'AIが予定を読み取れなかったので、いつもの読み取りで読みました。'; } catch (e) { reportError('aiRead: ' + (e && e.message || e), 'ocr'); window._aiNote = aiOff(e); } }
   paperMsg('📄 PDFを画像に変換中…');
   const base0 = await paperCanvas(file);
   // 写真は「ゆがみを直した物」と「そのまま」の両方で読み、よく読めた方を使う（名前は読めた方から）
@@ -6521,7 +6556,7 @@ async function paperSelfTest() {
 async function importPaper(input) {
   const file = input.files[0]; input.value = '';
   if (!file) return;
-  let res;
+  let res; window._aiNote = '';
   try { res = await readSchedulePaper(file); }
   catch (e) { paperMsg('⚠ 取込できませんでした（' + ((e && e.message) || e) + '）'); alert('取込できませんでした\n' + ((e && e.message) || e)); return; }
   paperMsg('');
@@ -6533,7 +6568,8 @@ async function importPaper(input) {
   const nameMsg = !res.name ? '\n⚠ 利用者名は読み取れませんでした。名前を入力してください。'
     : res.matched && res.matched !== 'exact' ? `\n利用者名は「${res.readName}」と読めたので、登録済みの「${res.name}」にしました。違っていたら名前を直してください。`
     : !res.matched ? `\n⚠ 利用者名「${res.name}」は登録済みの利用者に見つかりませんでした。読み間違いがないか確認してください。` : '';
-  alert(`予定 ${res.count}件を読み取りました${res.name ? `（${res.name} 様）` : ''}。${nameMsg}\n読み間違いがないか右の用紙で確認・修正し、よければ「💾 保存」を押してください。\nそのあと「📝 訪問記録」タブで記録を作れます。`);
+  const aiMsg = (res.by === 'ai' ? '\n🤖 AIで読みました。' : '') + ((res.unclear || []).length ? `\n⚠ 読めなかった所：${res.unclear.join('／')}` : '') + ((res.notes || []).length ? `\n表の外の書き込み（予定には入れていません）：${res.notes.join('／')}` : '') + (window._aiNote ? '\n⚠ ' + window._aiNote : '');
+  alert(`予定 ${res.count}件を読み取りました${res.name ? `（${res.name} 様）` : ''}。${nameMsg}${aiMsg}\n読み間違いがないか右の用紙で確認・修正し、よければ「💾 保存」を押してください。\nそのあと「📝 訪問記録」タブで記録を作れます。`);
 }
 
 try { const m = location.hash.match(/[#&]p=([^&]+)/); if (m) { lsSet('smilewan_pass', decodeURIComponent(m[1])); history.replaceState(null, '', location.pathname + location.search); } } catch {}
