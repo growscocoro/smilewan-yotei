@@ -705,7 +705,7 @@ function loadScriptOnce(src) {
 }
 
 // ===== 選択肢（ここを編集すれば増やせます） =====
-const SERVICE_TYPES = ['身体', '家事', '入浴', '通院介助', '生活援助', '身体・家事', '身体1生活1', '身体2生活1', 'その他'];
+const SERVICE_TYPES = ['身体', '家事', '入浴', '通院介助', '生活援助', '身体・家事', '身体1生活1', '身体1生活2', '身体2生活1', 'その他'];
 const DETAIL_PRESETS = [
   '起床介助・服薬等', '朝食準備等', '買い物代行・掃除', '買い物代行・調理', '洗濯・掃除', '洗濯・調理',
   '洗濯・掃除・調理', '共に行う', '一緒に掃除をする', '共に行う片付け', '調理', '調理（３品）',
@@ -790,7 +790,7 @@ async function setSetting(key, localKey, list, opt = {}) {
 const SUPA = { url: '', key: '' }; // 旧（使わない）
 const GAS = {"url": "https://script.google.com/macros/s/AKfycbxKEAUthQx9wiZKncHZR43jbSKjPfO2lYhlc2K5yXWJNXI_zA8wChdQTFlINEhLTDQO/exec"};           // 保存先（Googleドライブに保存するGAS）。build-site.sh が入れる
 // 版の確認：公開版が新しくなったら知らせ、古い版のままでは記録を保存しない（古い決まりで上書きしないため）
-const APP_VER = '20261106125846';
+const APP_VER = '20261106133554';
 let appOutdated = false;
 async function checkVer() {
   if (APP_VER === 'dev' || appOutdated) return appOutdated;
@@ -2551,7 +2551,7 @@ const BODY_ONLY = /^(排泄|入浴・清拭|身体整容|起床・就寝|服薬�
 function kpFinal(kp, e) {
   let out = kp.map(k => k === '自立支援|服薬' ? '服薬・医療|見守り' : k).filter(k => k !== NO_KP); // 「自立支援：声掛け・見守り」は付けない（事業所の決まり）
   if (kindOf(e.type || '') === '家事援助') out = out.filter(k => !BODY_ONLY.test(k));
-  else if (out.includes('入浴・清拭|入浴介助') || out.includes('入浴・清拭|シャワー浴')) { out.push('身体整容|更衣介助'); out = out.filter(k => !BATH_NO.test(k)); }
+  else if (out.includes('入浴・清拭|入浴介助') || out.includes('入浴・清拭|シャワー浴')) { out.push('身体整容|更衣介助'); out = out.filter(k => !BATH_NO.test(k) || (/生活/.test(e.type || '') && !/^(調理\||自立支援\|(一般的な調理|排泄・食事))/.test(k))); }
   return [...new Set(out)];
 }
 function autoKPFor0(e, name) {
@@ -3469,7 +3469,7 @@ function kpFromText(r) {
   // 最後にそろえる（家事の訪問に身体の項目なし／シャワーだけの入浴は入浴介助にしない／服薬の見守りは一本化）
   const drop = k => { out.delete(k); const i = kp.indexOf(k); if (i >= 0) kp.splice(i, 1); };
   if (!body) [...kp, ...out].filter(k => BODY_ONLY.test(k)).forEach(drop);
-  if (bath) [...kp, ...out].filter(k => BATH_NO.test(k)).forEach(drop);
+  if (bath) [...kp, ...out].filter(k => BATH_NO.test(k) && !(/生活/.test(r.e.type || '') && !/^(調理\||自立支援\|(一般的な調理|排泄・食事))/.test(k))).forEach(drop); // 身体2生活1 などは家事も同じ訪問で行う
   if (kp.includes(NO_KP)) drop(NO_KP);
   if (now().includes('自立支援|服薬')) { drop('自立支援|服薬'); add('服薬・医療|見守り', '服薬の見守り'); }
   if (now().includes('入浴・清拭|シャワー浴') && now().includes('入浴・清拭|入浴介助') && !/湯船|湯舟|浴槽|全身浴/.test(t + det)) drop('入浴・清拭|入浴介助');
@@ -3591,7 +3591,7 @@ function genItems(r) {
 // 家事の訪問（「入浴後の片付け」など）は入浴の訪問にしない
 const isBathRow = r => r.kind !== '家事援助' && /入浴|シャワー/.test(((r.e.type || '') + ' ' + (r.e.detail || '')).replace(/(入浴|シャワー)(後|の後)?の?(片付け|片づけ|掃除|清掃)/g, '')) || (tmplItems(r) || []).includes('入浴・清拭|入浴介助');
 // 体調不良の日にする入浴は、入浴だけの訪問（起床・朝食・就寝などと一緒の訪問は、文章全体を入れ替えると他の支援が抜けるので選ばない）
-const isPureBath = r => isBathRow(r) && !/起床|朝食|昼食|夕食|就寝|調理/.test((r.e.detail || '') + ' ' + (r.e.type || '').replace(/入浴/g, '')) && !(tmplItems(r) || []).some(k => /^(起床・就寝|調理)\|/.test(k));
+const isPureBath = r => isBathRow(r) && !/生活/.test(r.e.type || '') && !/起床|朝食|昼食|夕食|就寝|調理/.test((r.e.detail || '') + ' ' + (r.e.type || '').replace(/入浴/g, '')) && !(tmplItems(r) || []).some(k => /^(起床・就寝|調理)\|/.test(k));
 const SICK_BATH = [
   '訪問時、本人から「今日は少しだるい」と訴えがあり、体調を確認した。顔色がやや優れなかったため、本人と相談し、入浴は控えてシャワー浴とした。シャワー浴は短時間で済ませ、湯冷めしないよう室温に配慮した。シャワー浴後は水気をよく拭き取り、皮膚の状態を確認した。無理をせず休むよう声掛けした。',
   '訪問時、本人の表情がすぐれず、体のだるさの訴えが聞かれた。体調を考慮して入浴は見合わせ、シャワー浴で対応した。シャワー浴の後は体が冷えないよう、手早く着衣を整えた。体調が悪化していないか様子を確認し、ゆっくり休むよう伝えた。',
@@ -3720,7 +3720,7 @@ function kpAll0(r) {
   { const C = ['調理|調理', '調理|下拵え', '調理|配・下膳']; if (C.some(k => out.includes(k))) C.forEach(k => { if (!out.includes(k) && !(r.kpOff || []).includes(k)) out.push(k); }); } // 調理の欄（調理・下拵え・配・下膳）は全部セット（事業所の決まり）
   // 保存した時の版が古くても、出すときに決まりをそろえる（家事の訪問に身体・服薬なし／入浴に清掃・移動介助なし）
   if (r.kind === '家事援助') for (let i = out.length - 1; i >= 0; i--) if (BODY_ONLY.test(out[i])) out.splice(i, 1);
-  if (out.includes('入浴・清拭|入浴介助') || out.includes('入浴・清拭|シャワー浴')) for (let i = out.length - 1; i >= 0; i--) if (BATH_NO.test(out[i])) out.splice(i, 1);
+  if (out.includes('入浴・清拭|入浴介助') || out.includes('入浴・清拭|シャワー浴')) for (let i = out.length - 1; i >= 0; i--) if (BATH_NO.test(out[i]) && !(/生活/.test(r.e.type || '') && !/^(調理\||自立支援\|(一般的な調理|排泄・食事))/.test(out[i]))) out.splice(i, 1);
   // 身体介護の訪問（生活の付かない区分）には家事を付けない。「共に」の訪問は共に行うの欄へ（上で振り分け済み）
   if (!tog && r.kind !== '家事援助' && !/生活|家事/.test(r.e.type || '')) for (let i = out.length - 1; i >= 0; i--) if (/^(清掃|洗濯|衣類・寝具|調理|買物等)\|/.test(out[i])) out.splice(i, 1);
   { const i = out.indexOf('洗濯|取入れ・収納'); if (i >= 0) out.splice(i, 1); } // 取入れ・収納は付けない（事業所の決まり）
@@ -5315,7 +5315,7 @@ window.qaCheckRows = function (name) {
     if (!K && /利用者様/.test(t)) add(r, '呼び方', '障害なのに「利用者様」');
     // 5. 体調不良
     if (r.sick) {
-      if (typeof isPureBath === 'function' && !isPureBath(r)) add(r, '体調不良', '入浴だけでない訪問が体調不良になっている');
+      if (typeof isPureBath === 'function' && !isPureBath(r) && !/生活/.test(r.e.type || '')) add(r, '体調不良', '入浴だけでない訪問が体調不良になっている'); // 身体2生活1 は入浴と家事を同じ訪問で行う
       if (!kp.includes('入浴・清拭|シャワー浴')) add(r, '体調不良', 'シャワー浴が無い');
       if (kp.includes('入浴・清拭|入浴介助')) add(r, '体調不良', '入浴介助が残っている');
       if (kp.includes('入浴・清拭|清拭') && !(r.kpOn || []).includes('入浴・清拭|清拭')) add(r, '体調不良', '清拭が残っている');
