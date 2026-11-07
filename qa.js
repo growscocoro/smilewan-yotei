@@ -70,7 +70,7 @@ window.qaCheckRows = function (name) {
     if (typeof BROKEN_FIX !== 'undefined' && BROKEN_FIX.some(([re]) => { re.lastIndex = 0; return re.test(t); })) add(r, '文章', '言い回しの崩れ（「と発言ありる」など）');
     // 10. 家事の訪問はゴミ出し
     if (r.kind === '家事援助' && tm && !kp.includes('清掃|ゴミ出し')) add(r, 'ゴミ出し', '家事なのにゴミ出しが無い');
-    if (typeof cleanLeak === 'function' && cleanLeak(r).length) add(r, '清掃の文', 'その時間に使わない所の掃除の文がある');
+    if (typeof cleanLeak === 'function' && !(typeof rowClosed === 'function' && rowClosed(r)) && cleanLeak(r).length) add(r, '清掃の文', 'その時間に使わない所の掃除の文がある'); // 締めた月は対象外（決まり19は11月から・8〜10月の文は変えない）
     if ((typeof roomAlways === 'function' ? roomAlways(r) : r.kind === '家事援助') && kp.some(k => k.startsWith('清掃|')) && !kp.includes('清掃|居室') && !(r.kpOff || []).includes('清掃|居室')) add(r, '居室', '家事の清掃なのに居室が無い');
   });
   // 12. 同じ日・同じ時刻の訪問が2つ（時刻欄が空の古い行と、時刻の入った行）
