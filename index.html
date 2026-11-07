@@ -814,7 +814,7 @@ async function setSetting(key, localKey, list, opt = {}) {
 const SUPA = { url: '', key: '' }; // 旧（使わない）
 const GAS = {"url": "https://script.google.com/macros/s/AKfycbxKEAUthQx9wiZKncHZR43jbSKjPfO2lYhlc2K5yXWJNXI_zA8wChdQTFlINEhLTDQO/exec"};           // 保存先（Googleドライブに保存するGAS）。build-site.sh が入れる
 // 版の確認：公開版が新しくなったら知らせ、古い版のままでは記録を保存しない（古い決まりで上書きしないため）
-const APP_VER = '20261107163822';
+const APP_VER = '20261107165134';
 let appOutdated = false;
 async function checkVer() {
   if (APP_VER === 'dev' || appOutdated) return appOutdated;
@@ -3498,11 +3498,11 @@ function vOf(r) { if (r.vFrozen && rowClosed(r)) return { ...r.vFrozen }; const 
   v.その他 = ['環境整備', '相談援助', '情報収集・提供', '記録']; return v; } // その他は毎回4つとも（事業所の決まり）
 // 買い物の見積り（決まり21・11/7）：買い物リストの品物を統計価格で計算する。乱数は使わない。内訳に「金額は見積り」と残す。手入力・献立買い物支援の実際の金額があれば、そちらを出す
 const EST_FROM = '2026-11-08', AZU_CAP = 5000, BUY_RATE = 0.9;
-// e-Stat 小売物価統計調査 東大阪市 2026年9月（kondate の統計価格）を、リストの単位1つあたりの円に換算（1個・1本などの重さは kondate の購入単位と同じ）。無い品物は「価格不明」
-const EST_PRICE = { 鶏もも肉: [1.59, 'g'], 鶏むね肉: [1.59, 'g'], 鶏ひき肉: [1.59, 'g'], 鶏ささみ: [80, '本'], 豚肉: [2.89, 'g'], 豚ロース: [2.89, 'g'], 豚ひき肉: [2.89, 'g'], 生鮭: [216, '切れ'], ハム: [33, '枚'], ちくわ: [26, '本'], 卵: [34, '個'], 牛乳: [0.286, 'ml'], 豆腐: [84, '丁'], 納豆: [37, 'パック'], 油揚げ: [64, '枚'], じゃがいも: [57, '個'], 玉ねぎ: [73, '個'], にんじん: [54, '本'], キャベツ: [0.242, 'g'], 大根: [0.318, 'g'], 長ねぎ: [98, '本'], ほうれん草: [351, '束'], トマト: [109, '個'], きゅうり: [98, '本'], なす: [80, '本'], ピーマン: [35, '個'], かぼちゃ: [0.639, 'g'], さつまいも: [224, '本'], しいたけ: [30, '枚'], こんにゃく: [109, '枚'], パン: [36, '個'] };
+// e-Stat 小売物価統計調査 東大阪市 2026年9月（kondate の統計価格）を、kondate の購入単位に換算。[1パックの円, 1パックの量, リストの単位]。少しだけ使う物も1パック分で数える。無い品物は「価格不明」
+const EST_PRICE = { 鶏もも肉: [239, 150, 'g'], 鶏むね肉: [239, 150, 'g'], 鶏ひき肉: [239, 150, 'g'], 鶏ささみ: [239, 3, '本'], 豚肉: [434, 150, 'g'], 豚ロース: [434, 150, 'g'], 豚ひき肉: [434, 150, 'g'], 生鮭: [216, 1, '切れ'], ハム: [131, 4, '枚'], ちくわ: [103, 4, '本'], 卵: [203, 6, '個'], 牛乳: [143, 500, 'ml'], 豆腐: [84, 1, '丁'], 納豆: [111, 3, 'パック'], 油揚げ: [128, 2, '枚'], じゃがいも: [171, 3, '個'], 玉ねぎ: [147, 2, '個'], にんじん: [108, 2, '本'], キャベツ: [61, 250, 'g'], 大根: [80, 250, 'g'], 長ねぎ: [98, 1, '本'], ほうれん草: [351, 1, '束'], トマト: [217, 2, '個'], きゅうり: [196, 2, '本'], なす: [160, 2, '本'], ピーマン: [141, 4, '個'], かぼちゃ: [192, 300, 'g'], さつまいも: [224, 1, '本'], しいたけ: [199, 6, '枚'], こんにゃく: [109, 1, '枚'], パン: [213, 6, '個'] };
 function listEstimate(m) {
   const items = [];
-  Object.values((m && m.list) || {}).flat().forEach(x => { if (/在庫を確認|残りを確認/.test(x)) return; const g = /^(\S+) ([\d.]+)(\S*?)(?:（.*）)?$/.exec(x), p = g && EST_PRICE[g[1]]; items.push({ name: g ? g[1] : String(x).split(' ')[0], yen: p && p[1] === g[3] ? Math.round(p[0] * +g[2]) : null }); });
+  Object.values((m && m.list) || {}).flat().forEach(x => { if (/在庫を確認|残りを確認/.test(x)) return; const g = /^(\S+) ([\d.]+)(\S*?)(?:（.*）)?$/.exec(x), p = g && EST_PRICE[g[1]]; items.push({ name: g ? g[1] : String(x).split(' ')[0], yen: p && p[2] === g[3] ? Math.ceil(+g[2] / p[1]) * p[0] : null }); });
   return { items, total: items.reduce((a, i) => a + (i.yen || 0), 0), unknown: items.filter(i => i.yen == null).length };
 }
 function shopSlots(name) { const nz = x => String(x || '').replace(/[\s　]/g, ''), st = getStore(), sc = st[name] || Object.values(st).find(x => nz(x.name) === nz(name)), out = []; ((sc && sc.days) || []).forEach((d, dow) => dayEntries(normDay(d)).forEach(e => { if (/買い物|買物/.test((e.type || '') + (e.detail || ''))) out.push(dow + '|' + (e.start || '')); })); return out; }
