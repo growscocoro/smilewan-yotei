@@ -45,6 +45,7 @@ window.qaCheckRows = function (name) {
     if (kp.includes('買物等|日常品等の買物')) {
       if (!v.預り) add(r, '買物', '金額が入っていない');
       else if (+v.預り - +v.購入 !== +v.お釣) add(r, '買物', `預り${v.預り}−購入${v.購入}≠お釣${v.お釣}`);
+      if (typeof EST_FROM !== 'undefined' && ymd(r.date) >= EST_FROM && v.預り && !(typeof rowClosed === 'function' && rowClosed(r))) { if (+v.預り > AZU_CAP) add(r, '買物', `預かり金${v.預り}円が上限${AZU_CAP}円を超えている`); if (+v.購入 > +v.預り * BUY_RATE) add(r, '買物', `購入${v.購入}円が預かり金${v.預り}円の90%を超えている`); }
     }
     // 8. 時刻の流れ
     const h = Math.floor((hm(entryTime(r.e).s) || 720) / 60), pos = re => { const m = t.match(re); return m ? m.index : -1; };
