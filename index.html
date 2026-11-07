@@ -66,7 +66,17 @@
   .row > * { flex: 1; }
   .row > .fixed { flex: 0 0 auto; }
 
-  .day-tabs { display: flex; gap: 3px; margin: 14px 0 8px; }
+  .day-tabs { display: flex; gap: 3px; margin: 8px 0; position: sticky; top: 0; z-index: 5; padding: 4px 0; background: var(--panel); }
+  .entry { scroll-margin-top: 56px; }
+  .view-switch { display: flex; gap: 6px; align-items: center; margin-top: 12px; font-size: 12px; color: var(--muted); }
+  .view-switch button.active { color: var(--accent); background: var(--accent-soft); border-color: var(--accent); font-weight: 700; }
+  .plan-row { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 8px; margin-bottom: 6px; }
+  .plan-row.hl { box-shadow: inset 4px 0 0 #f5d90a; }
+  .plan-main { cursor: pointer; font-size: 13px; color: var(--text); }
+  .plan-main:hover { color: var(--accent); }
+  .plan-sub { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .plan-warn { font-size: 11px; font-weight: 700; color: var(--danger); margin-left: 6px; }
+  .plan-days { margin-top: 6px; }
   .day-tabs button { flex: 1; padding: 8px 0; font-size: 18px; font-weight: bold; border-radius: 6px; }
   .day-tabs button.active { background: var(--ink); color: var(--ink-text); border-color: var(--ink); }
   .day-tabs button.has { box-shadow: inset 0 -3px 0 var(--accent); }
@@ -320,15 +330,18 @@
       <button class="primary" onclick="addLinkEnd(); window.print()">🖨 印刷する</button>
       <button onclick="addLinkEnd(); saveCurrent()">💾 保存</button>
       <button onclick="newSheet()">＋ 新規作成</button>
+      <button onclick="if(event.shiftKey)paperSelfTest();else document.getElementById('paperFile').click()">📄 紙(PDF)から取込</button>
+    </div>
+    <details class="hint" style="margin:4px 0"><summary style="cursor:pointer">📂 その他（書き出し・読み込み・CSV・Excel取込）</summary>
+    <div class="toolbar" style="margin-top:6px">
       <button onclick="exportJson()">書き出し</button>
       <button onclick="document.getElementById('importFile').click()">読み込み</button>
       <input type="file" id="importFile" accept=".json" style="display:none" onchange="importJson(this)">
       <button onclick="document.getElementById('userCsv').click()">👥 利用者CSV取込</button>
       <button onclick="document.getElementById('xlsxFile').click()">📗 Excelから一括取込</button>
       <input type="file" id="xlsxFile" accept=".xlsx,.xls,.xlsm" style="display:none" onchange="importScheduleXlsx(this)">
-      <button onclick="if(event.shiftKey)paperSelfTest();else document.getElementById('paperFile').click()">📄 紙(PDF)から取込</button>
       <input type="file" id="userCsv" accept=".csv,text/csv" style="display:none" onchange="importUserCsv(this)">
-    </div>
+    </div></details>
     <details class="hint" ontoggle="if(this.open)aiKeyShow()" style="margin:4px 0"><summary style="cursor:pointer">🤖 AI読み取りの設定</summary><div id="aiKeyInfo" style="margin:4px 0"></div><div class="row"><input id="aiKeyInput" type="password" autocomplete="off" placeholder="APIキー（sk-ant-…）" style="flex:1;font:inherit;padding:5px;border:1px solid var(--line);border-radius:5px;background:transparent;color:inherit"><button class="small fixed" onclick="aiKeySave()">登録</button></div><div style="margin-top:4px">写真・スキャンの予定表と計画書・アセスメントをAIで読みます。写真に写った氏名や介護の内容がAnthropicのAPIへ送られます。画像は保存しません。読んだ結果は保存の前に確かめてください。</div></details>
     <div id="paperStatus2" class="hint" style="display:none;margin-bottom:8px"></div>
     <details id="sbBox" style="display:none">
@@ -376,11 +389,12 @@
       <div class="row" style="margin-top:6px"><button class="small primary fixed" onclick="saveClientInfo()">💾 利用者情報を保存</button><span class="hint" style="margin:0">手で直した内容は、CSVを取り込み直しても消えません。</span></div>
     </details>
 
+    <div class="view-switch"><span>入れ方</span><button class="small" id="viewDayBtn" onclick="setSheetView('day')">📅 曜日ごと</button><button class="small" id="viewPlanBtn" onclick="setSheetView('plan')">🗂 予定ごと（新）</button></div>
     <div class="day-tabs" id="dayTabs"></div>
 
     <div id="dayEditor"></div>
 
-    <div class="copy-row">
+    <div class="copy-row" id="dayCopyRow">
       <span class="fixed">この曜日の内容を</span>
       <select id="copyTarget" style="flex:1">
         <option value="1">月</option><option value="2">火</option><option value="3">水</option>
@@ -548,6 +562,7 @@
         </li>
         <li>同じ内容を他の時間にも入れるときは、そのサービスの「📋 コピー」を押し、時間と曜日を選んで「ここに入れる」（開始を変えると、終わりも同じ長さで動く）</li>
         <li>同じ内容の曜日は「この曜日の内容を ○曜にコピー」</li>
+        <li><b>「🗂 予定ごと」に切りかえると</b>、同じ予定は曜日をまとめて1行で並ぶ。行の曜日を押すと、その曜日に入る／外れる。行を押すと開いて直せて、選んでいる曜日すべてに入る。「＋ 予定を追加」で新しい予定を作る（「📅 曜日ごと」にいつでも戻せる）</li>
         <li>右の用紙で確認して「💾 保存」。「🖨 印刷する」でA4横の予定表を印刷</li>
       </ol>
 
@@ -799,7 +814,7 @@ async function setSetting(key, localKey, list, opt = {}) {
 const SUPA = { url: '', key: '' }; // 旧（使わない）
 const GAS = {"url": "https://script.google.com/macros/s/AKfycbxKEAUthQx9wiZKncHZR43jbSKjPfO2lYhlc2K5yXWJNXI_zA8wChdQTFlINEhLTDQO/exec"};           // 保存先（Googleドライブに保存するGAS）。build-site.sh が入れる
 // 版の確認：公開版が新しくなったら知らせ、古い版のままでは記録を保存しない（古い決まりで上書きしないため）
-const APP_VER = '20261107131700';
+const APP_VER = '20261107133130';
 let appOutdated = false;
 async function checkVer() {
   if (APP_VER === 'dev' || appOutdated) return appOutdated;
@@ -2615,12 +2630,13 @@ function markRecDirty() {
 function addEntry(block) {
   addLinkEnd(true);
   const e = emptyEntry(); state.days[currentDay][block].push(e);
-  _addLink = { src: e, block, day: currentDay, copies: new Map(), moved: false }; // 「＋ 追加」のあと、決定するまで曜日を選べる
+  _addLink = { src: e, block, day: currentDay, copies: new Map(), moved: false, origStart: '' }; // 「＋ 追加」のあと、決定するまで曜日を選べる
   render(); markSheetDirty();
-  const box = document.querySelector('.add-days'); if (box) box.scrollIntoView({ block: 'nearest' });
+  const box = document.querySelector('.add-days'); if (box) box.closest('.entry').scrollIntoView({ block: 'start' });
 }
 function removeEntry(block, i) {
   const arr = state.days[currentDay][block], e = arr[i], L = _addLink;
+  if (L && L.src === e && L.plan && !L.isNew && !confirm(`この予定を${dayLabel([L.day, ...L.copies.keys()])}曜のすべてから消しますか？`)) return;
   if (L && L.src === e) { L.copies.forEach((c, d) => { const a = state.days[d][L.block], k = a.indexOf(c); if (k >= 0) a.splice(k, 1); }); _addLink = null; } // 追加の途中で消したら、選んだ曜日の分も消す
   arr.splice(i, 1); render(); markSheetDirty();
 }
@@ -2675,7 +2691,14 @@ function placeByTime(arr, e) {
 // 「＋ 追加」のときに曜日も選ぶ（11/7）。選んだ曜日に同じ予定が入り、「✓ 決定」までは一緒に直る
 let _addLink = null; // { src, block, day, copies: Map(曜日→予定), moved }
 function addLinkDay(d, el) {
-  const L = _addLink; if (!L || d === L.day) return;
+  const L = _addLink; if (!L) return;
+  if (d === L.day) {
+    if (!L.plan) return;
+    if (!L.copies.size) { alert('曜日は1つ以上選んでください（予定を消すときは「削除」）'); return; }
+    const a0 = state.days[d][L.block]; a0.splice(a0.indexOf(L.src), 1); // 元にしていた曜日を外し、残りの曜日の1つを元にする
+    const [nd, ne] = L.copies.entries().next().value; L.copies.delete(nd); L.src = ne; L.day = nd; currentDay = nd; _copyForm = null;
+    renderEditor(); renderPaper(); updateTabMarks(); markSheetDirty(); return;
+  }
   const arr = state.days[d][L.block];
   if (L.copies.has(d)) { const k = arr.indexOf(L.copies.get(d)); if (k >= 0) arr.splice(k, 1); L.copies.delete(d); }
   else { const c = JSON.parse(JSON.stringify(L.src)); placeByTime(arr, c); L.copies.set(d, c); }
@@ -2697,25 +2720,86 @@ function addLinkWarn() { const el = document.getElementById('addLinkWarn'), h = 
 function addLinkEnd(quiet) {
   const L = _addLink; if (!L) return; _addLink = null;
   const arr = state.days[L.day] && state.days[L.day][L.block]; if (!arr || !arr.includes(L.src)) return; // 別の人を開いたあとなど
-  if (!L.moved && hmToMin(L.src.start) != null) { placeByTime(arr, L.src); markSheetDirty(); }
+  if (L.plan && L.isNew && JSON.stringify({ ...emptyEntry(), ...L.src }) === JSON.stringify(emptyEntry())) { [[L.day, L.src], ...L.copies].forEach(([d, e]) => { const a = state.days[d][L.block], k = a.indexOf(e); if (k >= 0) a.splice(k, 1); }); if (!quiet) render(); return; } // 何も入れずに閉じた新しい予定は残さない
+  const moved = (L.src.start || '') !== (L.origStart || '');
+  if (L.plan && moved && !L.blockSet && L.src.start) { const want = blockByTime(L.src.start); if (want !== L.block && (L.isNew || blockByTime(L.origStart) !== want)) { planMoveBlock(L, want); if (!quiet) render(); markSheetDirty(); return; } } // 時間を変えて朝・昼・夕が変わったら、用紙の段も合わせる（段を手で選んだときはそのまま）
+  if (!L.moved && moved && hmToMin(L.src.start) != null) { placeByTime(arr, L.src); markSheetDirty(); }
   if (quiet) return;
   if (L.copies.size) _copyMsg = { e: L.src, text: `✓ ${dayLabel([L.day, ...L.copies.keys()])}曜${L.src.start ? ` ${fmtTime(L.src.start)}〜${fmtTime(L.src.end)}` : ''} に入れました` };
   render();
 }
+function planMoveBlock(L, to) { [[L.day, L.src], ...L.copies].forEach(([d, e]) => { const a = state.days[d][L.block], k = a.indexOf(e); if (k >= 0) a.splice(k, 1); placeByTime(state.days[d][to], e); }); L.block = to; }
+function planSetBlock(v) { const L = _addLink; if (!L || !L.plan) return; L.blockSet = true; planMoveBlock(L, v); renderEditor(); renderPaper(); markSheetDirty(); }
+// ===== 予定ごとに入れる（11/7）：同じ予定は曜日をまとめて1行にする。保存の形は今までと同じ（曜日ごとの一覧） =====
+let sheetView = lsGet('smilewan_sheet_view') === 'plan' ? 'plan' : 'day', _planGroups = [];
+function setSheetView(v) { addLinkEnd(true); _copyForm = null; sheetView = v; lsSet('smilewan_sheet_view', v); render(); }
+function planGroups() {
+  const L = _addLink && _addLink.plan ? _addLink : null, skip = new Set(L ? [L.src, ...L.copies.values()] : []), map = new Map();
+  [1, 2, 3, 4, 5, 6, 0].forEach(d => BLOCKS.forEach(block => { const seen = new Map(); (state.days[d][block] || []).forEach(e => { if (skip.has(e)) return;
+    const base = JSON.stringify([block, e.type || '', e.start || '', e.end || '', e.detail || '', e.note || '', !!e.hl, [...(e.kpOff || [])].sort()]), nth = seen.get(base) || 0; seen.set(base, nth + 1); // 同じ曜日に同じ物が2つあれば別の行にする
+    const key = base + '#' + nth; if (!map.has(key)) map.set(key, { block, e, days: new Map() }); map.get(key).days.set(d, e); }); }));
+  return [...map.values()];
+}
+function planHits(g, groups) { // 同じ曜日で時間が重なる他の予定（知らせるだけ）
+  const s = hmToMin(g.e.start), t = hmToMin(g.e.end); if (s == null) return false;
+  return groups.some(o => o !== g && [...o.days.keys()].some(d => g.days.has(d)) && timesOverlap(o.e, s, t));
+}
+function planRowHtml(g, gi, groups) {
+  const e = g.e, lines = detailLines(e.detail).join('・');
+  return `<div class="plan-row ${e.hl ? 'hl' : ''}">
+    <div class="plan-main" onclick="planOpen(${gi})" title="押すと開いて直せます"><b>${e.start ? `${fmtTime(e.start)}〜${fmtTime(e.end)}` : '時間なし'}</b>　${esc(e.type || '')}${planHits(g, groups) ? '<span class="plan-warn">⚠ 時間が重なっています</span>' : ''}
+      <div class="plan-sub">${esc(lines || '（内容なし）')}${e.note ? `（${esc(e.note)}）` : ''}</div></div>
+    <div class="chips plan-days">${[1, 2, 3, 4, 5, 6, 0].map(d => `<span class="chip ${g.days.has(d) ? 'on' : ''}" data-d="${d}" onclick="planDay(${gi},${d})">${DAYS[d]}</span>`).join('')}</div>
+  </div>`;
+}
+function renderPlanView() {
+  const L = _addLink && _addLink.plan ? _addLink : null, groups = planGroups(); _planGroups = groups;
+  const rows = groups.map((g, gi) => ({ min: hmToMin(g.e.start) ?? 1e9, html: planRowHtml(g, gi, groups) }));
+  if (L) { const a = state.days[L.day][L.block]; rows.push({ min: L.openMin, html: entryHtml(L.block, a.indexOf(L.src), L.src, a.length) }); }
+  rows.sort((a, b) => a.min - b.min);
+  document.getElementById('dayEditor').innerHTML = `<div class="block"><h3><span>予定の一覧（${groups.length + (L ? 1 : 0)}件）</span><button class="small" id="planAddBtn" onclick="planAdd()">＋ 予定を追加</button></h3>
+    ${rows.length ? rows.map(r => r.html).join('') : '<div class="hint">（なし）「＋ 予定を追加」で作ります</div>'}
+    <div class="hint">曜日を押すと、その曜日に入る／外れる。行を押すと開いて直せます。</div></div>`;
+  _copyMsg = null;
+}
+function planDay(gi, d) {
+  const g = _planGroups[gi]; if (!g) return;
+  const arr = state.days[d][g.block];
+  if (g.days.has(d)) {
+    if (g.days.size === 1 && !confirm(`${DAYS[d]}曜だけの予定です。消しますか？\n${fmtTime(g.e.start)}〜${fmtTime(g.e.end)} ${g.e.type || ''}`)) return;
+    const k = arr.indexOf(g.days.get(d)); if (k >= 0) arr.splice(k, 1);
+  } else placeByTime(arr, JSON.parse(JSON.stringify(g.e)));
+  renderEditor(); renderPaper(); updateTabMarks(); markSheetDirty();
+}
+function planOpen(gi) {
+  const g = _planGroups[gi]; if (!g) return;
+  addLinkEnd(true); _copyForm = null;
+  const days = [...g.days.keys()], day = days[0]; currentDay = day;
+  _addLink = { plan: true, isNew: false, src: g.days.get(day), block: g.block, day, copies: new Map(days.slice(1).map(d => [d, g.days.get(d)])), moved: false, blockSet: false, origStart: g.e.start || '', openMin: hmToMin(g.e.start) ?? 1e9 };
+  renderEditor();
+  const c = document.querySelector('.add-days'); if (c) c.closest('.entry').scrollIntoView({ block: 'start' });
+}
+function planAdd() {
+  addLinkEnd(true); _copyForm = null;
+  const e = emptyEntry(); currentDay = 1; state.days[1].upper.push(e); // 段は時間を入れたあと、閉じるときに合わせる
+  _addLink = { plan: true, isNew: true, src: e, block: 'upper', day: 1, copies: new Map(), moved: false, blockSet: false, origStart: '', openMin: 2e9 };
+  render();
+  const c = document.querySelector('.add-days'); if (c) c.closest('.entry').scrollIntoView({ block: 'start' });
+}
 function addDaysHtml(L) {
   return `<div class="copy-box add-days">
     <div class="copy-title">入れる曜日（いくつでも選べます）</div>
-    <div class="chips" style="margin-top:4px">${[1, 2, 3, 4, 5, 6, 0].map(d => d === L.day ? `<span class="chip on fixed-day" title="今開いている曜日です">${DAYS[d]}</span>` : `<span class="chip ${L.copies.has(d) ? 'on' : ''}" data-d="${d}" onclick="addLinkDay(${d},this)">${DAYS[d]}</span>`).join('')}</div>
+    <div class="chips" style="margin-top:4px">${[1, 2, 3, 4, 5, 6, 0].map(d => d === L.day && !L.plan ? `<span class="chip on fixed-day" title="今開いている曜日です">${DAYS[d]}</span>` : `<span class="chip ${d === L.day || L.copies.has(d) ? 'on' : ''}" data-d="${d}" onclick="addLinkDay(${d},this)">${DAYS[d]}</span>`).join('')}</div>
     <div class="hint">この下で入れた時間・内容は、選んだ曜日にも同じように入ります。</div>
     <div class="copy-warn" id="addLinkWarn">${addLinkHits().length ? `⚠ 時間が重なっています：${esc(addLinkHits().join('、'))}` : ''}</div>
-    <div class="row" style="margin-top:6px"><button class="small primary" id="addLinkDone" onclick="addLinkEnd()">✓ 決定</button></div>
+    ${L.plan ? `<label>用紙の段</label><select onchange="planSetBlock(this.value)">${[['upper', '上段（午前）'], ['middle', '中段（昼）'], ['lower', '下段（夕方〜夜）']].map(([k, v]) => `<option value="${k}" ${k === L.block ? 'selected' : ''}>${v}</option>`).join('')}</select>` : ''}
   </div>`;
 }
 function copyEntryOpen(block, i) {
   const e = state.days[currentDay][block][i];
   if (_copyForm && _copyForm.src === e) { _copyForm = null; renderEditor(); return; } // 押し直すと閉じる
   const s = hmToMin(e.start), t = hmToMin(e.end);
-  _copyForm = { src: e, srcBlock: block, start: e.start || '', end: e.end || '', dur: s != null && t != null && t > s ? t - s : null, days: [currentDay], block, blockSet: false };
+  _copyForm = { src: e, srcBlock: block, start: e.start || '', end: e.end || '', dur: s != null && t != null && t > s ? t - s : null, days: _addLink && _addLink.src === e ? [_addLink.day, ..._addLink.copies.keys()] : [currentDay], block, blockSet: false };
   renderEditor();
 }
 function copyFormTime(key, val) {
@@ -2795,6 +2879,10 @@ function updateTabMarks() {
 }
 
 function renderEditor() {
+  const plan = sheetView === 'plan';
+  [['dayTabs', !plan], ['dayCopyRow', !plan]].forEach(([id, on]) => { const el = document.getElementById(id); if (el) el.style.display = on ? '' : 'none'; });
+  const b1 = document.getElementById('viewDayBtn'), b2 = document.getElementById('viewPlanBtn'); if (b1 && b2) { b1.classList.toggle('active', !plan); b2.classList.toggle('active', plan); }
+  if (plan) { renderPlanView(); return; }
   const day = state.days[currentDay];
   const blockHtml = (key, label) => `
     <div class="block">
@@ -2818,11 +2906,11 @@ function entryHtml(block, i, e, n) {
   const chipHtml = v => `<span class="chip ${lines.includes(v) ? 'on' : ''}" onclick="toggleDetail('${block}',${i},this.dataset.v)" data-v="${esc(v)}">${esc(v)}</span>`;
   return `
   <div class="entry">
-    <div class="entry-head"><span>サービス ${i + 1}</span>
+    <div class="entry-head"><span>${_addLink && _addLink.plan && _addLink.src === e ? (_addLink.isNew ? '新しい予定' : 'この予定を直す') : `サービス ${i + 1}`}</span>
       <div class="btns">
         <button class="small" title="この内容を他の時間・曜日にもコピーする" onclick="copyEntryOpen('${block}',${i})">📋 コピー</button>
-        <button class="small" ${i === 0 ? 'disabled' : ''} onclick="moveEntry('${block}',${i},-1)">↑</button>
-        <button class="small" ${i === n - 1 ? 'disabled' : ''} onclick="moveEntry('${block}',${i},1)">↓</button>
+        ${sheetView === 'plan' ? '' : `<button class="small" ${i === 0 ? 'disabled' : ''} onclick="moveEntry('${block}',${i},-1)">↑</button>
+        <button class="small" ${i === n - 1 ? 'disabled' : ''} onclick="moveEntry('${block}',${i},1)">↓</button>`}
         <button class="small danger" onclick="removeEntry('${block}',${i})">削除</button>
       </div>
     </div>
@@ -2852,6 +2940,7 @@ function entryHtml(block, i, e, n) {
       <input type="text" placeholder="自由入力" value="${esc(e.note)}" oninput="setField('${block}',${i},'note',this.value)">
     </div>
     <label class="check"><input type="checkbox" ${e.hl ? 'checked' : ''} onchange="setField('${block}',${i},'hl',this.checked)"> 黄色マーカーを付ける（通院介助など）</label>
+    ${_addLink && _addLink.src === e ? `<div class="row" style="margin-top:8px"><button class="primary" id="addLinkDone" onclick="addLinkEnd()">${_addLink.plan && !_addLink.isNew ? '✓ 閉じる' : '✓ 決定'}</button></div>` : ''}
   </div>`;
 }
 
