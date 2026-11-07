@@ -84,6 +84,10 @@
   .copy-box { border: 1px dashed var(--accent); border-radius: 6px; padding: 8px; margin: 6px 0; background: var(--panel2); }
   .copy-box .copy-title { font-size: 12px; font-weight: 700; color: var(--text); }
   .copy-done { font-size: 12px; font-weight: 700; color: var(--accent); margin-top: 4px; }
+  .copy-warn { font-size: 12px; font-weight: 700; color: var(--danger); margin-top: 4px; }
+  .copy-warn:empty { display: none; }
+  .chip.fixed-day { cursor: default; }
+  .chip-sep { flex-basis: 100%; font-size: 11px; color: var(--muted); margin-top: 4px; }
   .saved-list { display: flex; gap: 6px; align-items: center; margin-bottom: 8px; }
   .saved-list select { flex: 1; }
 
@@ -313,8 +317,8 @@
     </div>
     <div id="sheetPanel">
     <div class="toolbar">
-      <button class="primary" onclick="window.print()">🖨 印刷する</button>
-      <button onclick="saveCurrent()">💾 保存</button>
+      <button class="primary" onclick="addLinkEnd(); window.print()">🖨 印刷する</button>
+      <button onclick="addLinkEnd(); saveCurrent()">💾 保存</button>
       <button onclick="newSheet()">＋ 新規作成</button>
       <button onclick="exportJson()">書き出し</button>
       <button onclick="document.getElementById('importFile').click()">読み込み</button>
@@ -538,7 +542,8 @@
         <li>曜日のボタン（月〜日）を押す</li>
         <li>入れたい段の「＋ 追加」を押し、種別・時間・内容・備考を選ぶ
           <ul>
-            <li>内容は候補のボタンを押して選ぶ。青が選ばれている内容で、もう一度押すと外れる。候補にないものは下の欄に入力して Enter</li>
+            <li>同じ予定を他の曜日にも入れるときは、「＋ 追加」のあとに出る「入れる曜日」で曜日を選ぶ。そのあと入れた時間・内容は、選んだ曜日にも同じように入る。入れ終わったら「✓ 決定」</li>
+            <li>内容は候補のボタンを押して選ぶ。青が選ばれている内容で、もう一度押すと外れる。その人の予定で使っている内容が先に並ぶ。候補にないものは下の欄に入力して Enter</li>
           </ul>
         </li>
         <li>同じ内容を他の時間にも入れるときは、そのサービスの「📋 コピー」を押し、時間と曜日を選んで「ここに入れる」（開始を変えると、終わりも同じ長さで動く）</li>
@@ -794,7 +799,7 @@ async function setSetting(key, localKey, list, opt = {}) {
 const SUPA = { url: '', key: '' }; // 旧（使わない）
 const GAS = {"url": "https://script.google.com/macros/s/AKfycbxKEAUthQx9wiZKncHZR43jbSKjPfO2lYhlc2K5yXWJNXI_zA8wChdQTFlINEhLTDQO/exec"};           // 保存先（Googleドライブに保存するGAS）。build-site.sh が入れる
 // 版の確認：公開版が新しくなったら知らせ、古い版のままでは記録を保存しない（古い決まりで上書きしないため）
-const APP_VER = '20261107110750';
+const APP_VER = '20261107131700';
 let appOutdated = false;
 async function checkVer() {
   if (APP_VER === 'dev' || appOutdated) return appOutdated;
@@ -2607,11 +2612,22 @@ function markRecDirty() {
   clearTimeout(recTimer);
   recTimer = setTimeout(() => saveRecords({ quiet: true }), 3000);
 }
-function addEntry(block) { state.days[currentDay][block].push(emptyEntry()); render(); markSheetDirty(); }
-function removeEntry(block, i) { state.days[currentDay][block].splice(i, 1); render(); markSheetDirty(); }
+function addEntry(block) {
+  addLinkEnd(true);
+  const e = emptyEntry(); state.days[currentDay][block].push(e);
+  _addLink = { src: e, block, day: currentDay, copies: new Map(), moved: false }; // 「＋ 追加」のあと、決定するまで曜日を選べる
+  render(); markSheetDirty();
+  const box = document.querySelector('.add-days'); if (box) box.scrollIntoView({ block: 'nearest' });
+}
+function removeEntry(block, i) {
+  const arr = state.days[currentDay][block], e = arr[i], L = _addLink;
+  if (L && L.src === e) { L.copies.forEach((c, d) => { const a = state.days[d][L.block], k = a.indexOf(c); if (k >= 0) a.splice(k, 1); }); _addLink = null; } // 追加の途中で消したら、選んだ曜日の分も消す
+  arr.splice(i, 1); render(); markSheetDirty();
+}
 function moveEntry(block, i, dir) {
   const arr = state.days[currentDay][block]; const j = i + dir;
   if (j < 0 || j >= arr.length) return;
+  if (_addLink && _addLink.day === currentDay && _addLink.block === block) _addLink.moved = true; // 手で並べたら、そのままにする
   [arr[i], arr[j]] = [arr[j], arr[i]]; render(); markSheetDirty();
 }
 function detailLines(d) { return String(d || '').split('\n').map(x => x.trim()).filter(Boolean); }
@@ -2624,6 +2640,13 @@ function detailChoices() {
   _detailCache = [...used];
   return [...DETAIL_PRESETS, ..._detailCache.filter(v => !DETAIL_PRESETS.includes(v)).sort((a, b) => a.localeCompare(b, 'ja'))];
 }
+// 内容の候補の並び（11/7）：選ばれている内容 → その人の他の予定で使っている内容（多い順） → ほかの候補（今までの順）
+function detailChipOrder(e) {
+  const lines = detailLines(e.detail), n = new Map();
+  (state.days || []).forEach(d => dayEntries(d).forEach(x => { if (x !== e) detailLines(x.detail).forEach(v => n.set(v, (n.get(v) || 0) + 1)); }));
+  const rest = detailChoices().filter(v => !lines.includes(v));
+  return { lines, mine: rest.filter(v => n.has(v)).sort((a, b) => n.get(b) - n.get(a)), others: rest.filter(v => !n.has(v)) }; // sort は同じ数なら今までの順のまま
+}
 function typeChoices() {
   const base = SERVICE_TYPES.filter(t => t !== 'その他');
   const used = new Set();
@@ -2634,13 +2657,60 @@ function toggleDetail(block, i, v, addOnly) {
   const e = state.days[currentDay][block][i], ls = detailLines(e.detail);
   const k = ls.indexOf(v);
   if (k >= 0) { if (addOnly) return; ls.splice(k, 1); } else ls.push(v);
-  e.detail = ls.join('\n'); renderEditor(); renderPaper(); updateTabMarks(); markSheetDirty();
+  e.detail = ls.join('\n'); addLinkSync(e, 'detail'); renderEditor(); renderPaper(); updateTabMarks(); markSheetDirty();
 }
-function setField(block, i, key, val) { state.days[currentDay][block][i][key] = val; renderPaper(); updateTabMarks(); markSheetDirty(); }
+function setField(block, i, key, val) { const e = state.days[currentDay][block][i]; e[key] = val; addLinkSync(e, key); renderPaper(); updateTabMarks(); markSheetDirty(); }
 // 1つの予定を他の時間・他の曜日にもコピーする（11/7）。種別・内容・備考・マーカー・「付けない」項目はそのまま、時間だけ変える
 let _copyForm = null, _copyMsg = null;
 const hmToMin = t => { const m = /^(\d{1,2}):(\d{2})$/.exec(t || ''); return m ? +m[1] * 60 + +m[2] : null; };
 const minToHm = n => `${String(Math.floor(n / 60)).padStart(2, '0')}:${String(n % 60).padStart(2, '0')}`;
+const dayLabel = ds => [1, 2, 3, 4, 5, 6, 0].filter(x => ds.includes(x)).map(x => DAYS[x]).join('・');
+const timesOverlap = (x, s, t) => { const a = hmToMin(x.start), b = hmToMin(x.end); return a != null && s != null && (b != null && t != null ? s < b && a < t : a === s); };
+// 時間の順の位置に入れる（時間なしは後ろ）
+function placeByTime(arr, e) {
+  const i = arr.indexOf(e); if (i >= 0) arr.splice(i, 1);
+  const s = hmToMin(e.start), k = s == null ? -1 : arr.findIndex(x => { const a = hmToMin(x.start); return a != null && a > s; });
+  arr.splice(k < 0 ? arr.length : k, 0, e);
+}
+// 「＋ 追加」のときに曜日も選ぶ（11/7）。選んだ曜日に同じ予定が入り、「✓ 決定」までは一緒に直る
+let _addLink = null; // { src, block, day, copies: Map(曜日→予定), moved }
+function addLinkDay(d, el) {
+  const L = _addLink; if (!L || d === L.day) return;
+  const arr = state.days[d][L.block];
+  if (L.copies.has(d)) { const k = arr.indexOf(L.copies.get(d)); if (k >= 0) arr.splice(k, 1); L.copies.delete(d); }
+  else { const c = JSON.parse(JSON.stringify(L.src)); placeByTime(arr, c); L.copies.set(d, c); }
+  el.classList.toggle('on', L.copies.has(d));
+  addLinkWarn(); renderPaper(); updateTabMarks(); markSheetDirty();
+}
+function addLinkSync(e, key) {
+  const L = _addLink; if (!L || L.src !== e) return;
+  L.copies.forEach((c, d) => { Object.assign(c, JSON.parse(JSON.stringify(e))); if (key === 'start') placeByTime(state.days[d][L.block], c); });
+  if (key === 'start' || key === 'end') addLinkWarn();
+}
+function addLinkHits() { // 選んだ曜日で時間が重なる、ほかの予定（2人で入る訪問があるので、知らせるだけ）
+  const L = _addLink; if (!L) return [];
+  const s = hmToMin(L.src.start), t = hmToMin(L.src.end), mine = new Set([L.src, ...L.copies.values()]), hits = [];
+  [L.day, ...L.copies.keys()].forEach(d => dayEntries(state.days[d]).forEach(x => { if (!mine.has(x) && timesOverlap(x, s, t)) hits.push(`${DAYS[d]}曜 ${fmtTime(x.start)}〜${fmtTime(x.end)} ${x.type || ''}`); }));
+  return hits;
+}
+function addLinkWarn() { const el = document.getElementById('addLinkWarn'), h = addLinkHits(); if (el) el.textContent = h.length ? `⚠ 時間が重なっています：${h.join('、')}` : ''; }
+function addLinkEnd(quiet) {
+  const L = _addLink; if (!L) return; _addLink = null;
+  const arr = state.days[L.day] && state.days[L.day][L.block]; if (!arr || !arr.includes(L.src)) return; // 別の人を開いたあとなど
+  if (!L.moved && hmToMin(L.src.start) != null) { placeByTime(arr, L.src); markSheetDirty(); }
+  if (quiet) return;
+  if (L.copies.size) _copyMsg = { e: L.src, text: `✓ ${dayLabel([L.day, ...L.copies.keys()])}曜${L.src.start ? ` ${fmtTime(L.src.start)}〜${fmtTime(L.src.end)}` : ''} に入れました` };
+  render();
+}
+function addDaysHtml(L) {
+  return `<div class="copy-box add-days">
+    <div class="copy-title">入れる曜日（いくつでも選べます）</div>
+    <div class="chips" style="margin-top:4px">${[1, 2, 3, 4, 5, 6, 0].map(d => d === L.day ? `<span class="chip on fixed-day" title="今開いている曜日です">${DAYS[d]}</span>` : `<span class="chip ${L.copies.has(d) ? 'on' : ''}" data-d="${d}" onclick="addLinkDay(${d},this)">${DAYS[d]}</span>`).join('')}</div>
+    <div class="hint">この下で入れた時間・内容は、選んだ曜日にも同じように入ります。</div>
+    <div class="copy-warn" id="addLinkWarn">${addLinkHits().length ? `⚠ 時間が重なっています：${esc(addLinkHits().join('、'))}` : ''}</div>
+    <div class="row" style="margin-top:6px"><button class="small primary" id="addLinkDone" onclick="addLinkEnd()">✓ 決定</button></div>
+  </div>`;
+}
 function copyEntryOpen(block, i) {
   const e = state.days[currentDay][block][i];
   if (_copyForm && _copyForm.src === e) { _copyForm = null; renderEditor(); return; } // 押し直すと閉じる
@@ -2689,19 +2759,17 @@ function copyEntryDo() {
   if (!targets.length) { alert('同じ時間に同じ内容がもう入っています。時間か曜日を変えてください'); return; }
   // 時間が重なる予定があれば聞く（2人で入る訪問などがあるので、止めはしない）
   const hits = [];
-  targets.forEach(d => dayEntries(state.days[d]).forEach(x => { const a = hmToMin(x.start), b = hmToMin(x.end);
-    if (a != null && s != null && (b != null && t != null ? s < b && a < t : a === s)) hits.push(`${DAYS[d]}曜 ${fmtTime(x.start)}〜${fmtTime(x.end)} ${x.type || ''}`); }));
+  targets.forEach(d => dayEntries(state.days[d]).forEach(x => { if (timesOverlap(x, s, t)) hits.push(`${DAYS[d]}曜 ${fmtTime(x.start)}〜${fmtTime(x.end)} ${x.type || ''}`); }));
   if (hits.length && !confirm(`時間が重なる予定があります。\n${hits.join('\n')}\n\nこのまま入れますか？`)) return;
   targets.forEach(d => {
-    const arr = state.days[d][f.block], c = JSON.parse(JSON.stringify(e)); c.start = f.start; c.end = f.end;
-    const k = s == null ? -1 : arr.findIndex(x => { const a = hmToMin(x.start); return a != null && a > s; }); // 時間の順に入れる
-    arr.splice(k < 0 ? arr.length : k, 0, c);
+    const c = JSON.parse(JSON.stringify(e)); c.start = f.start; c.end = f.end;
+    placeByTime(state.days[d][f.block], c); // 時間の順に入れる
   });
-  const label = d => [1, 2, 3, 4, 5, 6, 0].filter(x => d.includes(x)).map(x => DAYS[x]).join('・');
-  _copyMsg = { e, text: `✓ ${label(targets)}曜${f.start ? ` ${fmtTime(f.start)}〜${fmtTime(f.end)}` : ''} に入れました${skipped.length ? `（${label(skipped)}曜は同じものがあるので入れていません）` : ''}` };
+  _copyMsg = { e, text: `✓ ${dayLabel(targets)}曜${f.start ? ` ${fmtTime(f.start)}〜${fmtTime(f.end)}` : ''} に入れました${skipped.length ? `（${dayLabel(skipped)}曜は同じものがあるので入れていません）` : ''}` };
   _copyForm = null; render(); markSheetDirty();
 }
 function copyDay() {
+  addLinkEnd(true);
   const to = +document.getElementById('copyTarget').value;
   if (to === currentDay) { alert('同じ曜日です'); return; }
   const src = state.days[currentDay];
@@ -2718,7 +2786,7 @@ function renderTabs() {
   const el = document.getElementById('dayTabs');
   el.innerHTML = [1, 2, 3, 4, 5, 6, 0].map(d => {
     const cls = ['', d === currentDay ? 'active' : '', d === 0 ? 'sun' : d === 6 ? 'sat' : '', dayHas(d) ? 'has' : ''].join(' ');
-    return `<button class="${cls}" data-d="${d}" onclick="currentDay=${d}; render()">${DAYS[d]}</button>`;
+    return `<button class="${cls}" data-d="${d}" onclick="addLinkEnd(true); currentDay=${d}; render()">${DAYS[d]}</button>`;
   }).join('');
 }
 function dayHas(d) { return dayEntries(state.days[d]).length; }
@@ -2746,8 +2814,8 @@ function entryHtml(block, i, e, n) {
   const types = typeChoices();
   const typeIsPreset = types.includes(e.type) || !e.type;
   // 内容: この予定の内容（取り込んだものも）を選ばれた状態のチップで先に並べ、残りの候補を後ろに
-  const lines = detailLines(e.detail);
-  const chips = [...lines, ...detailChoices().filter(v => !lines.includes(v))];
+  const { lines, mine, others } = detailChipOrder(e);
+  const chipHtml = v => `<span class="chip ${lines.includes(v) ? 'on' : ''}" onclick="toggleDetail('${block}',${i},this.dataset.v)" data-v="${esc(v)}">${esc(v)}</span>`;
   return `
   <div class="entry">
     <div class="entry-head"><span>サービス ${i + 1}</span>
@@ -2758,6 +2826,7 @@ function entryHtml(block, i, e, n) {
         <button class="small danger" onclick="removeEntry('${block}',${i})">削除</button>
       </div>
     </div>
+    ${_addLink && _addLink.src === e ? addDaysHtml(_addLink) : ''}
     ${_copyForm && _copyForm.src === e ? copyBoxHtml(_copyForm, block, i) : ''}
     ${_copyMsg && _copyMsg.e === e ? `<div class="copy-done">${esc(_copyMsg.text)}</div>` : ''}
     <label>種別</label>
@@ -2775,7 +2844,7 @@ function entryHtml(block, i, e, n) {
       <input type="time" step="300" value="${esc(e.end)}" onchange="setField('${block}',${i},'end',this.value)">
     </div>
     <label>内容（押して選ぶ・もう一度押すと外れます。青が選ばれている内容）</label>
-    <div class="chips detail-chips">${chips.map(v => `<span class="chip ${lines.includes(v) ? 'on' : ''}" onclick="toggleDetail('${block}',${i},this.dataset.v)" data-v="${esc(v)}">${esc(v)}</span>`).join('')}</div>
+    <div class="chips detail-chips">${[...lines, ...mine].map(chipHtml).join('')}${(lines.length || mine.length) && others.length ? '<span class="chip-sep">ほかの候補</span>' : ''}${others.map(chipHtml).join('')}</div>
     <input type="text" list="detailList" placeholder="候補にない内容は、ここに入力して Enter" style="margin-top:4px" onkeydown="if(event.key==='Enter'&&!event.isComposing&&this.value.trim()){toggleDetail('${block}',${i},this.value.trim(),true);this.value='';}" onchange="if(this.value.trim()&&DETAIL_PRESETS.includes(this.value.trim())){toggleDetail('${block}',${i},this.value.trim(),true);this.value='';}">
     <label>備考</label>
     <div class="row">
