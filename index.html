@@ -229,6 +229,18 @@
   .dup-alert { background: var(--dup-alert-bg); color: var(--dup-alert-text); border: 1px solid var(--dup-alert-line); border-radius: 6px; padding: 6px 10px; margin-bottom: 8px; font-size: 13px; }
   #kpPop { position: absolute; z-index: 50; background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 6px 24px rgba(0,0,0,.18); padding: 10px 12px; width: 470px; max-height: 70vh; overflow: auto; display: none; }
   #vPop { position: absolute; z-index: 50; background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 6px 24px rgba(0,0,0,.18); padding: 10px 12px; width: 470px; max-height: 75vh; overflow: auto; display: none; }
+  #ckSheet { position: fixed; inset: 0; z-index: 60; background: rgba(0,0,0,.35); display: none; overflow: auto; padding: 16px; }
+  #ckSheet .ck-box { background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 10px; max-width: 980px; margin: 0 auto; padding: 12px 14px; }
+  #ckSheet table { border-collapse: collapse; width: 100%; font-size: 13px; }
+  #ckSheet th, #ckSheet td { border-bottom: 1px solid var(--line); padding: 4px 6px; text-align: left; vertical-align: middle; }
+  #ckSheet thead th { position: sticky; top: -16px; background: var(--panel); font-size: 12px; z-index: 1; }
+  #ckSheet td.c { text-align: center; white-space: nowrap; }
+  #ckSheet td.c input { width: 18px; height: 18px; vertical-align: middle; cursor: pointer; }
+  #ckSheet td.c.chg { background: var(--warn-bg); }
+  #ckSheet .mk { font-size: 10px; color: var(--accent); font-weight: bold; margin-left: 2px; }
+  #ckSheet .part { font-size: 10px; color: var(--muted); margin-left: 2px; }
+  #ckSheet tr.cat td { font-size: 11px; color: var(--muted); background: var(--accent-soft); }
+  #ckSheet .ck-foot { position: sticky; bottom: -16px; background: var(--panel); padding: 8px 0 4px; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
   #vPop .cat { font-size: 11px; color: var(--muted); margin: 8px 0 3px; }
   #vPop .head { display: flex; justify-content: space-between; align-items: center; font-size: 12px; margin-bottom: 4px; }
   #vPop .row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: 12px; }
@@ -454,6 +466,7 @@
         <button class="primary" onclick="buildRecords()">📝 記録を生成</button>
         <button onclick="copyRecordsTsv()">表をコピー</button>
         <button id="docxBtn" onclick="exportRecordsDocx()">📄 文章をWord</button>
+        <button onclick="checkSheetOpen()" title="時間ごと×項目の一覧でチェックを見直して、予定表と開いている月の記録にまとめて当てます">📋 チェック確認表</button>
         <button id="qaAllBtn" onclick="qaAllSaved()" title="保存してある全員・全月の記録を点検して、合わない所を一覧にします">🔍 全件点検</button>
         <button id="pdfBtn" onclick="exportRecordsPdf()">📄 文章をPDF</button>
         <button id="chkPdfBtn" onclick="exportRecordsPdf('check')">✅ チェックリストをPDF</button>
@@ -705,6 +718,7 @@
 
     <div id="statePop"></div>
     <div id="kpPop"></div>
+    <div id="ckSheet" onclick="if(event.target===this)checkSheetClose()"></div>
     <div id="vPop"></div>
   </div>
 </div>
@@ -815,7 +829,7 @@ async function setSetting(key, localKey, list, opt = {}) {
 const SUPA = { url: '', key: '' }; // 旧（使わない）
 const GAS = {"url": "https://script.google.com/macros/s/AKfycbxKEAUthQx9wiZKncHZR43jbSKjPfO2lYhlc2K5yXWJNXI_zA8wChdQTFlINEhLTDQO/exec"};           // 保存先（Googleドライブに保存するGAS）。build-site.sh が入れる
 // 版の確認：公開版が新しくなったら知らせ、古い版のままでは記録を保存しない（古い決まりで上書きしないため）
-const APP_VER = '20261109155746';
+const APP_VER = '20261109163451';
 let appOutdated = false;
 async function checkVer() {
   if (APP_VER === 'dev' || appOutdated) return appOutdated;
@@ -3497,6 +3511,83 @@ function openKpPop(i, btn) {
   pop.style.display = 'block';
   pop.style.left = Math.max(8, Math.min(window.scrollX + rect.left, window.innerWidth - 480)) + 'px';
   pop.style.top = (window.scrollY + rect.bottom + 4) + 'px';
+}
+// ===== チェック確認表（11/9 ユーザー指示「自動でできるようにして」：一覧でチェック→そのまま当たる）=====
+//   列＝予定表の時間（開始時刻＋種別）、行＝実施項目。☑＝開いている月の記録の半分以上で付いている物。計＝手順書（計画書）、見＝見本の用紙。
+//   「当てる」と、変えたマスだけ ①予定表の枠（これから作る記録）②開いている月の記録（締めた月は除く）に入る。
+//   変えていないマスは今までの決まりのまま（シーツは週1回・眠前薬は次の日の身体だけ など、日によって変わる物を消さない）
+let _ck = null;
+function ckCols() {
+  const map = new Map();
+  [1, 2, 3, 4, 5, 6, 0].forEach(d => dayEntries(state.days[d]).forEach(e => { const t = entryTime(e); if (!t.s) return; const key = fmtTime(t.s) + '|' + (e.type || '');
+    if (!map.has(key)) map.set(key, { key, start: t.s, end: e.end || t.e || '', type: e.type || '', fam: entFam(e), days: new Set(), entries: [] });
+    const c = map.get(key); c.days.add(d); c.entries.push(e); }));
+  return [...map.values()].sort((a, b) => hm(a.start) - hm(b.start));
+}
+function ckColOf(cols, r) { // 記録の訪問が、予定表のどの時間の物か（シフトで時刻が少しずれた訪問も、45分以内で同じ種類なら同じ列）
+  const st = hm(r.e.start || entryTime(r.e).s), dow = r.date.getDay(), fam = entFam(r.e); if (st == null) return null;
+  const near = list => list.filter(c => Math.abs(hm(c.start) - st) <= 45).sort((a, b) => Math.abs(hm(a.start) - st) - Math.abs(hm(b.start) - st))[0];
+  return near(cols.filter(c => c.days.has(dow) && c.fam === fam)) || near(cols.filter(c => c.days.has(dow))) || near(cols.filter(c => c.fam === fam)) || null;
+}
+const ckColLabel = c => `${tmplTod(c.start)} ${fmtTime(c.start)}${c.end ? '〜' + fmtTime(c.end) : ''}（${c.type || '種別なし'}・${c.days.size === 7 ? '毎日' : dayLabel([...c.days])}）`;
+function checkSheetOpen() {
+  const name = (state.name || '').trim();
+  if (!name || !hasContent()) { alert('先に利用者を選んでください'); return; }
+  const rows = recRows.filter(r => r.on !== false && r.e && !rowClosed(r));
+  if (!rows.length) { alert('先に、今の月の記録を開いてください（「📚 保存した訪問記録」で月を選んで「開く」、または「📝 記録を生成」）。\n締めた月（7〜10月）は変えません。直すときは先に「月を開ける」を押してください。'); return; }
+  const cols = ckCols(); if (!cols.length) { alert('予定表に、時間の入った予定がありません'); return; }
+  cols.forEach(c => { c.rows = []; }); let other = 0;
+  rows.forEach(r => { const c = ckColOf(cols, r); if (c) c.rows.push(r); else other++; });
+  const use = cols.filter(c => c.rows.length);
+  use.forEach(c => { c.cnt = {}; c.rows.forEach(r => kpAll(r).forEach(k => { c.cnt[k] = (c.cnt[k] || 0) + 1; }));
+    const smp = c.rows[0]; c.sample = smp; let pl = [], tm = []; try { pl = planItems(smp) || []; } catch (e) {} try { tm = tmplItems(smp) || []; } catch (e) {}
+    c.plan = new Set(pl); c.tmpl = new Set(tm); c.init = new Set(Object.keys(c.cnt).filter(k => c.cnt[k] * 2 >= c.rows.length)); c.now = new Set(c.init); });
+  const months = [...new Set(rows.map(r => ymd(r.date).slice(0, 7)))].sort();
+  _ck = { name, cols: use, other, empty: cols.filter(c => !c.rows.length), months, closedSkip: recRows.filter(r => r.on !== false && r.e && rowClosed(r)).length };
+  renderCheckSheet(); document.getElementById('ckSheet').style.display = 'block';
+}
+function checkSheetClose() { document.getElementById('ckSheet').style.display = 'none'; _ck = null; }
+function ckToggle(ci, k) { const c = _ck && _ck.cols[ci]; if (!c) return; if (c.now.has(k)) c.now.delete(k); else c.now.add(k); renderCheckSheet(); }
+function ckChanges() { const out = []; if (!_ck) return out; _ck.cols.forEach(c => KPD().forEach(([, cat, items]) => items.forEach(it => { const k = cat + '|' + it; if (c.now.has(k) !== c.init.has(k)) out.push({ c, k, on: c.now.has(k) }); }))); return out; }
+function renderCheckSheet() {
+  const box = document.getElementById('ckSheet'); if (!_ck) { box.innerHTML = ''; return; }
+  const C = _ck.cols, ch = ckChanges(), y = document.getElementById('ckSheet').scrollTop;
+  const head = `<tr><th>項目</th>${C.map(c => `<th class="c" style="text-align:center">${esc(ckColLabel(c))}<br><small style="font-weight:normal">記録${c.rows.length}件</small></th>`).join('')}</tr>`;
+  const body = KPD().map(([lb, cat, items]) => `<tr class="cat"><td colspan="${1 + C.length}">${esc(lb)}</td></tr>` + items.map(it => { const k = cat + '|' + it;
+    return `<tr><td>${esc(it)}</td>${C.map((c, ci) => { const n = c.cnt[k] || 0, on = c.now.has(k), blk = !on && kpBlocked(c.sample, k);
+      return `<td class="c ${on !== c.init.has(k) ? 'chg' : ''}" title="${esc(blk || `この時間の記録${c.rows.length}件のうち${n}件に付いている`)}"><input type="checkbox" ${on ? 'checked' : ''} ${blk ? 'disabled' : ''} onclick="ckToggle(${ci},'${k.replace(/'/g, "\\'")}')">${c.plan.has(k) ? '<span class="mk" title="手順書（計画書）にある">計</span>' : ''}${c.tmpl.has(k) ? '<span class="mk" title="見本の用紙にある">見</span>' : ''}${n && n < c.rows.length ? `<span class="part">${n}/${c.rows.length}</span>` : ''}</td>`; }).join('')}</tr>`; }).join('')).join('');
+  box.innerHTML = `<div class="ck-box"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><b style="font-size:16px">📋 ${esc(_ck.name)}さん チェック確認表（${esc(_ck.months.join('・'))}）</b><button class="small" onclick="checkSheetClose()">閉じる</button></div>
+    <div class="hint" style="margin:4px 0 8px">☑＝今付いている物（その時間の記録の半分以上）。<span class="mk">計</span>＝手順書（計画書）にある　<span class="mk">見</span>＝見本の用紙にある　<span class="part">3/9</span>＝一部の日だけ付いている（シーツの週1回など）。<br>付ける物・外す物を押して直し、下の「当てる」を押すと、<b>予定表の枠（これから作る記録）</b>と<b>開いている月の記録</b>に同じチェックが入ります。押したマスだけ変わり、ほかは今までの決まりのままです。${_ck.closedSkip ? `<br>締めた月の記録${_ck.closedSkip}件は変えません。` : ''}${_ck.other ? `<br>予定表の時間と合わない訪問${_ck.other}件は対象外です。` : ''}${_ck.empty.length ? `<br>記録がまだ無い時間（${esc(_ck.empty.map(ckColLabel).join('、'))}）は出していません。` : ''}</div>
+    <table><thead>${head}</thead><tbody>${body}</tbody></table>
+    <div class="ck-foot"><button class="primary" onclick="checkSheetApply()" ${ch.length ? '' : 'disabled'}>✓ この内容で当てる（${ch.length}か所）</button><button class="small" onclick="checkSheetOpen()">元に戻す</button><button class="small" onclick="checkSheetCopy()">結果をコピー</button><span class="hint" style="margin:0">${ch.length ? '黄色＝変えたマス' : 'まだ変えていません'}</span></div></div>`;
+  box.scrollTop = y;
+}
+function checkSheetCopy() {
+  if (!_ck) return; const t = `${_ck.name}さん チェック（確認表より）\n` + _ck.cols.map(c => `【${ckColLabel(c)}】` + KPD().flatMap(([, cat, items]) => items.map(it => cat + '|' + it)).filter(k => c.now.has(k)).map(k => k.replace('|', '：')).join('、')).join('\n');
+  try { navigator.clipboard.writeText(t); alert('コピーしました'); } catch (e) { prompt('コピーしてください', t); }
+}
+function checkSheetApply() {
+  if (!_ck) return; const ch = ckChanges(); if (!ch.length) { alert('変えたマスがありません'); return; }
+  if ((state.name || '').trim() !== _ck.name) { alert('利用者が変わりました。もう一度開いてください'); checkSheetClose(); return; }
+  const add = (o, k) => { o.kpOn = [...new Set([...(o.kpOn || []), k])]; o.kpOff = (o.kpOff || []).filter(x => x !== k); };
+  const del = (o, k) => { o.kpOff = [...new Set([...(o.kpOff || []), k])]; o.kpOn = (o.kpOn || []).filter(x => x !== k); };
+  const nEnt = new Set(ch.flatMap(x => x.c.entries)).size, touched = new Set(ch.flatMap(x => x.c.rows)), nRow = touched.size;
+  const lines = _ck.cols.map(c => { const a = ch.filter(x => x.c === c); return a.length ? `【${ckColLabel(c)}】` + a.map(x => (x.on ? '＋' : '－') + x.k.replace('|', '：')).join('、') : ''; }).filter(Boolean);
+  if (!confirm(`次のとおり当てます。\n\n${lines.join('\n')}\n\n・予定表の枠 ${nEnt}件（これから作る記録に入ります）\n・開いている月（${_ck.months.join('・')}）の記録 ${nRow}件\n　チェックと文章が合わなくなった訪問は、「直す案」と同じ直し方でその文だけ直します\n・締めた月は変えません\n\nよろしいですか？`)) return;
+  const name = _ck.name;
+  ch.forEach(({ c, k, on }) => {
+    c.entries.forEach(e => { on ? add(e, k) : del(e, k); if (!e.kpOn.length) delete e.kpOn; if (!e.kpOff.length) delete e.kpOff; });
+    c.rows.forEach(r => { const kp = kpOf(r), i = kp.indexOf(k); if (on) { add(r, k); if (i < 0) kp.push(k); } else { del(r, k); if (i >= 0) kp.splice(i, 1); } });
+  });
+  touched.forEach(r => kpFromText(r));
+  // 文章：点検の「直す案」を、チェックを変えた訪問だけ入れる（ほかの訪問はいつもどおり案として出すだけ）。直した結果、選んだチェックが戻ってしまう訪問は入れない
+  let fixed = 0; try { const pre = new Map([...touched].map(r => [r, REC_SNAP(r)])), p = repairPreview(name); p.plan.filter(x => touched.has(x.r) && !rowClosed(x.r)).forEach(x => { REC_RESTORE(x.r, x.after);
+    if (ch.some(y => y.c.rows.includes(x.r) && kpAll(x.r).includes(y.k) !== y.on)) REC_RESTORE(x.r, pre.get(x.r)); else fixed++; }); } catch (e) { reportError('checkSheet: ' + (e && e.message || e), 'qa'); }
+  const miss = ch.map(x => ({ ...x, n: x.c.rows.filter(r => kpAll(r).includes(x.k) !== x.on).length })).filter(x => x.n);
+  window._saveVia = 'チェック確認表'; markSheetDirty(); renderRecordView(); markRecDirty(); try { showRecQa(); } catch (e) {}
+  if (DB) gasCall({ pass: (lsGet('smilewan_pass') || '').trim(), op: 'log', item: { where: 'check-sheet', ver: APP_VER, client: name, msg: `チェック確認表で当てた（${actorName() || '名前なし'}）：${lines.join(' ')}／予定表${nEnt}枠・記録${nRow}件・文章を直した${fixed}件` } }).catch(() => {});
+  alert(`当てました。予定表の枠 ${nEnt}件・記録 ${nRow}件（自動で保存します）。` + (fixed ? `\n文章を直した訪問 ${fixed}件。` : '') + (miss.length ? `\n\n決まりで変わらなかった物：\n${miss.map(x => `${ckColLabel(x.c)} ${x.on ? '＋' : '－'}${x.k.replace('|', '：')}（${x.n}件）`).join('\n')}` : ''));
+  checkSheetOpen();
 }
 // ---- カイポケ訪問記録の入力欄（顔色・発汗・バイタル・排泄・食事・買物など） ----
 //   ・文章から自動で入る欄（顔色・発汗・その他・実施項目）＝点線のチップ
