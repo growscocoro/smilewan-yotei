@@ -815,7 +815,7 @@ async function setSetting(key, localKey, list, opt = {}) {
 const SUPA = { url: '', key: '' }; // 旧（使わない）
 const GAS = {"url": "https://script.google.com/macros/s/AKfycbxKEAUthQx9wiZKncHZR43jbSKjPfO2lYhlc2K5yXWJNXI_zA8wChdQTFlINEhLTDQO/exec"};           // 保存先（Googleドライブに保存するGAS）。build-site.sh が入れる
 // 版の確認：公開版が新しくなったら知らせ、古い版のままでは記録を保存しない（古い決まりで上書きしないため）
-const APP_VER = '20261109114603';
+const APP_VER = '20261109122528';
 let appOutdated = false;
 async function checkVer() {
   if (APP_VER === 'dev' || appOutdated) return appOutdated;
@@ -3517,7 +3517,7 @@ function vAuto(r) {
   v.内訳 = m(/購入品[:：は]\s*([^。]+)/);
   // その他：環境整備・相談援助・情報収集・提供・記録は毎回すべて付ける（事業所の決まり・カイポケの並び順）
   v.その他 = ['環境整備', '相談援助', '情報収集・提供', '記録'];
-  { const mn = kpAll(r).some(k => k === '調理|調理' || k === '自立支援|一般的な調理・配下膳') ? menuOrQuick(r, mealOf(r)) : ''; const mt = t.match(/献立に沿って(.+?)を調理|（([^）]+)）の(準備|調理)/); v.献立 = mn || (mt ? (mt[1] || mt[2]) : ''); }
+  { const mn = kpAll(r).some(k => k === '調理|調理' || k === '自立支援|一般的な調理・配下膳') ? menuOrQuick(r, mealOf(r)) : ''; const mt = t.match(/献立に沿って(.+?)を調理|（([^）]+)）の(準備|調理)/); v.献立 = mn || (mt ? (mt[1] || mt[2]) : ''); if (!v.献立 && !r.sick) { try { const pm = planMenu(r, mealOf(r)); if (pm) v.献立 = pm; } catch (e) {} } } // 調理のチェックが無い訪問でも、手順書に食事の品があれば献立欄に入れる（11/9 ユーザー「献立のところにも入れれるように」）
   Object.keys(v).forEach(k => { if (v[k] === '' || v[k] == null) delete v[k]; });
   return v;
 }
