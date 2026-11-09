@@ -814,7 +814,7 @@ async function setSetting(key, localKey, list, opt = {}) {
 const SUPA = { url: '', key: '' }; // 旧（使わない）
 const GAS = {"url": "https://script.google.com/macros/s/AKfycbxKEAUthQx9wiZKncHZR43jbSKjPfO2lYhlc2K5yXWJNXI_zA8wChdQTFlINEhLTDQO/exec"};           // 保存先（Googleドライブに保存するGAS）。build-site.sh が入れる
 // 版の確認：公開版が新しくなったら知らせ、古い版のままでは記録を保存しない（古い決まりで上書きしないため）
-const APP_VER = '20261109105614';
+const APP_VER = '20261109105939';
 let appOutdated = false;
 async function checkVer() {
   if (APP_VER === 'dev' || appOutdated) return appOutdated;
@@ -2433,7 +2433,7 @@ const PLAN_PHRASES = [
     say: st => { const m = (st.match(/朝食|昼食|夕食/) || [/夕ご飯/.test(st) ? '夕食' : '食事'])[0]; return [`${m}を食べられたことを確認してから、服薬の声掛けを行った。`, `${m}を済まされたことを確認し、服薬の声掛けをした。`]; } },
   { re: /夕(食|ご飯)の確認/, ctx: 'body', grp: 'meal', has: /夕食[^。]*確認/, say: ['夕食を食べられたか確認した。', '夕食は済まされたか本人に確認した。'] },
   { re: /眠前薬(の)?(セット|準備)/, need: PB_MED, has: /眠前薬を?(セット|準備|用意)|寝る[^。]{0,8}前に服用/, swap: /^(眠前薬(を確認し|について声掛け)|服薬(について|についても|状況を|の声掛けを行い))(?![^。]*見守)/, say: [MINZEN_PREP] }, // 11/5 見本どおり
-  { re: /傾聴/, has: /傾聴/, say: ['本人の話に耳を傾けながら支援した。', '必要に応じて本人の話を傾聴した。'] },
+  { re: /傾聴/, has: /傾聴|耳を傾け/, say: ['本人の話に耳を傾けながら支援した。', '必要に応じて本人の話を傾聴した。'] },
   // 掃除・洗濯
   { re: /クイックルワイパー/, need: PB_CLEAN, has: /クイックルワイパー/, swap: /^(居室に掃除機をかけ|居室の掃除を行い|居室(内)?を掃除し、床)/,
     say: (st, r, kp, tog) => tog ? ['居室の床は、本人と一緒にクイックルワイパーで拭いた。'] : ['居室に掃除機をかけ、床はクイックルワイパーで拭き上げた。', '居室の床はクイックルワイパーで拭き、きれいにした。'] },
