@@ -815,7 +815,7 @@ async function setSetting(key, localKey, list, opt = {}) {
 const SUPA = { url: '', key: '' }; // 旧（使わない）
 const GAS = {"url": "https://script.google.com/macros/s/AKfycbxKEAUthQx9wiZKncHZR43jbSKjPfO2lYhlc2K5yXWJNXI_zA8wChdQTFlINEhLTDQO/exec"};           // 保存先（Googleドライブに保存するGAS）。build-site.sh が入れる
 // 版の確認：公開版が新しくなったら知らせ、古い版のままでは記録を保存しない（古い決まりで上書きしないため）
-const APP_VER = '20261109134856';
+const APP_VER = '20261109135404';
 let appOutdated = false;
 async function checkVer() {
   if (APP_VER === 'dev' || appOutdated) return appOutdated;
@@ -4041,7 +4041,9 @@ function kpAll(r) {
 // 見本のある訪問に足す手順書の項目。今までに外すと決めた物は足さない（家事に身体の項目・入浴に調理や排泄食事など・共に行う訪問の更衣介助（11/5 井口さん）・入浴の訪問の清掃や洗濯（生活の付く種別は除く））
 function planForOwn(r, ti) {
   const bath = (ti || []).some(k => /^入浴・清拭\|(入浴介助|シャワー浴)$/.test(k)) || /入浴/.test(r.e.type || ''); // kpAll を呼ぶ関数（bathVisit・kpBlocked）は使わない（くり返しになる）
-  return (planItems(r) || []).filter(k => !(r.kind === '家事援助' && BODY_ONLY.test(k)) && !(bath && /^(調理\||自立支援\|(一般的な調理|排泄・食事))/.test(k)) && !(visTogether(r.e) && k === '身体整容|更衣介助') && !(bath && BATH_NO.test(k) && !/生活/.test(r.e.type || '')));
+  let steps = ''; try { const pr = procedureFor(r.e, (state.name || '').trim()); steps = pr ? pr.steps.map(x => (x.label || '') + (x.text || '')).join('。') : ''; } catch (e) {}
+  const prepOk = /下拵え|下ごしらえ|切る|切って|刻/.test(steps) || (ti || []).includes('調理|下拵え'); // 下拵えは手順書に書いてある訪問だけ（調理の3つセットの決まりで足した物は足さない）
+  return (planItems(r) || []).filter(k => (k !== '調理|下拵え' || prepOk) && !(r.kind === '家事援助' && BODY_ONLY.test(k)) && !(bath && /^(調理\||自立支援\|(一般的な調理|排泄・食事))/.test(k)) && !(visTogether(r.e) && k === '身体整容|更衣介助') && !(bath && BATH_NO.test(k) && !/生活/.test(r.e.type || '')));
 }
 function kpAll0(r) {
   // 見本がある訪問は、見本どおり（手で足した物は足し、手で外した物は外す）
