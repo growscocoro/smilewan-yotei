@@ -815,7 +815,7 @@ async function setSetting(key, localKey, list, opt = {}) {
 const SUPA = { url: '', key: '' }; // 旧（使わない）
 const GAS = {"url": "https://script.google.com/macros/s/AKfycbxKEAUthQx9wiZKncHZR43jbSKjPfO2lYhlc2K5yXWJNXI_zA8wChdQTFlINEhLTDQO/exec"};           // 保存先（Googleドライブに保存するGAS）。build-site.sh が入れる
 // 版の確認：公開版が新しくなったら知らせ、古い版のままでは記録を保存しない（古い決まりで上書きしないため）
-const APP_VER = '20261109131712';
+const APP_VER = '20261109132731';
 let appOutdated = false;
 async function checkVer() {
   if (APP_VER === 'dev' || appOutdated) return appOutdated;
@@ -5410,7 +5410,7 @@ const MENTION_NOT = [
 const MN_HOUSE = [[['調理|調理', '調理|下拵え', '調理|配・下膳', '自立支援|一般的な調理・配下膳'], /(朝食|昼食|夕食)[^。]*(調理|配膳|を用意し)|調理(を|し|・|後|に使)|下拵え|下ごしらえ/], // 11/3 調理の無い家事の訪問に調理の文（時刻を直して見本が変わった訪問など）
   [['清掃|トイレ', '自立支援|掃除'], /トイレ[^。]*(掃除|清掃|拭)|便器/], [['清掃|浴室', '自立支援|掃除'], /(浴室|お風呂|浴槽)[^。]*(掃除|清掃|汚れ|水気を拭)|(掃除|清掃)[^。]*(浴室|お風呂)/]];
 // 入浴の訪問だけ：調理・配膳・食事の用意の文があっても、入浴の訪問には調理の欄を付けないので外す（11/3「入浴の時に配膳食事はいらない」。「朝食後の服薬」などはそのまま）
-const MN_BATH = [[['調理|調理', '調理|下拵え', '調理|配・下膳', '自立支援|一般的な調理・配下膳'], /調理|配膳|下膳|下拵え|下ごしらえ|献立|(朝食|昼食|夕食|朝ごはん|昼ごはん|夕ごはん)(（|に[^。]*を用意|を(用意|準備|整え|作)|の(支度|準備|用意)|は[^。]*(作|用意|準備))|食事を(調理|用意|準備|作)/]];
+const MN_BATH = [[['調理|調理', '調理|下拵え', '調理|配・下膳', '自立支援|一般的な調理・配下膳'], /調理(?!台)|配膳|下膳|下拵え|下ごしらえ|献立|(朝食|昼食|夕食|朝ごはん|昼ごはん|夕ごはん)(（|に[^。]*を用意|を(用意|準備|整え|作)|の(支度|準備|用意)|は[^。]*(作|用意|準備))|食事を(調理|用意|準備|作)/]];
 const bathVisit = r => { const k = kpAll(r); return k.includes('入浴・清拭|入浴介助') || k.includes('入浴・清拭|シャワー浴'); };
 const mnRules = r => (r && r.sick ? MENTION_NOT.filter(([keys]) => !keys.some(k => /^入浴・清拭\|/.test(k))) : MENTION_NOT).concat(r && r.kind === '家事援助' ? MN_HOUSE : []).concat(r && r.kind !== '家事援助' && r.e && bathVisit(r) ? MN_BATH : []);
 function mentionNotFix(r) {
