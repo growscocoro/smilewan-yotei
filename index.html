@@ -815,7 +815,7 @@ async function setSetting(key, localKey, list, opt = {}) {
 const SUPA = { url: '', key: '' }; // 旧（使わない）
 const GAS = {"url": "https://script.google.com/macros/s/AKfycbxKEAUthQx9wiZKncHZR43jbSKjPfO2lYhlc2K5yXWJNXI_zA8wChdQTFlINEhLTDQO/exec"};           // 保存先（Googleドライブに保存するGAS）。build-site.sh が入れる
 // 版の確認：公開版が新しくなったら知らせ、古い版のままでは記録を保存しない（古い決まりで上書きしないため）
-const APP_VER = '20261109114144';
+const APP_VER = '20261109114603';
 let appOutdated = false;
 async function checkVer() {
   if (APP_VER === 'dev' || appOutdated) return appOutdated;
@@ -2577,6 +2577,7 @@ function planDedupe(r, t) {
   // dedupe：手順書から足した決まった文と同じ意味の文がほかにもあれば、足した方を外す（10/31 新しい手順書の文が重ならないように）
   PLAN_PHRASES.forEach(p => { if (!p.dedupe || !Array.isArray(p.say)) return; const mine = ss.map((x, i) => p.say.some(y => y === x.trim() || y.replace(/本人/g, '利用者様') === x.trim()) ? i : -1).filter(i => i >= 0);
     if (mine.length && ss.some((x, i) => !mine.includes(i) && !drop.has(i) && p.has.test(x))) mine.forEach(i => drop.add(i)); });
+  ss.forEach((x, i) => { if (MED_FIXED.includes(x.trim())) drop.delete(i); }); // 手書きの見本の薬の文（朝・前日・眠前）は外さない（11/9 河村さん：作り直すと外す・足すが食い違った）
   return drop.size ? ss.filter((x, i) => !drop.has(i)).join('') : t;
 }
 // 1回の訪問に入れる手順書の文の数（30分以下は2つ・それより長い訪問は3つ）。点検ではこれより1つ少なくてもよい
