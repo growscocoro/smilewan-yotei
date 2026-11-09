@@ -815,7 +815,7 @@ async function setSetting(key, localKey, list, opt = {}) {
 const SUPA = { url: '', key: '' }; // 旧（使わない）
 const GAS = {"url": "https://script.google.com/macros/s/AKfycbxKEAUthQx9wiZKncHZR43jbSKjPfO2lYhlc2K5yXWJNXI_zA8wChdQTFlINEhLTDQO/exec"};           // 保存先（Googleドライブに保存するGAS）。build-site.sh が入れる
 // 版の確認：公開版が新しくなったら知らせ、古い版のままでは記録を保存しない（古い決まりで上書きしないため）
-const APP_VER = '20261109144156';
+const APP_VER = '20261109155746';
 let appOutdated = false;
 async function checkVer() {
   if (APP_VER === 'dev' || appOutdated) return appOutdated;
@@ -4052,7 +4052,7 @@ function kpAll0(r) {
   if (!r.kpText) kpFromText(r);
   // 予定表に「共に・一緒」とある身体介護は、家事を自立支援（共に行う）の欄へ。それ以外は共に行うの欄を使わない
   const tog = r.kind !== '家事援助' && visTogether(r.e);
-  const out = [...new Set([...kpOf(r), ...r.kpText].map(k => tog ? (TOGETHER_RE.test(k) ? k : /^自立支援\|/.test(k) ? null : TO_TOGETHER(k)) : /^自立支援\|/.test(k) ? JIRITSU_MAP[k] : k).filter(Boolean))];
+  const out = [...new Set([...kpOf(r), ...r.kpText].map(k => tog ? (TOGETHER_RE.test(k) ? k : /^自立支援\|/.test(k) ? null : TO_TOGETHER(k)) : /^自立支援\|/.test(k) ? ((r.kpOn || []).includes(k) ? k : JIRITSU_MAP[k]) : k).filter(Boolean))]; // 手で選んだ自立支援は置き換えない
   { const C = ['調理|調理', '調理|下拵え', '調理|配・下膳']; if (C.some(k => out.includes(k))) C.forEach(k => { if (!out.includes(k) && !(r.kpOff || []).includes(k)) out.push(k); }); } // 調理の欄（調理・下拵え・配・下膳）は全部セット（事業所の決まり）
   // 保存した時の版が古くても、出すときに決まりをそろえる（家事の訪問に身体・服薬なし／入浴に清掃・移動介助なし）
   if (r.kind === '家事援助') for (let i = out.length - 1; i >= 0; i--) if (BODY_ONLY.test(out[i])) out.splice(i, 1);
@@ -4063,6 +4063,7 @@ function kpAll0(r) {
   if (!(r.vin || {}).水分) { const i = out.indexOf('食事|水分補給'); if (i >= 0) out.splice(i, 1); } // 水分補給は付けない（記録欄に水分ccを手で入れたときだけ）
   { const W = ['洗濯|洗濯', '洗濯|乾燥（物干し）']; if (W.some(k => out.includes(k))) W.forEach(k => { if (!out.includes(k) && !(r.kpOff || []).includes(k)) out.push(k); }); } // 洗濯と物干しはセット（事業所の決まり）
   if (out.includes('衣類・寝具|シーツ・カバー交換') && !out.includes('衣類・寝具|ベッドメイク') && !(r.kpOff || []).includes('衣類・寝具|ベッドメイク')) out.push('衣類・寝具|ベッドメイク'); // シーツ・カバー交換のときはベッドメイクも（事業所の決まり）
+  (r.kpOn || []).forEach(k => { if (!out.includes(k) && !(r.kpOff || []).includes(k)) out.push(k); }); // 手で選んだ項目は置き換えずにそのまま（11/9 松川さん：自立支援の服薬が「見守り」に変わっていた）
   return out;
 }
 function vSummary(r) {
