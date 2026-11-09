@@ -815,7 +815,7 @@ async function setSetting(key, localKey, list, opt = {}) {
 const SUPA = { url: '', key: '' }; // 旧（使わない）
 const GAS = {"url": "https://script.google.com/macros/s/AKfycbxKEAUthQx9wiZKncHZR43jbSKjPfO2lYhlc2K5yXWJNXI_zA8wChdQTFlINEhLTDQO/exec"};           // 保存先（Googleドライブに保存するGAS）。build-site.sh が入れる
 // 版の確認：公開版が新しくなったら知らせ、古い版のままでは記録を保存しない（古い決まりで上書きしないため）
-const APP_VER = '20261109135404';
+const APP_VER = '20261109144156';
 let appOutdated = false;
 async function checkVer() {
   if (APP_VER === 'dev' || appOutdated) return appOutdated;
@@ -4522,7 +4522,8 @@ async function buildRecords() {
       const row = { date: new Date(d), e: p.e, kind: kindOf(p.e.type), staff: p.staff || (p.fromShift ? '' : staff), on: p.on, flag: p.flag };
       if (p.fromShift) { row.staffFromShift = true; row.staffEdited = true; }
       if ((row.e.kpOff || []).length) row.kpOff = [...new Set([...(row.kpOff || []), ...row.e.kpOff])]; // 予定表の枠で「付けない」と決めた項目（11/6 田中さん 14:00 はトイレ介助だけ）
-      row.kp = sheetApply(row, cleanApply(row, (tmplItems(row) || genItems(row) || autoKPFor(row.e, name)).filter(k => k !== '食事|完食' && !(row.kpOff || []).includes(k)))); // 見本（無ければ似た訪問の見本＋アセスメント）の項目で文章を作る
+      if ((row.e.kpOn || []).length) row.kpOn = [...new Set([...(row.kpOn || []), ...row.e.kpOn])]; // 予定表の枠で「付ける」と決めた項目（11/9 松川さん 14:00 はパッド交換）
+      row.kp = sheetApply(row, cleanApply(row, (tmplItems(row) || genItems(row) || autoKPFor(row.e, name)).filter(k => k !== '食事|完食' && !(row.kpOff || []).includes(k)))); if (row.kpOn) row.kp = [...new Set([...row.kp, ...row.kpOn.filter(k => !(row.kpOff || []).includes(k))])]; // 見本（無ければ似た訪問の見本＋アセスメント）の項目で文章を作る
       if (p.on) { row.text = uniqueText(row, recRows.filter(r => r.on)); } else row.text = '';
       recRows.push(row);
     }
@@ -4639,7 +4640,8 @@ async function shiftSync(name, month, dry) { // dry＝見るだけ（ずれの�
       if (!e) { const tpl = allEntries.filter(x => !g.v || entFam(x) === fam).sort((a, b) => dist(a) - dist(b))[0]; e = tpl && dist(tpl) <= 60 ? tpl : { ...emptyEntry(), type: fam === '家事' ? '家事' : fam === '通院' ? '通院介助' : '身体', detail: '' }; flag = '予定表に無い訪問（シフトから）'; }
       const row = { date: new Date(date), e: { ...e, start: g.s, end: g.e || e.end }, kind: kindOf(e.type), staff: g.helpers.join('・'), on: true, flag, staffFromShift: true, staffEdited: true };
       if ((row.e.kpOff || []).length) row.kpOff = [...new Set([...(row.kpOff || []), ...row.e.kpOff])];
-      row.kp = sheetApply(row, cleanApply(row, (tmplItems(row) || genItems(row) || autoKPFor(row.e, name)).filter(k => k !== '食事|完食' && !(row.kpOff || []).includes(k))));
+      if ((row.e.kpOn || []).length) row.kpOn = [...new Set([...(row.kpOn || []), ...row.e.kpOn])];
+      row.kp = sheetApply(row, cleanApply(row, (tmplItems(row) || genItems(row) || autoKPFor(row.e, name)).filter(k => k !== '食事|完食' && !(row.kpOff || []).includes(k)))); if (row.kpOn) row.kp = [...new Set([...row.kp, ...row.kpOn.filter(k => !(row.kpOff || []).includes(k))])];
       recRows.push(row); row.text = uniqueText(row, recRows.filter(r => r.on && r !== row));
       if (rows.some(r => r.sick || r.sickDay)) { if (isPureBath(row)) { row.sick = true; let t = SICK_BATH[dd % SICK_BATH.length]; if (K) t = t.replace(/本人/g, '利用者様'); row.text = t; row.kpText = null; } else sickMarkRow(row, K, dd); } // 体調不良の日は足した訪問も体調不良
       res.added.push(row); res.log.push(`${dk} ${g.s} 記録が無い訪問を足した`);
