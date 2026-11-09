@@ -376,6 +376,7 @@
     <details id="clientBox">
       <summary>📇 利用者情報（住所・電話・緊急連絡先・メモ） <span id="clientState" class="sync local"></span></summary>
       <label>区分</label><select id="ciKubun" onchange="setKubun((state.name||'').trim(), this.value)"><option value="介護">介護</option><option value="障害">障害</option></select>
+      <label>眠前薬（寝る前のお薬）</label><select id="ciMinzen" onchange="setMinzen(this.value)"><option value="">自動（予定表・手順書・文章から判断）</option><option value="あり">あり</option><option value="なし">なし</option></select>
       <label>住所</label><input type="text" id="ciAddress" placeholder="利用者CSVから自動で入ります" oninput="clientDirty()">
       <label>電話番号</label><input type="text" id="ciPhone" oninput="clientDirty()">
       <label>緊急連絡先（続柄・名前・電話）</label><input type="text" id="ciEmergency" oninput="clientDirty()">
@@ -642,7 +643,7 @@
       <p><b>月締め</b>：「この月を締める」を押すと、その月の全員について、今画面に出ているチェックと記録欄を残して鍵を掛ける（文章は変えない）。締めた月は保存されず、決まりを変えても見え方は変わらない。直すときは「月を開ける」を押す（だれが・いつ開けたかが残る）。</p>
       <p><b>消した予定表</b>：削除は2回確認し、ゴミ箱（🗑）に入る。だれがいつ消したかが残り、🗑から戻せる。</p>
       <p><b>決まり一覧</b>：締めた月には、締めた後の決まりは効きません。</p>
-      <table class="cl-table"><tr><th>番号</th><th>決まり</th><th>いつから</th></tr><tr><td>1</td><td>家事の訪問に身体の項目（排泄・入浴・服薬介助など）を付けない</td><td>10/15</td></tr><tr><td>2</td><td>家事の訪問に服薬のチェックを付けない（文章は残す）</td><td>11/5</td></tr><tr><td>3</td><td>入浴の訪問に調理のチェックと文を付けない</td><td>11/3</td></tr><tr><td>4</td><td>入浴の訪問に「排泄・食事」のチェックを付けない</td><td>11/5</td></tr><tr><td>5</td><td>整容の「髪」を自動で付けない</td><td>11/5</td></tr><tr><td>6</td><td>家事の訪問で清掃があれば、居室にもチェックを付ける</td><td>10/24</td></tr><tr><td>7</td><td>起床介助・就寝介助があれば、起床就寝介助にもチェックを付ける</td><td>11/3</td></tr><tr><td>8</td><td>朝食の訪問：「朝食を少し食べていただき、服薬していただいています。」</td><td>11/3（全員は11/5）</td></tr><tr><td>9</td><td>眠前薬の翌朝：「前日の眠前薬の服用も確認し、忘れず飲まれていました。」</td><td>11/5</td></tr><tr><td>10</td><td>夜の訪問：「お薬を準備し、寝る30分ほど前に服用する様お伝えさせて頂いております。」</td><td>11/5</td></tr><tr><td>11</td><td>体調不良の訪問から続けて入った訪問も体調不良にする</td><td>11/3</td></tr><tr><td>12</td><td>食事の文の飲み物は、コーヒー・牛乳・お茶・紅茶で書く</td><td>11/3</td></tr><tr><td>13</td><td>手順書と見本（記録用紙）が違うときは勝手に変えず、聞く</td><td>10/31</td></tr><tr><td>14</td><td>シフトに無い訪問は知らせるだけで、外さない</td><td>11/2</td></tr><tr><td>15</td><td>点検は見つけて知らせるだけ。直すのは人が「直す案」から決める</td><td>11/6</td></tr><tr><td>16</td><td>締めた月は保存しない。決まりを変えても見え方を変えない</td><td>11/6（7〜10月を締めた）</td></tr><tr><td>17</td><td>松川さん 月水金 14:00 は身体2生活1（入浴＋掃除・洗濯・買い物）。朝の訪問に入浴を入れない</td><td>11/6（8月から）</td></tr><tr><td>18</td><td>田中さん 月水土 14:00 は身体1生活2（トイレ介助＋掃除・洗濯・買い物）。排泄のチェックはトイレ介助だけ</td><td>11/6（8月から）</td></tr><tr><td>19</td><td>予定に「掃除」と書いてある時間帯は、その時間に使うところを掃除する（調理→台所と食卓、入浴→浴室、トイレ介助→トイレ、起床・就寝→居室、掃除だけ→居室）。見本のある訪問は見本どおり。この時間帯は6番より優先</td><td>11/6（11月から）</td></tr><tr><td>20</td><td>調理なしの1時間半以上の訪問は、清掃をポータブルトイレ以外すべて付ける（居室・トイレ・卓上・台所・浴室・玄関・ゴミ出し）。手で外した物は外したまま。通院・共に行う・身体だけの訪問は対象外。決まり19より優先</td><td>11/7（11月から）</td></tr><tr><td>21</td><td>11/8以降の買い物の預り・購入・お釣は、買い物リストと統計価格から計算した見積りを出す（乱数は使わない）。内訳に「金額は見積り」と入れる。預りは購入が90%以内に収まる1,000円単位で上限5,000円。実際の金額を入れたらそちらを出す。リストがない訪問は空欄</td><td>11/7（11/8の訪問から）</td></tr><tr><td>22</td><td>予定表のその枠に「シーツ交換」とある訪問は、シーツ・カバー交換とベッドメイクを付ける（見本に無くても）。「週1回」はその週の最初の枠だけ。手で外した物は外したまま。共に行う・身体だけの訪問は対象外</td><td>11/9（11月から）</td></tr></table>
+      <table class="cl-table"><tr><th>番号</th><th>決まり</th><th>いつから</th></tr><tr><td>1</td><td>家事の訪問に身体の項目（排泄・入浴・服薬介助など）を付けない</td><td>10/15</td></tr><tr><td>2</td><td>家事の訪問に服薬のチェックを付けない（文章は残す）</td><td>11/5</td></tr><tr><td>3</td><td>入浴の訪問に調理のチェックと文を付けない</td><td>11/3</td></tr><tr><td>4</td><td>入浴の訪問に「排泄・食事」のチェックを付けない</td><td>11/5</td></tr><tr><td>5</td><td>整容の「髪」を自動で付けない</td><td>11/5</td></tr><tr><td>6</td><td>家事の訪問で清掃があれば、居室にもチェックを付ける</td><td>10/24</td></tr><tr><td>7</td><td>起床介助・就寝介助があれば、起床就寝介助にもチェックを付ける</td><td>11/3</td></tr><tr><td>8</td><td>朝食の訪問：「朝食を少し食べていただき、服薬していただいています。」</td><td>11/3（全員は11/5）</td></tr><tr><td>9</td><td>眠前薬の翌朝：「前日の眠前薬の服用も確認し、忘れず飲まれていました。」</td><td>11/5</td></tr><tr><td>10</td><td>夜の訪問：「お薬を準備し、寝る30分ほど前に服用する様お伝えさせて頂いております。」</td><td>11/5</td></tr><tr><td>11</td><td>体調不良の訪問から続けて入った訪問も体調不良にする</td><td>11/3</td></tr><tr><td>12</td><td>食事の文の飲み物は、コーヒー・牛乳・お茶・紅茶で書く</td><td>11/3</td></tr><tr><td>13</td><td>手順書と見本（記録用紙）が違うときは勝手に変えず、聞く</td><td>10/31</td></tr><tr><td>14</td><td>シフトに無い訪問は知らせるだけで、外さない</td><td>11/2</td></tr><tr><td>15</td><td>点検は見つけて知らせるだけ。直すのは人が「直す案」から決める</td><td>11/6</td></tr><tr><td>16</td><td>締めた月は保存しない。決まりを変えても見え方を変えない</td><td>11/6（7〜10月を締めた）</td></tr><tr><td>17</td><td>松川さん 月水金 14:00 は身体2生活1（入浴＋掃除・洗濯・買い物）。朝の訪問に入浴を入れない</td><td>11/6（8月から）</td></tr><tr><td>18</td><td>田中さん 月水土 14:00 は身体1生活2（トイレ介助＋掃除・洗濯・買い物）。排泄のチェックはトイレ介助だけ</td><td>11/6（8月から）</td></tr><tr><td>19</td><td>予定に「掃除」と書いてある時間帯は、その時間に使うところを掃除する（調理→台所と食卓、入浴→浴室、トイレ介助→トイレ、起床・就寝→居室、掃除だけ→居室）。見本のある訪問は見本どおり。この時間帯は6番より優先</td><td>11/6（11月から）</td></tr><tr><td>20</td><td>調理なしの1時間半以上の訪問は、清掃をポータブルトイレ以外すべて付ける（居室・トイレ・卓上・台所・浴室・玄関・ゴミ出し）。手で外した物は外したまま。通院・共に行う・身体だけの訪問は対象外。決まり19より優先</td><td>11/7（11月から）</td></tr><tr><td>21</td><td>11/8以降の買い物の預り・購入・お釣は、買い物リストと統計価格から計算した見積りを出す（乱数は使わない）。内訳に「金額は見積り」と入れる。預りは購入が90%以内に収まる1,000円単位で上限5,000円。実際の金額を入れたらそちらを出す。リストがない訪問は空欄</td><td>11/7（11/8の訪問から）</td></tr><tr><td>22</td><td>予定表のその枠に「シーツ交換」とある訪問は、シーツ・カバー交換とベッドメイクを付ける（見本に無くても）。「週1回」はその週の最初の枠だけ。手で外した物は外したまま。共に行う・身体だけの訪問は対象外</td><td>11/9（11月から）</td></tr><tr><td>23</td><td>利用者情報の「眠前薬」で、あり／なし／自動を選ぶ。なし＝夜の眠前薬の文・翌朝の確認の文を入れない。あり＝17時以降で服薬のチェックがあるその日いちばん遅い訪問に夜の文、翌日最初の朝の訪問に確認の文。自動＝今までどおり（予定表・手順書・文章から判断）。締めた月は変えない</td><td>11/9</td></tr></table>
       <p><b>赤い帯</b>：毎朝の点検が失敗した／全員の点検が26時間以上終わっていない／記録があるのに予定表が無い人／今月のシフトにいるのに予定表が無い人、のときに画面の上に赤い帯が出る。</p>
       <p><b>Word</b>：下の端に書き出した日時と版が入る。指摘のときは、この日時より後に直した所か確かめられる。</p>
       <p><b>点検</b>：記録を作ったとき・開いたときに、見本どおりか・チェックと文章・NG表現・体調不良・共に行う・買物の金額・順番・重複を自動で調べ、合わない所があれば「⚠ 点検で〇件」と一覧を出す。</p>
@@ -814,7 +815,7 @@ async function setSetting(key, localKey, list, opt = {}) {
 const SUPA = { url: '', key: '' }; // 旧（使わない）
 const GAS = {"url": "https://script.google.com/macros/s/AKfycbxKEAUthQx9wiZKncHZR43jbSKjPfO2lYhlc2K5yXWJNXI_zA8wChdQTFlINEhLTDQO/exec"};           // 保存先（Googleドライブに保存するGAS）。build-site.sh が入れる
 // 版の確認：公開版が新しくなったら知らせ、古い版のままでは記録を保存しない（古い決まりで上書きしないため）
-const APP_VER = '20261109113336';
+const APP_VER = '20261109114144';
 let appOutdated = false;
 async function checkVer() {
   if (APP_VER === 'dev' || appOutdated) return appOutdated;
@@ -1052,7 +1053,7 @@ function kubunOf(name) {
 async function setKubun(name, kubun) {
   if (!name || !kubun) return;
   const prev = clientDoc(name) || { name };
-  await putDoc('clients', docId(name), { ...prev, name, kubun, updatedAt: new Date().toISOString() });
+  await putDoc('clients', clientKey(name), { ...prev, name, kubun, updatedAt: new Date().toISOString() });
   renderKubun(); refreshSavedList(); refreshRecUsers();
 }
 // 担当者で絞り込み：保存した訪問記録の担当者（シフトから入った人）がその利用者に入っているか
@@ -1343,16 +1344,26 @@ function renderClientBox(force) {
   const i = name ? clientInfoOf(name) : { address: '', phone: '', emergency: '', memo: '' };
   document.getElementById('ciAddress').value = i.address; document.getElementById('ciPhone').value = i.phone;
   document.getElementById('ciEmergency').value = i.emergency; document.getElementById('ciMemo').value = i.memo;
+  { const mz = document.getElementById('ciMinzen'); if (mz) mz.value = (name && (clientDoc(name) || {}).minzen) || ''; }
   renderShop();
   const st = document.getElementById('clientState');
   st.textContent = !name ? '' : i.manual ? '保存済み' : (i.address || i.phone) ? 'CSVから' : '未入力'; st.className = 'sync ' + (i.manual ? 'ok' : 'local');
+}
+// 利用者情報の保存先：今ある物（空白違いの名前でも同じ人の物）に書く。無ければ新しく作る（11/7 清野さんで別の物ができた）
+function clientKey(name) { const C = getColl('clients') || {}, c = clientDoc(name); const k = c ? Object.keys(C).find(x => C[x] === c) : null; return k || docId(name); }
+// 眠前薬（11/9 ユーザー「眠前薬があるかなしかを選べるようにして」）：''＝自動／あり／なし
+const minzenOf = () => ((clientDoc((state.name || '').trim()) || {}).minzen || '');
+async function setMinzen(v) {
+  const name = (state.name || '').trim(); if (!name) { alert('先に利用者を選んでください'); renderClientBox(true); return; }
+  const c = clientDoc(name) || { name }, ok = await putDoc('clients', clientKey(name), { ...c, name: c.name || name, minzen: v, updatedAt: new Date().toISOString() });
+  if (ok) alert(`「${name}」の眠前薬を「${v || '自動'}」にしました。\n今月の記録は「確認が必要」の「直す案」で文がそろいます（締めた月は変えません）。`);
 }
 async function saveClientInfo() {
   const name = (state.name || '').trim();
   if (!name) { alert('先に利用者名を入力（または選択）してください'); return; }
   const prevNg = clientNg(name), prevDoc = clientDoc(name) || {};
   const data = { ...prevDoc, name, ng: prevNg, address: document.getElementById('ciAddress').value.trim(), phone: document.getElementById('ciPhone').value.trim(), emergency: document.getElementById('ciEmergency').value.trim(), memo: document.getElementById('ciMemo').value.trim(), updatedAt: new Date().toISOString() };
-  const ok = await putDoc('clients', docId(name), data);
+  const ok = await putDoc('clients', clientKey(name), data);
   clientEdited = false; renderClientBox(true);
   if (ok) alert(`「${name}」の利用者情報を保存しました${DB ? '（共有）' : ''}`);
 }
@@ -1458,7 +1469,7 @@ async function setGoods(item, key, val) {
   const name = (state.name || '').trim(); if (!name) return;
   const c = clientDoc(name) || { name }, g = { ...(c.goods || {}) };
   g[item] = { ...(g[item] || {}), [key]: key === 'cycle' ? Math.max(1, parseInt(val, 10) || GOODS_CYCLE[item]?.[0] || 30) : val };
-  await putDoc('clients', docId(name), { ...c, name, goods: g, updatedAt: new Date().toISOString() });
+  await putDoc('clients', clientKey(name), { ...c, name, goods: g, updatedAt: new Date().toISOString() });
   renderShop();
 }
 const mdTxt = d => d ? `${+d.slice(5, 7)}/${+d.slice(8, 10)}` : '';
@@ -1551,7 +1562,7 @@ function makeMenu() {
   if (R.avoid.has('塩')) R.notes.push('汁物は1日1回まで（減塩）');
   const doc = clientDoc(name) || { name };
   const menu = { created: new Date().toISOString(), plan: plan.map(({ ing, ...p }) => p), list, notes: R.notes };
-  putDoc('clients', docId(name), { ...doc, name, food: document.getElementById('ciFood').value.trim(), menu, updatedAt: new Date().toISOString() });
+  putDoc('clients', clientKey(name), { ...doc, name, food: document.getElementById('ciFood').value.trim(), menu, updatedAt: new Date().toISOString() });
   renderShop();
 }
 function goodsDueText(name) { return goodsOf(name).filter(g => g.due).map(g => `${g.name}（${g.last ? g.cycle + '日ごと' : '前回未記録・在庫を確認'}）`).join('、'); }
@@ -1563,21 +1574,21 @@ function refreshShopUsers() {
 async function saveFood() {
   const name = (state.name || '').trim(); if (!name) return;
   const c = clientDoc(name) || { name };
-  await putDoc('clients', docId(name), { ...c, name, food: document.getElementById('ciFood').value.trim(), updatedAt: new Date().toISOString() });
+  await putDoc('clients', clientKey(name), { ...c, name, food: document.getElementById('ciFood').value.trim(), updatedAt: new Date().toISOString() });
   renderShop();
 }
 // 買い物リストのチェック（献立ごとに保存）
 async function toggleShop(key, on) {
   const name = (state.name || '').trim(), c = clientDoc(name); if (!c?.menu) return;
   const checked = { ...(c.menu.checked || {}) }; if (on) checked[key] = 1; else delete checked[key];
-  await putDoc('clients', docId(name), { ...c, menu: { ...c.menu, checked }, updatedAt: new Date().toISOString() });
+  await putDoc('clients', clientKey(name), { ...c, menu: { ...c.menu, checked }, updatedAt: new Date().toISOString() });
   renderShop();
 }
 async function toggleGoods(item, on) {
   const name = (state.name || '').trim(), c = clientDoc(name) || { name }, g = { ...(c.goods || {}) };
   const prev = g[item] || {};
   g[item] = on ? { ...prev, last: todayYmd(), prevLast: prev.last || '' } : { ...prev, last: prev.prevLast || '' };
-  await putDoc('clients', docId(name), { ...c, name, goods: g, updatedAt: new Date().toISOString() });
+  await putDoc('clients', clientKey(name), { ...c, name, goods: g, updatedAt: new Date().toISOString() });
   renderShop();
 }
 function renderShop() {
@@ -1761,8 +1772,17 @@ function medOneSentence(r, t, say, isMed0, after) {
   if (at < 0) { at = out.length; while (at > 0 && (LINK_RE.test(out[at - 1]) || CLOSE_RE.test(out[at - 1]) || /「/.test(out[at - 1]))) at--; } // 無ければ締めの文の前に
   out.splice(at, 0, say); return out.join('');
 }
+// 眠前薬「なし」の人：夜の眠前薬の文・翌朝の確認の文・眠前薬の話の文を外す
+function dropMinzen(t) { return String(t || '').split(/(?<=。)/).filter(x => !(x === MINZEN_PREP || x === MINZEN_NEXT || NIGHT_MED.test(x) || /^(前夜|昨夜|前日)[^。]*(眠前薬|お薬)/.test(x.trim()))).join(''); }
+// 眠前薬「あり」の人：その日の17時以降で服薬のチェックがある、いちばん遅い訪問を夜の眠前薬の訪問にする
+function minzenNight(r) {
+  if (!r || r.on === false || !r.e || planHour(r) < 17 || !medChecked(r)) return false;
+  const d = ymd(r.date), st = entryTime(r.e).s || ''; if (typeof recRows === 'undefined' || !recRows.includes(r)) return 2;
+  return recRows.some(x => x !== r && x.on !== false && x.e && ymd(x.date) === d && planHour(x) >= 17 && medChecked(x) && (entryTime(x.e).s || '') > st) ? false : 2;
+}
 function withMinzenPrep(r, t) {
-  const nv = r && t ? nightMedVisit(r, t) : false; if (!nv) return t;
+  const mz = minzenOf(); if (mz === 'なし') return dropMinzen(t);
+  const nv = r && t ? (mz === 'あり' ? minzenNight(r) : nightMedVisit(r, t)) : false; if (!nv) return t;
   const isMed = x => MED_SENT.test(x) && !NIGHT_KEEP.test(x);
   if (nv === 1 && !String(t).split(/(?<=。)/).some(x => x === MINZEN_PREP || isMed(x))) return t;
   return medOneSentence(r, t, MINZEN_PREP, isMed);
@@ -1783,9 +1803,10 @@ function withAsa(r, t) {
 function withMedNext(r, t) {
   t = withAsa(r, withMinzenPrep(r, t));
   if (!r || r.on === false || r.sick || !t) return t;
+  const mz = minzenOf(); if (mz === 'なし') return dropMinzen(t);
   const pv = nightMedBefore(r), m = String(t).match(MED_SENT_RE), first = firstMorning(r);
   // 朝の業務手順書に「眠前薬服薬確認」がある人（10/31 新しい手順書・14人）は、その日の最初の朝の訪問で必ず書く
-  let planSays = false; if (first) { try { const pr = procedureFor(r.e, (state.name || '').trim()); planSays = !!pr && pr.steps.some(x => /眠前薬[^。]*確認/.test(x.text || '')); } catch (e) {} }
+  let planSays = false; if (first) { try { const pr = procedureFor(r.e, (state.name || '').trim()); planSays = !!pr && pr.steps.some(x => /眠前薬[^。]*確認/.test(x.text || '')); } catch (e) {} if (mz === 'あり') planSays = true; } // 「あり」の人は、その日の最初の朝の訪問で必ず確認の文
   // それ以外で、前の夜に眠前薬の訪問が無い時は、確認の文を入れない（10/31 ユーザー指示「ない場合は外しておいて」）
   if (!planSays && !pv) return m ? String(t).replace(m[0], '') : t;
   const all = String(t).split(/(?<=。)/).filter(y => y.trim()), isConf = y => y === MINZEN_NEXT || MED_SENT_RE.test(y), conf = all.filter(isConf), asa = all.indexOf(MED_ASA);
@@ -1966,7 +1987,7 @@ async function saveRecords(opt = {}) {
   // 記録に買った日用品が書いてあれば「前回買った日」を更新
   { const c = clientDoc(name) || { name }, g = { ...(c.goods || {}) }; let ch = false;
     rows.forEach(r => { if (!/買|購入/.test(r.text || '')) return; Object.keys(GOODS_CYCLE).forEach(x => { const key = x.split(/[（・]/)[0]; if ((r.text || '').includes(key) && (!g[x]?.last || g[x].last < ymd(r.date))) { g[x] = { ...(g[x] || {}), last: ymd(r.date) }; ch = true; } }); });
-    if (ch) await putDoc('clients', docId(name), { ...c, name, goods: g, updatedAt: new Date().toISOString() }); }
+    if (ch) await putDoc('clients', clientKey(name), { ...c, name, goods: g, updatedAt: new Date().toISOString() }); }
   const byMonth = {};
   rows.forEach(r => { const k = ymd(r.date).slice(0, 7); (byMonth[k] = byMonth[k] || []).push(r); });
   let n = 0, ok = true;
@@ -2282,7 +2303,7 @@ async function importAssessment(input, opt = {}) {
       if (!info.phone && A.phone) doc.phone = A.phone;
       if (!info.emergency && A.emergency) doc.emergency = A.emergency;
     }
-    await putDoc('clients', docId(name), doc);
+    await putDoc('clients', clientKey(name), doc);
     done.push(`${name}（${A.form === 'plan' ? '計画書' : 'アセスメント'}）`);
   }
   paperMsg('');
@@ -4669,7 +4690,7 @@ async function saveNgLists() {
   const lines = id => document.getElementById(id).value.split('\n').map(x => x.trim()).filter(Boolean);
   await setSetting('ng', 'smilewan_ng_list', lines('ngCommon'));
   const name = (state.name || '').trim();
-  if (name) { const prev = clientDoc(name) || { name }; await putDoc('clients', docId(name), { ...prev, name, ng: lines('ngClient'), updatedAt: new Date().toISOString() }); }
+  if (name) { const prev = clientDoc(name) || { name }; await putDoc('clients', clientKey(name), { ...prev, name, ng: lines('ngClient'), updatedAt: new Date().toISOString() }); }
   if (recRows.length) renderRecordView();
   alert('NG表現を保存しました' + (name ? `（共通＋${name} 様）` : '（共通）'));
 }
@@ -5647,7 +5668,7 @@ window.qaCheckRows = function (name) {
     // 8.5 計画書（業務手順書）の手順の言い回し：その訪問に当たる手順の文が文章にあるか（チェックの無い支援・本人がやることは数えない）
     if (typeof planCands === 'function' && !r.sick) { const c = planCands(r, t), n = c.length; if (n > 0 && c.filter(x => x.present).length < n) add(r, '計画書', `計画書の手順の文が足りない（例：${c.find(x => !x.present).says[0].slice(0, 24)}）`); }
     if (typeof planDedupe === 'function' && planDedupe(r, t) !== t) add(r, '計画書', '手順書の文と同じ意味の決まった文が残っている');
-    if (typeof withMedNext === 'function' && withMedNext(r, t) !== t) add(r, '眠前薬', '朝の服薬・眠前薬の文が決まった言い回しになっていない');
+    if (typeof withMedNext === 'function' && !(typeof rowClosed === 'function' && rowClosed(r)) && withMedNext(r, t) !== t) add(r, '眠前薬', '朝の服薬・眠前薬の文が決まった言い回しになっていない');
     // 8.6 献立・買い物支援で選んだ料理・保存した買い物の品物が文章にあるか
     if (typeof withKd === 'function' && !r.sick && withKd(r, t) !== t) add(r, '献立アプリ', '献立（献立アプリ・手順書のメニュー）や買った品物が文章に無い');
     { const mx = typeof TEXT_MAX !== 'undefined' ? TEXT_MAX : 500; if (t.length > mx) add(r, '文字数', `文章が${t.length}字（${mx}字まで）`); }
