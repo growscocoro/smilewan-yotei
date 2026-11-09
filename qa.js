@@ -69,6 +69,7 @@ window.qaCheckRows = function (name) {
     if (!ss.length) add(r, '文章', '文章が空');
     if (/。。|、。|、、/.test(t)) add(r, '文章', '句読点の重なり');
     if (typeof BROKEN_FIX !== 'undefined' && BROKEN_FIX.some(([re]) => { re.lastIndex = 0; return re.test(t); })) add(r, '文章', '言い回しの崩れ（「と発言ありる」など）');
+    if (typeof tidyTwice === 'function' && !(typeof rowClosed === 'function' && rowClosed(r)) && tidyTwice(t) !== t) add(r, '文章', '言い回しの重なり（体調の確認が2回・「耳を傾け、傾聴」など）');
     // 10. 家事の訪問はゴミ出し
     if (r.kind === '家事援助' && tm && !kp.includes('清掃|ゴミ出し')) add(r, 'ゴミ出し', '家事なのにゴミ出しが無い');
     if (typeof cleanLeak === 'function' && !(typeof rowClosed === 'function' && rowClosed(r)) && cleanLeak(r).length) add(r, '清掃の文', 'その時間に使わない所の掃除の文がある'); // 締めた月は対象外（決まり19は11月から・8〜10月の文は変えない）
