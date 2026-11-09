@@ -814,7 +814,7 @@ async function setSetting(key, localKey, list, opt = {}) {
 const SUPA = { url: '', key: '' }; // 旧（使わない）
 const GAS = {"url": "https://script.google.com/macros/s/AKfycbxKEAUthQx9wiZKncHZR43jbSKjPfO2lYhlc2K5yXWJNXI_zA8wChdQTFlINEhLTDQO/exec"};           // 保存先（Googleドライブに保存するGAS）。build-site.sh が入れる
 // 版の確認：公開版が新しくなったら知らせ、古い版のままでは記録を保存しない（古い決まりで上書きしないため）
-const APP_VER = '20261109111421';
+const APP_VER = '20261109113336';
 let appOutdated = false;
 async function checkVer() {
   if (APP_VER === 'dev' || appOutdated) return appOutdated;
@@ -1805,7 +1805,7 @@ const BROKEN_FIX = [[/と発言ありる/g, 'と話される'], [/との言葉�
   [/と話され。/g, 'と話された。'], [/(^|。)[^。、「」]{1,8}(の間に|時|の際|際に)。/g, '$1'], [/(^|。)[^。、「」]{1,10}(に|で|を|が|は|時|際|(?<!こ)と)。/g, '$1']]; // 11/3 抜けの点検で見つけた切れ端（「〜と話され。」「洗濯の間に。」「訪問時。」：文の後ろ半分だけ外して残っていた） // 10/31 までの言い換えで崩れた言い回し／11/3 何を確認したかが抜けた「本人と確認した。」だけの文（家事の訪問の服薬の文から薬の部分だけ外して残っていた）
 const TEXT_MAX = 500;
 // 言い回しの重なり（11/9 高山秀都 8/9 20:00 の写真）：体調の確認が2回／「耳を傾け、傾聴しながら」／「声掛けで促し」が2回。入浴前・帰宅後の体調確認は別の確認なので残す
-const COND_RE = /体調を(確認|確かめ|伺|うかが|尋ね|お聞き)|体調(確認|の確認)|体調面について確かめ|体調について(確認|確かめ|伺|尋ね)/, COND_KEEP = /入浴前|入浴の前|帰宅後|帰りは/;
+const COND_RE = /体調を(確認|確かめ|伺|うかが|尋ね|お聞き)|体調(確認|の確認)|体調面について確かめ|体調について(確認|確かめ|伺|尋ね)/, COND_KEEP = /入浴前|入浴の前|浴室|帰宅後|帰りは/;
 function tidyTwice(t) {
   let seen = false, prompted = 0;
   return String(t || '').replace(/耳を傾け、傾聴しながら/g, '耳を傾けながら').split(/(?<=。)/).map(s => {
@@ -1813,7 +1813,7 @@ function tidyTwice(t) {
     if (COND_RE.test(s) && !COND_KEEP.test(s)) {
       if (!seen) { seen = true; return s; }
       const a = s.replace(/挨拶し体調(を確認し|を伺っ|の確認をし)た。$/, '挨拶した。'); if (a !== s) return a; // 「挨拶し体調を確認した」→「挨拶した」
-      if (/^\s*(支援の前に体調を(確認|確かめ)した|体調を(伺って|確認して|確かめて)から支援を始めた)。$/.test(s)) return ''; // 確認だけの文は外す
+      if (/^\s*(支援の前に体調を(確認|確かめ)した|(まず)?((本人|利用者様)の)?体調を(伺って|確認して|確かめて)から支援を始めた)。$/.test(s)) return ''; // 確認だけの文は外す
       const b = s.replace(/^(\s*)体調[^、。]*?(すると|ところ|たが|が|し|め|と)、/, '$1'); if (b !== s && b.trim().length > 4) return b; // 「体調を確認すると、訴えはなかった」→「訴えはなかった」
       return s;
     }
@@ -5770,7 +5770,7 @@ function autoRepair(name) {
     else if (i.kind === '体調不良') { if (/文章に清拭/.test(i.msg)) r.text = String(r.text).split(/(?<=。)/).filter(x => !/清拭/.test(x)).join(''); else needSick = true; }
     else if (i.kind === '重複') { const seen = new Set(); r.text = String(r.text).split(/(?<=。)/).filter(x => { if (!x.trim() || seen.has(x)) return false; seen.add(x); return true; }).join(''); }
     else if (i.kind === '文章' && /崩れ/.test(i.msg)) BROKEN_FIX.forEach(([re, to]) => { r.text = String(r.text).replace(re, to); });
-    else if (i.kind === '文章' && /重なり/.test(i.msg)) r.text = tidyTwice(r.text);
+    else if (i.kind === '文章' && /重なり/.test(i.msg)) { r.text = tidyTwice(r.text); orderRows.add(r); } // 外したあとは流れの順にそろえる
     else if (i.kind === '文章' && /句読点/.test(i.msg)) r.text = String(r.text).replace(/。。+/g, '。').replace(/、。/g, '。').replace(/、、+/g, '、');
     else if (i.kind === '文章' && /空/.test(i.msg)) r.text = uniqueText(r, recRows.filter(x => x !== r && x.on));
     else if (i.kind === 'チェックと文章' || i.kind === '文章とチェック') textRows.add(r);
