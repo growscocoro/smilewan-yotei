@@ -830,7 +830,7 @@ async function setSetting(key, localKey, list, opt = {}) {
 const SUPA = { url: '', key: '' }; // 旧（使わない）
 const GAS = {"url": "https://script.google.com/macros/s/AKfycbxKEAUthQx9wiZKncHZR43jbSKjPfO2lYhlc2K5yXWJNXI_zA8wChdQTFlINEhLTDQO/exec"};           // 保存先（Googleドライブに保存するGAS）。build-site.sh が入れる
 // 版の確認：公開版が新しくなったら知らせ、古い版のままでは記録を保存しない（古い決まりで上書きしないため）
-const APP_VER = '20261110170347';
+const APP_VER = '20261110173810';
 let appOutdated = false;
 async function checkVer() {
   if (APP_VER === 'dev' || appOutdated) return appOutdated;
@@ -4155,7 +4155,7 @@ function sheetApply(r, o) { if (!sheetDay(r)) return o; const off = r.kpOff || [
 function cleanApply(r, o) { if (longClean(r, o)) { const on = r.kpOn || [], off = r.kpOff || [], x = o.filter(k => k !== '清掃|ポータブルトイレ' || on.includes(k)); LONG_CLEAN.forEach(k => { if (!x.includes(k) && !off.includes(k)) x.push(k); }); return x; } if (!cleanRule(r)) return o; const u = cleanPlaces(r), on = r.kpOn || [], off = r.kpOff || [], x = o.filter(k => !k.startsWith('清掃|') || u.has(k) || on.includes(k)); u.forEach(k => { if (!x.includes(k) && !off.includes(k)) x.push(k); }); return x; }
 const CLEAN_TEXT = [['清掃|トイレ', /(トイレ|便器)[^。]*(掃除|清掃|拭)/], ['清掃|浴室', /(浴室|浴槽|お風呂|風呂)[^。]*(掃除|清掃|磨|洗い流)/], ['清掃|台所', /(台所|シンク|調理台|キッチン|水回り)[^。]*(掃除|清掃|拭|磨)/], ['清掃|卓上', /(食卓|卓上|テーブル)[^。]*(拭|片付)/], ['清掃|居室', /(居室|掃除機|生活スペース|床面|室内|部屋|過ごす場所)[^。]*(掃除|清掃|整)|^床[^。]*(掃除|拭)/], ['清掃|ゴミ出し', /ゴミ|ごみ/]];
 // その時間に使わない所の掃除の文（決まり19）
-function cleanLeak(r) { if (!cleanRule(r) || longClean(r, kpAll0(r))) return []; const u = cleanPlaces(r), on = r.kpOn || []; return String(r.text || '').split(/(?<=。)/).filter(x => CLEAN_TEXT.some(([k, re]) => !u.has(k) && !on.includes(k) && re.test(x))); }
+function cleanLeak(r) { if (!cleanRule(r) || longClean(r, kpAll0(r))) return []; const u = cleanPlaces(r), on = r.kpOn || []; if (kpAll0(r).includes('調理|調理')) u.add('清掃|ゴミ出し'); /* 調理の訪問はゴミ出しも使う所（11/10） */ return String(r.text || '').split(/(?<=。)/).filter(x => CLEAN_TEXT.some(([k, re]) => !u.has(k) && !on.includes(k) && re.test(x))); }
 const roomAlways = r => !cleanRule(r) && (r.kind === '家事援助' || (!!r.e && /生活/.test(r.e.type || '') && !tmplItems(r)));
 function kpAll(r) {
   if (r.kpFrozen && rowClosed(r)) return r.kpFrozen.slice(); // 締めた月は、保存したときのチェックのまま（11/6 決まりを変えても昔の月は変えない）
@@ -4178,7 +4178,10 @@ function kpAll(r) {
   if ((o.some(k => /^入浴・清拭\|(入浴介助|シャワー浴)$/.test(k)) || /入浴/.test(r.e && r.e.type || '')) && !o.includes('自立支援|服薬') && !off.includes('自立支援|服薬') && minzenOf() !== 'なし' && lastOfDay(r) && !noMed('自立支援|服薬')) o.push('自立支援|服薬'); // 眠前薬「なし」の人は付けない
   // 眠前薬「あり」の人：夜（17時から）の最後の身体の訪問で服薬のチェックが無いときは、服薬の声かけを付ける（11/10 高山治女さん「身体 服薬声かけ チェック」）
   if (mzAri && nightVisitAri(r) && !o.some(k => /^服薬・医療\|/.test(k) || k === '自立支援|服薬') && !off.includes('自立支援|服薬')) o.push('自立支援|服薬');
-  return sheetApply(r, cleanApply(r, o));
+  const fin = sheetApply(r, cleanApply(r, o));
+  // 11/10 手書きメモ「調理の場合 ゴミ出し✅」：調理にチェックがある訪問はゴミ出しも付ける（手で外したときだけ外す）
+  if (fin.includes('調理|調理') && !fin.includes('清掃|ゴミ出し') && !(r.kpOff || []).includes('清掃|ゴミ出し')) fin.push('清掃|ゴミ出し');
+  return fin;
 }
 // 見本のある訪問に足す手順書の項目。今までに外すと決めた物は足さない（家事に身体の項目・入浴に調理や排泄食事など・共に行う訪問の更衣介助（11/5 井口さん）・入浴の訪問の清掃や洗濯（生活の付く種別は除く））
 function planForOwn(r, ti) {
