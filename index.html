@@ -718,7 +718,7 @@
 
     <div id="statePop"></div>
     <div id="kpPop"></div>
-    <div id="ckSheet" onclick="if(event.target===this)checkSheetClose()"></div>
+    <div id="ckSheet" onclick="if(event.target===this)checkSheetClose(true)"></div>
     <div id="vPop"></div>
   </div>
 </div>
@@ -792,6 +792,7 @@ async function dbWrite(fn, what) {
   catch (e) {
     const code = e && e.code;
     if (code === 'quota_exceeded') alert('共有データベースの上限に達しました。使っていない利用者の予定表を削除してください。');
+    else if (code === 'gone') alert(`${what}しませんでした。${e.message}`);
     else if (code === 'invalid_argument') alert(`${what}できませんでした。このページの共有設定が「閲覧のみ」の可能性があります（この端末には保存しました）。`);
     else alert(`${what}できませんでした（${e && e.message || code || '不明なエラー'}）。この端末には保存しました。`);
     return false;
@@ -801,7 +802,7 @@ async function saveSchedule(name, data, opt = {}) {
   if (!opt.skipNameCheck && !Object.keys(getStore()).includes(name) && !confirmNewName(name, '予定表')) return false; // 二重登録の注意
   const ls = localStore(); ls[name] = { ...data, updatedAt: new Date().toISOString() }; lsSet(STORAGE_KEY, JSON.stringify(ls));
   if (!opt.skipSb) sbPush('schedule', name, { name, days: data.days });
-  if (DB) return dbWrite(() => DB.doc('schedules/' + docId(name)).set({ name, days: data.days, updatedAt: new Date().toISOString() }), '共有保存');
+  if (DB) return dbWrite(() => DB.doc('schedules/' + docId(name)).set({ name, days: data.days, updatedAt: new Date().toISOString() }, { fresh: !!opt.fresh }), '共有保存'); // fresh＝ゴミ箱から戻すとき（消した物を、わざと作り直す）
   return true;
 }
 async function removeSchedule(name) {
@@ -829,7 +830,7 @@ async function setSetting(key, localKey, list, opt = {}) {
 const SUPA = { url: '', key: '' }; // 旧（使わない）
 const GAS = {"url": "https://script.google.com/macros/s/AKfycbxKEAUthQx9wiZKncHZR43jbSKjPfO2lYhlc2K5yXWJNXI_zA8wChdQTFlINEhLTDQO/exec"};           // 保存先（Googleドライブに保存するGAS）。build-site.sh が入れる
 // 版の確認：公開版が新しくなったら知らせ、古い版のままでは記録を保存しない（古い決まりで上書きしないため）
-const APP_VER = '20261109163451';
+const APP_VER = '20261110095121';
 let appOutdated = false;
 async function checkVer() {
   if (APP_VER === 'dev' || appOutdated) return appOutdated;
@@ -870,6 +871,9 @@ const SMALL_KINDS = ['schedules', 'clients', 'settings'];
 function gasDB(pass, first) {
   const subs = {}; let timer = null, busy = false, fails = 0, retryT = null, meta = (first && first.meta) || {};
   const cache = {}; ((first && first.docs) || []).forEach(d => { (cache[d.kind] = cache[d.kind] || {})[d.name] = d.data; });
+  // この画面が一度でも見た物（ほかの画面で消されても覚えておく）。保存するときに「見た版」として送り、消された後の古い画面からの保存を保存先で止める（11/9 大田亜美さんの記録が戻った）
+  // 記録は、この画面で中身を読んだ物・保存した物だけ（一覧に載っているだけの人の記録は入れない）。この画面で消した物は、消す前の一覧を読み直しても入れない
+  const seen = {}, dropped = new Set(), see = m => Object.entries(m || {}).forEach(([id, x]) => { if (dropped.has(id) || (id.startsWith('records/') && !(id in seen))) return; seen[id] = (x && x.u) || seen[id] || '1'; }); see(meta);
   cloud.recordsMeta = meta;
   const deliver = kinds => (kinds || Object.keys(subs)).forEach(k => { const docs = Object.entries(cache[k] || {}).map(([id, data]) => ({ id, data: () => data })); (subs[k] || []).forEach(sb => sb.cb({ docs })); });
   const split = id => { const i = id.indexOf('/'); return [id.slice(0, i), id.slice(i + 1)]; };
@@ -887,7 +891,7 @@ function gasDB(pass, first) {
           const g = await gasCall({ pass, op: 'get', kind, name }); if (g.doc) { (cache[kind] = cache[kind] || {})[name] = g.doc.data; changed.add(kind); }
         }
       }
-      meta = nm; cloud.recordsMeta = meta; if (changed.size) deliver([...changed]);
+      meta = nm; see(nm); cloud.recordsMeta = meta; if (changed.size) deliver([...changed]);
       if (changed.size || true) refreshStaffFilter();
     } catch (e) {
       if (e && e.code === 'badpass') { Object.values(subs).flat().forEach(sb => sb.err && sb.err(e)); }
@@ -903,16 +907,16 @@ function gasDB(pass, first) {
     doc(path) {
       const [kind, name] = split(path);
       return {
-        set: async data => { const j = await gasCall({ pass, op: 'put', kind, name, data }); if (j.skipped && j.skipped.length) { refresh(); const e = new Error('保存先にもっと新しい内容があったため保存しませんでした。画面を読み直してください'); e.code = 'stale'; throw e; } (cache[kind] = cache[kind] || {})[name] = data; meta[kind + '/' + name] = { ...(meta[kind + '/' + name] || {}), u: data.updatedAt, n: data.name }; cloud.recordsMeta = meta; deliver([kind]); },
-        delete: async () => { await gasCall({ pass, op: 'del', kind, name }); if (cache[kind]) delete cache[kind][name]; delete meta[kind + '/' + name]; deliver([kind]); },
+        set: async (data, opt = {}) => { const id = kind + '/' + name, j = await gasCall({ pass, op: 'put', kind, name, data, base: opt.fresh ? '' : (opt.base || seen[id] || '') }); if (j.skipped && j.skipped.length) { refresh(); const gone = j.skipped.some(x => /消した物/.test(x)); if (gone) dropLocalCopy(kind, name, data); const e = new Error(gone ? 'この内容は、ほかの画面で消されています。保存しませんでした。画面を読み直してください' : '保存先にもっと新しい内容があったため保存しませんでした。画面を読み直してください'); e.code = gone ? 'gone' : 'stale'; throw e; } dropped.delete(id); seen[id] = data.updatedAt || seen[id]; (cache[kind] = cache[kind] || {})[name] = data; meta[kind + '/' + name] = { ...(meta[kind + '/' + name] || {}), u: data.updatedAt, n: data.name }; cloud.recordsMeta = meta; deliver([kind]); },
+        delete: async () => { dropped.add(kind + '/' + name); await gasCall({ pass, op: 'del', kind, name }); delete seen[kind + '/' + name]; if (cache[kind]) delete cache[kind][name]; delete meta[kind + '/' + name]; deliver([kind]); },
       };
     },
     collection(kind) { return { onSnapshot(cb, err) { (subs[kind] = subs[kind] || []).push({ cb, err }); start(); } }; },
     // 利用者1人分の訪問記録を読む（選んだとき）
-    async loadRecords(client) { const j = await gasCall({ pass, op: 'records', client }); (j.docs || []).forEach(d => { (cache.records = cache.records || {})[d.name] = d.data; }); deliver(['records']); return (j.docs || []).length; },
+    async loadRecords(client) { const j = await gasCall({ pass, op: 'records', client }); (j.docs || []).forEach(d => { (cache.records = cache.records || {})[d.name] = d.data; seen['records/' + d.name] = (d.data && d.data.updatedAt) || seen['records/' + d.name] || '1'; }); deliver(['records']); return (j.docs || []).length; },
     // 全員分の記録を読む（保守用・重い）
     async loadAllRecords() { // 一度に全部だと返事が大きすぎて届かないことがあるので、1人ずつ順に読む
-      const m = await gasCall({ pass, op: 'meta' }); if (m.meta) { meta = m.meta; cloud.recordsMeta = meta; }
+      const m = await gasCall({ pass, op: 'meta' }); if (m.meta) { meta = m.meta; see(meta); cloud.recordsMeta = meta; }
       const names = [...new Set(Object.keys(meta).filter(id => id.startsWith('records/')).map(id => meta[id].n).filter(Boolean))]; let n = 0;
       for (const c of names) { const j = await gasCall({ pass, op: 'records', client: c }); (j.docs || []).forEach(d => { (cache.records = cache.records || {})[d.name] = d.data; n++; }); }
       const want = Object.keys(meta).filter(id => id.startsWith('records/')).length; if (n < want) throw new Error(`記録を全部読めませんでした（${n}/${want}）`);
@@ -1032,7 +1036,7 @@ async function initCloud() {
     const ls = localStore();
     // この端末にだけある予定表・この端末の方が新しい予定表は、共有側へ送る（つながっていない間の変更を取りこぼさない）
     Object.keys(m).forEach(n => { if (isTomb('schedules', docId(n))) delete m[n]; }); // 消した物は、古い端末から戻ってきても出さない
-    if (!cloud._migrated && Object.keys(m).length) Object.keys(ls).forEach(n => { if (isTomb('schedules', docId(n))) return; const l = ls[n], c = m[n]; if (!c || (l.updatedAt && (!c.updatedAt || l.updatedAt > c.updatedAt))) { m[n] = { name: n, days: l.days, updatedAt: l.updatedAt }; DB.doc('schedules/' + docId(n)).set({ name: n, days: l.days, updatedAt: l.updatedAt || new Date().toISOString() }).catch(() => {}); } });
+    if (!cloud._migrated && Object.keys(m).length) Object.keys(ls).forEach(n => { if (isTomb('schedules', docId(n))) return; const l = ls[n], c = m[n]; if (!c || (l.updatedAt && (!c.updatedAt || l.updatedAt > c.updatedAt))) { m[n] = { name: n, days: l.days, updatedAt: l.updatedAt }; DB.doc('schedules/' + docId(n)).set({ name: n, days: l.days, updatedAt: l.updatedAt || new Date().toISOString() }, { base: '0' }).catch(() => {}); } });
     cloud._migrated = true;
     refreshSavedList(); refreshUserPick(); if (mode === 'record') refreshRecUsers();
     setSyncStatus(`☁ 共有保存（予定表 ${Object.keys(m).length}名）`, 'ok');
@@ -1051,7 +1055,7 @@ async function initCloud() {
       Object.keys(m).forEach(id => { if (isTomb(kind, id)) delete m[id]; });
       // 共有側の一覧（meta）が読めていないとき（通信の失敗など）は、この端末の写しを送らない（古い写しで上書きしないため）
       if (first && !Object.keys(cloud.recordsMeta || {}).some(id => id.startsWith(kind + '/'))) first = false;
-      if (first) { first = false; const l = localColl(kind); Object.keys(l).forEach(id => { if (isTomb(kind, id)) return; const mt = (cloud.recordsMeta || {})[kind + '/' + id]; const c = m[id] || (mt ? { updatedAt: mt.u } : null), x = l[id]; if (!c || (x.updatedAt && (!c.updatedAt || x.updatedAt > c.updatedAt))) { m[id] = x; DB.doc(kind + '/' + id).set(x).catch(() => {}); } }); }
+      if (first) { first = false; const l = localColl(kind); Object.keys(l).forEach(id => { if (isTomb(kind, id)) return; const mt = (cloud.recordsMeta || {})[kind + '/' + id]; const c = m[id] || (mt ? { updatedAt: mt.u } : null), x = l[id]; if (!c || (x.updatedAt && (!c.updatedAt || x.updatedAt > c.updatedAt))) { m[id] = x; DB.doc(kind + '/' + id).set(x, { base: '0' }).catch(() => {}); } }); }
       cloud[kind] = m;
       if (kind === 'clients') { renderClientBox(!clientEdited); renderNgBox(); renderAssessBox(); renderGlobStates(); renderKubun(); refreshSavedList(); if (recRows.length) renderRecordView(); } else refreshSavedMonths();
     }, () => {});
@@ -1139,7 +1143,7 @@ async function openTrash() {
   const list = docs.map((d, i) => `${i + 1}. ${d.name}（${new Date(d.at).toLocaleString('ja-JP')}・${d.by}）`).join('\n');
   const no = window.prompt(`戻す予定表の番号を入れてください\n${list}`), d = docs[(+no || 0) - 1]; if (!d) return;
   if (getStore()[d.name] && !confirm(`「${d.name}」の予定表はもうあります。上書きしますか？`)) return;
-  await saveSchedule(d.name, d.doc, { skipNameCheck: true });
+  await saveSchedule(d.name, d.doc, { skipNameCheck: true, fresh: true });
   await gasCall({ pass, op: 'del', kind: 'trash', name: d.tid });
   await gasCall({ pass, op: 'log', item: { where: 'delete', ver: APP_VER, msg: `予定表を戻した：${d.name}（${actorName() || '名前なし'}）` } });
   refreshSavedList(); alert(`「${d.name}」の予定表を戻しました`);
@@ -1317,6 +1321,13 @@ function csvClientInfo(r, heads) {
 // ===== 利用者情報・訪問記録の保存（共有DB/Supabase があればそこへ、なければこの端末へ） =====
 function localColl(kind) { try { return JSON.parse(lsGet('smilewan_' + kind) || '{}'); } catch { return {}; } }
 // 消した予定表・記録の控え（設定 deleted）：古い端末の控えから共有へ戻らないようにする
+// 保存先で「消した物」と言われた写しは、この端末からも消す（読み直したときに、端末の写しを送り直して戻さないため・11/10）
+function dropLocalCopy(kind, id) {
+  try {
+    if (kind === 'schedules') { const ls = localStore(); Object.keys(ls).forEach(n => { if (docId(n) === id) delete ls[n]; }); lsSet(STORAGE_KEY, JSON.stringify(ls)); if (cloud.schedules) Object.keys(cloud.schedules).forEach(n => { if (docId(n) === id) delete cloud.schedules[n]; }); }
+    else { const l = localColl(kind); if (id in l) { delete l[id]; lsSet('smilewan_' + kind, JSON.stringify(l)); } if (cloud[kind]) delete cloud[kind][id]; }
+  } catch (e) {}
+}
 function isTomb(kind, id) { const l = getSetting('deleted', 'smilewan_deleted', []) || []; return Array.isArray(l) && l.includes(kind + '/' + id); }
 function getColl(kind) { return (DB && cloud[kind]) ? cloud[kind] : localColl(kind); }
 // ===== 名前の二重登録の防止：表記ゆれ（空白・全角半角）や1文字違いの名前を新しく登録しようとしたら警告する =====
@@ -2064,7 +2075,7 @@ function openSavedRecords() {
   const d = month && getColl('records')[docId(name) + '_' + month];
   if (!d) { alert('開く記録を選んでください'); return; }
   if (recRows.length && !confirm('今の表の内容を、保存した記録に入れ替えますか？')) return;
-  recRows = d.rows.map(savedRowToRec)
+  recRows = d.rows.map(savedRowToRec); _recOwner = name; recRows = recRows
     .sort((a, b) => (b.date - a.date) || ((b.e.start || '') > (a.e.start || '') ? 1 : -1));
   const [y, m] = month.split('-').map(Number);
   document.getElementById('recFrom').value = `${month}-01`; document.getElementById('recTo').value = `${month}-${String(new Date(y, m, 0).getDate()).padStart(2, '0')}`;
@@ -3043,7 +3054,7 @@ document.body.appendChild(dl);
 // ================= 訪問記録 =================
 let mode = 'sheet';
 var recWho = (() => { try { return localStorage.getItem('smilewan_recwho') === 'staff' ? 'staff' : 'user'; } catch (e) { return 'user'; } })(); // 訪問記録の選び方：user=利用者から選ぶ／staff=担当者から選ぶ（前回の選び方）
-let recRows = [];
+let recRows = [], _recOwner = ''; // _recOwner＝今の recRows がだれの記録か（開いた・作ったときの利用者）
 const pageStyle = document.createElement('style'); document.head.appendChild(pageStyle);
 function setMode(m) {
   mode = m;
@@ -3524,69 +3535,86 @@ function ckCols() {
     const c = map.get(key); c.days.add(d); c.entries.push(e); }));
   return [...map.values()].sort((a, b) => hm(a.start) - hm(b.start));
 }
-function ckColOf(cols, r) { // 記録の訪問が、予定表のどの時間の物か（シフトで時刻が少しずれた訪問も、45分以内で同じ種類なら同じ列）
+function ckColOf(cols, r) { // 記録の訪問が、予定表のどの時間の物か。同じ種類（身体／家事／通院）の列だけに入れる（家事の訪問を身体の列に入れない・11/10 見直し）
   const st = hm(r.e.start || entryTime(r.e).s), dow = r.date.getDay(), fam = entFam(r.e); if (st == null) return null;
   const near = list => list.filter(c => Math.abs(hm(c.start) - st) <= 45).sort((a, b) => Math.abs(hm(a.start) - st) - Math.abs(hm(b.start) - st))[0];
-  return near(cols.filter(c => c.days.has(dow) && c.fam === fam)) || near(cols.filter(c => c.days.has(dow))) || near(cols.filter(c => c.fam === fam)) || null;
+  return near(cols.filter(c => c.days.has(dow) && c.fam === fam)) || near(cols.filter(c => c.fam === fam)) || null;
 }
 const ckColLabel = c => `${tmplTod(c.start)} ${fmtTime(c.start)}${c.end ? '〜' + fmtTime(c.end) : ''}（${c.type || '種別なし'}・${c.days.size === 7 ? '毎日' : dayLabel([...c.days])}）`;
+const ckKeys = () => KPD().flatMap(([, cat, items]) => items.map(it => cat + '|' + it));
 function checkSheetOpen() {
   const name = (state.name || '').trim();
   if (!name || !hasContent()) { alert('先に利用者を選んでください'); return; }
+  if (recRows.length && _recOwner !== name) { alert(`開いている記録が ${name} さんの物か確かめられません。\n「📚 保存した訪問記録」で月を選んで「開く」を押してから、もう一度押してください。`); return; }
   const rows = recRows.filter(r => r.on !== false && r.e && !rowClosed(r));
   if (!rows.length) { alert('先に、今の月の記録を開いてください（「📚 保存した訪問記録」で月を選んで「開く」、または「📝 記録を生成」）。\n締めた月（7〜10月）は変えません。直すときは先に「月を開ける」を押してください。'); return; }
   const cols = ckCols(); if (!cols.length) { alert('予定表に、時間の入った予定がありません'); return; }
   cols.forEach(c => { c.rows = []; }); let other = 0;
   rows.forEach(r => { const c = ckColOf(cols, r); if (c) c.rows.push(r); else other++; });
-  const use = cols.filter(c => c.rows.length);
+  const use = cols.filter(c => c.rows.length), keys = ckKeys();
   use.forEach(c => { c.cnt = {}; c.rows.forEach(r => kpAll(r).forEach(k => { c.cnt[k] = (c.cnt[k] || 0) + 1; }));
-    const smp = c.rows[0]; c.sample = smp; let pl = [], tm = []; try { pl = planItems(smp) || []; } catch (e) {} try { tm = tmplItems(smp) || []; } catch (e) {}
-    c.plan = new Set(pl); c.tmpl = new Set(tm); c.init = new Set(Object.keys(c.cnt).filter(k => c.cnt[k] * 2 >= c.rows.length)); c.now = new Set(c.init); });
+    const smp = c.rows[0]; let pl = [], tm = []; try { pl = planItems(smp) || []; } catch (e) {} try { tm = tmplItems(smp) || []; } catch (e) {}
+    c.plan = new Set(pl); c.tmpl = new Set(tm); c.init = new Set(Object.keys(c.cnt).filter(k => c.cnt[k] * 2 >= c.rows.length)); c.now = new Set(c.init);
+    c.block = {}; keys.forEach(k => { const why = c.rows.map(r => kpBlocked(r, k)).filter(Boolean); if (why.length) c.block[k] = { n: why.length, why: why[0] }; }); }); // 付けられない訪問（列の全部なら押せない・一部ならその訪問だけ飛ばす）。開いたときに1回だけ求める
   const months = [...new Set(rows.map(r => ymd(r.date).slice(0, 7)))].sort();
   _ck = { name, cols: use, other, empty: cols.filter(c => !c.rows.length), months, closedSkip: recRows.filter(r => r.on !== false && r.e && rowClosed(r)).length };
   renderCheckSheet(); document.getElementById('ckSheet').style.display = 'block';
 }
-function checkSheetClose() { document.getElementById('ckSheet').style.display = 'none'; _ck = null; }
+function checkSheetClose(ask) { if (ask && ckChanges().length && !confirm('変えたマスは当てずに閉じます。よろしいですか？')) return; document.getElementById('ckSheet').style.display = 'none'; _ck = null; }
 function ckToggle(ci, k) { const c = _ck && _ck.cols[ci]; if (!c) return; if (c.now.has(k)) c.now.delete(k); else c.now.add(k); renderCheckSheet(); }
-function ckChanges() { const out = []; if (!_ck) return out; _ck.cols.forEach(c => KPD().forEach(([, cat, items]) => items.forEach(it => { const k = cat + '|' + it; if (c.now.has(k) !== c.init.has(k)) out.push({ c, k, on: c.now.has(k) }); }))); return out; }
+function ckChanges() { const out = []; if (!_ck) return out; const keys = ckKeys(); _ck.cols.forEach(c => keys.forEach(k => { if (c.now.has(k) !== c.init.has(k)) out.push({ c, k, on: c.now.has(k) }); })); return out; }
 function renderCheckSheet() {
   const box = document.getElementById('ckSheet'); if (!_ck) { box.innerHTML = ''; return; }
-  const C = _ck.cols, ch = ckChanges(), y = document.getElementById('ckSheet').scrollTop;
+  const C = _ck.cols, ch = ckChanges(), y = box.scrollTop;
   const head = `<tr><th>項目</th>${C.map(c => `<th class="c" style="text-align:center">${esc(ckColLabel(c))}<br><small style="font-weight:normal">記録${c.rows.length}件</small></th>`).join('')}</tr>`;
   const body = KPD().map(([lb, cat, items]) => `<tr class="cat"><td colspan="${1 + C.length}">${esc(lb)}</td></tr>` + items.map(it => { const k = cat + '|' + it;
-    return `<tr><td>${esc(it)}</td>${C.map((c, ci) => { const n = c.cnt[k] || 0, on = c.now.has(k), blk = !on && kpBlocked(c.sample, k);
-      return `<td class="c ${on !== c.init.has(k) ? 'chg' : ''}" title="${esc(blk || `この時間の記録${c.rows.length}件のうち${n}件に付いている`)}"><input type="checkbox" ${on ? 'checked' : ''} ${blk ? 'disabled' : ''} onclick="ckToggle(${ci},'${k.replace(/'/g, "\\'")}')">${c.plan.has(k) ? '<span class="mk" title="手順書（計画書）にある">計</span>' : ''}${c.tmpl.has(k) ? '<span class="mk" title="見本の用紙にある">見</span>' : ''}${n && n < c.rows.length ? `<span class="part">${n}/${c.rows.length}</span>` : ''}</td>`; }).join('')}</tr>`; }).join('')).join('');
-  box.innerHTML = `<div class="ck-box"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><b style="font-size:16px">📋 ${esc(_ck.name)}さん チェック確認表（${esc(_ck.months.join('・'))}）</b><button class="small" onclick="checkSheetClose()">閉じる</button></div>
-    <div class="hint" style="margin:4px 0 8px">☑＝今付いている物（その時間の記録の半分以上）。<span class="mk">計</span>＝手順書（計画書）にある　<span class="mk">見</span>＝見本の用紙にある　<span class="part">3/9</span>＝一部の日だけ付いている（シーツの週1回など）。<br>付ける物・外す物を押して直し、下の「当てる」を押すと、<b>予定表の枠（これから作る記録）</b>と<b>開いている月の記録</b>に同じチェックが入ります。押したマスだけ変わり、ほかは今までの決まりのままです。${_ck.closedSkip ? `<br>締めた月の記録${_ck.closedSkip}件は変えません。` : ''}${_ck.other ? `<br>予定表の時間と合わない訪問${_ck.other}件は対象外です。` : ''}${_ck.empty.length ? `<br>記録がまだ無い時間（${esc(_ck.empty.map(ckColLabel).join('、'))}）は出していません。` : ''}</div>
+    return `<tr><td>${esc(it)}</td>${C.map((c, ci) => { const n = c.cnt[k] || 0, on = c.now.has(k), b = c.block[k], all = b && b.n === c.rows.length, dis = all && !on && !c.init.has(k);
+      const tip = b ? `${b.why}（${b.n}/${c.rows.length}件。${all ? '押せません' : 'その訪問には付けません'}）` : `この時間の記録${c.rows.length}件のうち${n}件に付いている`;
+      return `<td class="c ${on !== c.init.has(k) ? 'chg' : ''}" title="${esc(tip)}"><input type="checkbox" ${on ? 'checked' : ''} ${dis ? 'disabled' : ''} onclick="ckToggle(${ci},'${k.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}')">${c.plan.has(k) ? '<span class="mk" title="手順書（計画書）にある">計</span>' : ''}${c.tmpl.has(k) ? '<span class="mk" title="見本の用紙にある">見</span>' : ''}${n && n < c.rows.length ? `<span class="part">${n}/${c.rows.length}</span>` : ''}</td>`; }).join('')}</tr>`; }).join('')).join('');
+  box.innerHTML = `<div class="ck-box"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><b style="font-size:16px">📋 ${esc(_ck.name)}さん チェック確認表（${esc(_ck.months.join('・'))}）</b><button class="small" onclick="checkSheetClose(true)">閉じる</button></div>
+    <div class="hint" style="margin:4px 0 8px">☑＝今付いている物（その時間の記録の半分以上）。<span class="mk">計</span>＝手順書（計画書）にある　<span class="mk">見</span>＝見本の用紙にある　<span class="part">3/9</span>＝一部の日だけ付いている（シーツの週1回など）。<br>付ける物・外す物を押して直し、下の「当てる」を押すと、<b>予定表の枠（これから作る記録）</b>と<b>開いている月の記録</b>に同じチェックが入ります。押したマスだけ変わり、ほかは今までの決まりのままです。${_ck.closedSkip ? `<br>締めた月の記録${_ck.closedSkip}件は変えません。` : ''}${_ck.other ? `<br>予定表に同じ種類・近い時間の予定が無い訪問${_ck.other}件は対象外です。` : ''}${_ck.empty.length ? `<br>記録がまだ無い時間（${esc(_ck.empty.map(ckColLabel).join('、'))}）は出していません。` : ''}</div>
     <table><thead>${head}</thead><tbody>${body}</tbody></table>
     <div class="ck-foot"><button class="primary" onclick="checkSheetApply()" ${ch.length ? '' : 'disabled'}>✓ この内容で当てる（${ch.length}か所）</button><button class="small" onclick="checkSheetOpen()">元に戻す</button><button class="small" onclick="checkSheetCopy()">結果をコピー</button><span class="hint" style="margin:0">${ch.length ? '黄色＝変えたマス' : 'まだ変えていません'}</span></div></div>`;
   box.scrollTop = y;
 }
 function checkSheetCopy() {
-  if (!_ck) return; const t = `${_ck.name}さん チェック（確認表より）\n` + _ck.cols.map(c => `【${ckColLabel(c)}】` + KPD().flatMap(([, cat, items]) => items.map(it => cat + '|' + it)).filter(k => c.now.has(k)).map(k => k.replace('|', '：')).join('、')).join('\n');
-  try { navigator.clipboard.writeText(t); alert('コピーしました'); } catch (e) { prompt('コピーしてください', t); }
+  if (!_ck) return; const keys = ckKeys(), t = `${_ck.name}さん チェック（確認表より）\n` + _ck.cols.map(c => `【${ckColLabel(c)}】` + keys.filter(k => c.now.has(k)).map(k => k.replace('|', '：')).join('、')).join('\n');
+  const manual = () => prompt('コピーしてください', t);
+  try { navigator.clipboard.writeText(t).then(() => alert('コピーしました'), manual); } catch (e) { manual(); }
 }
 function checkSheetApply() {
   if (!_ck) return; const ch = ckChanges(); if (!ch.length) { alert('変えたマスがありません'); return; }
-  if ((state.name || '').trim() !== _ck.name) { alert('利用者が変わりました。もう一度開いてください'); checkSheetClose(); return; }
+  const name = _ck.name; if ((state.name || '').trim() !== name || _recOwner !== name) { alert('利用者が変わりました。もう一度開いてください'); checkSheetClose(); return; }
+  ch.forEach(x => { x.rows = x.c.rows.filter(r => !rowClosed(r) && !(x.on && kpBlocked(r, x.k))); }); // 開いた後に締めた月・付けられない訪問は飛ばす
   const add = (o, k) => { o.kpOn = [...new Set([...(o.kpOn || []), k])]; o.kpOff = (o.kpOff || []).filter(x => x !== k); };
   const del = (o, k) => { o.kpOff = [...new Set([...(o.kpOff || []), k])]; o.kpOn = (o.kpOn || []).filter(x => x !== k); };
-  const nEnt = new Set(ch.flatMap(x => x.c.entries)).size, touched = new Set(ch.flatMap(x => x.c.rows)), nRow = touched.size;
+  const ents = [...new Set(ch.flatMap(x => x.c.entries))], touched = new Set(ch.flatMap(x => x.rows)), nEnt = ents.length, nRow = touched.size;
   const lines = _ck.cols.map(c => { const a = ch.filter(x => x.c === c); return a.length ? `【${ckColLabel(c)}】` + a.map(x => (x.on ? '＋' : '－') + x.k.replace('|', '：')).join('、') : ''; }).filter(Boolean);
-  if (!confirm(`次のとおり当てます。\n\n${lines.join('\n')}\n\n・予定表の枠 ${nEnt}件（これから作る記録に入ります）\n・開いている月（${_ck.months.join('・')}）の記録 ${nRow}件\n　チェックと文章が合わなくなった訪問は、「直す案」と同じ直し方でその文だけ直します\n・締めた月は変えません\n\nよろしいですか？`)) return;
-  const name = _ck.name;
-  ch.forEach(({ c, k, on }) => {
-    c.entries.forEach(e => { on ? add(e, k) : del(e, k); if (!e.kpOn.length) delete e.kpOn; if (!e.kpOff.length) delete e.kpOff; });
-    c.rows.forEach(r => { const kp = kpOf(r), i = kp.indexOf(k); if (on) { add(r, k); if (i < 0) kp.push(k); } else { del(r, k); if (i >= 0) kp.splice(i, 1); } });
-  });
-  touched.forEach(r => kpFromText(r));
-  // 文章：点検の「直す案」を、チェックを変えた訪問だけ入れる（ほかの訪問はいつもどおり案として出すだけ）。直した結果、選んだチェックが戻ってしまう訪問は入れない
-  let fixed = 0; try { const pre = new Map([...touched].map(r => [r, REC_SNAP(r)])), p = repairPreview(name); p.plan.filter(x => touched.has(x.r) && !rowClosed(x.r)).forEach(x => { REC_RESTORE(x.r, x.after);
-    if (ch.some(y => y.c.rows.includes(x.r) && kpAll(x.r).includes(y.k) !== y.on)) REC_RESTORE(x.r, pre.get(x.r)); else fixed++; }); } catch (e) { reportError('checkSheet: ' + (e && e.message || e), 'qa'); }
-  const miss = ch.map(x => ({ ...x, n: x.c.rows.filter(r => kpAll(r).includes(x.k) !== x.on).length })).filter(x => x.n);
+  if (!confirm(`次のとおり当てます。\n\n${lines.join('\n')}\n\n・予定表の枠 ${nEnt}件（これから作る記録に入ります）\n・開いている月（${_ck.months.join('・')}）の記録 ${nRow}件\n　チェックと文章が合わなくなった訪問は、その訪問の文章だけ直します\n・締めた月は変えません\n\nよろしいですか？`)) return;
+  // 途中で失敗したら、予定表の枠も記録も元に戻す（半分だけ当たったまま保存しない）
+  const entSnap = new Map(ents.map(e => [e, { kpOn: e.kpOn, kpOff: e.kpOff }])), rowSnap = new Map([...touched].map(r => [r, REC_SNAP(r)]));
+  const issues = () => { const m = new Map(); qaCheckRows(name).out.forEach(i => { const k = i.date + ' ' + i.start; (m.get(k) || m.set(k, new Set()).get(k)).add(i.kind + '｜' + i.msg); }); return m; };
+  const rkey = r => ymd(r.date) + ' ' + (r.e.start || entryTime(r.e).s || '');
+  let fixed = 0, miss = [];
+  try {
+    const before = issues();
+    ch.forEach(({ c, k, on, rows }) => {
+      c.entries.forEach(e => { on ? add(e, k) : del(e, k); if (!e.kpOn.length) delete e.kpOn; if (!e.kpOff.length) delete e.kpOff; });
+      rows.forEach(r => { const kp = kpOf(r), i = kp.indexOf(k); if (on) { add(r, k); if (i < 0) kp.push(k); } else { del(r, k); if (i >= 0) kp.splice(i, 1); } });
+    });
+    touched.forEach(r => kpFromText(r));
+    // 文章：チェックを変えたことで新しく出た点検の指摘がある訪問だけ、直す案の「文章」だけを入れる（ほかの直し＝体調不良・二重の訪問・チェックの足し外しは入れない）
+    const after = issues(), need = new Set([...touched].filter(r => { const a = after.get(rkey(r)), b = before.get(rkey(r)) || new Set(); return a && [...a].some(x => !b.has(x)); }));
+    if (need.size) { const p = repairPreview(name); p.plan.filter(x => need.has(x.r) && !rowClosed(x.r) && x.after.text !== x.r.text).forEach(x => { const keep = { text: x.r.text, kpText: x.r.kpText, kpSrc: x.r.kpSrc }; x.r.text = x.after.text; kpFromText(x.r);
+      if (ch.some(y => y.rows.includes(x.r) && kpAll(x.r).includes(y.k) !== y.on)) Object.assign(x.r, keep); else fixed++; }); } // 直した文章で、選んだチェックが戻ってしまう訪問は文章を元のまま
+    miss = ch.map(x => ({ ...x, n: x.rows.filter(r => kpAll(r).includes(x.k) !== x.on).length, skip: x.c.rows.length - x.rows.length })).filter(x => x.n || x.skip);
+  } catch (e) {
+    entSnap.forEach((v, e) => { ['kpOn', 'kpOff'].forEach(k => { if (v[k]) e[k] = v[k]; else delete e[k]; }); }); rowSnap.forEach((a, r) => REC_RESTORE(r, a));
+    reportError('checkSheetApply: ' + (e && e.message || e), 'qa'); alert('当てる途中で失敗したので、何も変えずに元に戻しました。\n（' + (e && e.message || e) + '）'); return;
+  }
   window._saveVia = 'チェック確認表'; markSheetDirty(); renderRecordView(); markRecDirty(); try { showRecQa(); } catch (e) {}
   if (DB) gasCall({ pass: (lsGet('smilewan_pass') || '').trim(), op: 'log', item: { where: 'check-sheet', ver: APP_VER, client: name, msg: `チェック確認表で当てた（${actorName() || '名前なし'}）：${lines.join(' ')}／予定表${nEnt}枠・記録${nRow}件・文章を直した${fixed}件` } }).catch(() => {});
-  alert(`当てました。予定表の枠 ${nEnt}件・記録 ${nRow}件（自動で保存します）。` + (fixed ? `\n文章を直した訪問 ${fixed}件。` : '') + (miss.length ? `\n\n決まりで変わらなかった物：\n${miss.map(x => `${ckColLabel(x.c)} ${x.on ? '＋' : '－'}${x.k.replace('|', '：')}（${x.n}件）`).join('\n')}` : ''));
+  alert(`当てました。予定表の枠 ${nEnt}件・記録 ${nRow}件（自動で保存します）。` + (fixed ? `\n文章を直した訪問 ${fixed}件。` : '') + (miss.length ? `\n\n決まりで変わらなかった物・付けられない訪問：\n${miss.map(x => `${ckColLabel(x.c)} ${x.on ? '＋' : '－'}${x.k.replace('|', '：')}（${[x.n ? `変わらない${x.n}件` : '', x.skip ? `飛ばした${x.skip}件` : ''].filter(Boolean).join('・')}）`).join('\n')}` : ''));
   checkSheetOpen();
 }
 // ---- カイポケ訪問記録の入力欄（顔色・発汗・バイタル・排泄・食事・買物など） ----
@@ -4572,6 +4600,17 @@ function entryTime(e) { // 開始時刻の欄が空で、内容欄に「７：00
 }
 const svcFam = v => /通院/.test(v) ? '通院' : /^家事|生活援助/.test(v) ? '家事' : '身体';
 const entFam = e => /通院/.test(e.type || '') ? '通院' : /家事|生活/.test(e.type || '') && !/身体/.test(e.type || '') ? '家事' : '身体';
+// 同じ曜日に、同じ時間・同じ種類の予定が2つ入っているとき（予定表の入れ間違い）は1つにする。記録が2つにならないように（11/10 本間さん土曜19:30・藤崎さん土日8:00）
+// 内容が長い方を使い、付ける・付けない項目は両方の分を合わせる
+function uniqEntries(list) {
+  const out = [];
+  (list || []).forEach(e => { const t = entryTime(e), j = t.s ? out.findIndex(x => { const u = entryTime(x); return u.s === t.s && (u.e || '') === (t.e || '') && entFam(x) === entFam(e); }) : -1;
+    if (j < 0) { out.push(e); return; }
+    const a = out[j], keep = (e.detail || '').length > (a.detail || '').length ? e : a, other = keep === e ? a : e, m = { ...keep };
+    ['kpOn', 'kpOff'].forEach(k => { const v = [...new Set([...(keep[k] || []), ...(other[k] || [])])]; if (v.length) m[k] = v; });
+    out[j] = m; });
+  return out;
+}
 async function buildRecords() {
   const from = document.getElementById('recFrom').value, to = document.getElementById('recTo').value;
   if (!from || !to) { alert('期間を入力してください'); return; }
@@ -4586,9 +4625,9 @@ async function buildRecords() {
   const useShift = {}; Object.keys(shift).forEach(ym => { useShift[ym] = hasShift(ym); });
   const allEntries = [0, 1, 2, 3, 4, 5, 6].flatMap(w => dayEntries(state.days[w]) || []).filter(e => entryTime(e).s);
   const fam = x => /入浴/.test(x) ? '入浴' : /通院/.test(x) ? '通院' : /家事|生活援助|^生活/.test(x) ? '家事' : '身体';
-  recRows = []; let nShift = 0, nAdd = 0, nMiss = 0;
+  recRows = []; _recOwner = name; let nShift = 0, nAdd = 0, nMiss = 0;
   for (let d = new Date(from + 'T00:00:00'); d <= new Date(to + 'T00:00:00'); d.setDate(d.getDate() + 1)) {
-    const ym = ymd(d).slice(0, 7), entries = dayEntries(state.days[d.getDay()]).slice().sort((a, b) => (a.start || '').localeCompare(b.start || ''));
+    const ym = ymd(d).slice(0, 7), entries = uniqEntries(dayEntries(state.days[d.getDay()])).sort((a, b) => (a.start || '').localeCompare(b.start || ''));
     const plan = [];
     if (useShift[ym]) {
       const used = new Set();
@@ -5933,6 +5972,7 @@ function scheduleQa(name) {
     const t = entryTime(e).s, what = `${W[w]}曜 ${t || '（時刻なし）'} ${e.type || '（種別なし）'}`;
     if (!e.start && t) out.push(`${what}：開始時刻の欄が空です（内容欄の「${t}」を使って作ります）。時刻欄に入れてください`);
     else if (!t && (e.type || e.detail)) out.push(`${what}：予定表に時刻がありません（シフトに無い月は記録になりません）`);
+    if (t && dayEntries(state.days[w]).some(x => x !== e && entryTime(x).s === t && (entryTime(x).e || '') === (entryTime(e).e || '') && entFam(x) === entFam(e)) && dayEntries(state.days[w]).find(x => entryTime(x).s === t && (entryTime(x).e || '') === (entryTime(e).e || '') && entFam(x) === entFam(e)) === e) out.push(`${what}：同じ時間の予定が2つ入っています（記録は1つにまとめて作ります）。いらない方を消してください`);
     if (t && !e.type) out.push(`${what}：種別が空です`);
     else if (e.type && !TYPE_OK.test(e.type)) out.push(`${what}：種別「${e.type}」が身体・家事・入浴・通院・共に のどれか分かりません`);
   }));
