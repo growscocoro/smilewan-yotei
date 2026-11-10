@@ -1,0 +1,275 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>記録の点検</title>
+<style>
+  :root { --bg: #f7f7f5; --panel: #fff; --text: #1f2328; --muted: #6b7280; --line: #e5e7eb; --accent: #2563eb; --bad: #b91c1c; --bad-bg: #fef2f2; --warn: #92400e; --warn-bg: #fffbeb; --ok: #166534; --ok-bg: #f0fdf4; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg: #16181c; --panel: #1f2227; --text: #e5e7eb; --muted: #9aa1ab; --line: #333842; --accent: #60a5fa; --bad: #f87171; --bad-bg: #3a1d1d; --warn: #fcd34d; --warn-bg: #3b2f0b; --ok: #86efac; --ok-bg: #12301d; } }
+  :root[data-theme="dark"] { --bg: #16181c; --panel: #1f2227; --text: #e5e7eb; --muted: #9aa1ab; --line: #333842; --accent: #60a5fa; --bad: #f87171; --bad-bg: #3a1d1d; --warn: #fcd34d; --warn-bg: #3b2f0b; --ok: #86efac; --ok-bg: #12301d; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.6 -apple-system, "Hiragino Sans", "Yu Gothic", sans-serif; }
+  main { max-width: 980px; margin: 0 auto; padding: 16px; }
+  h1 { font-size: 20px; margin: 4px 0 2px; }
+  .sub { color: var(--muted); font-size: 13px; margin: 0 0 12px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; margin: 10px 0; }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  input, select, button { font: inherit; padding: 6px 10px; border: 1px solid var(--line); border-radius: 7px; background: var(--panel); color: var(--text); }
+  button.primary { background: var(--accent); color: #fff; border-color: var(--accent); cursor: pointer; }
+  button { cursor: pointer; }
+  table { border-collapse: collapse; width: 100%; font-size: 14px; }
+  th, td { border-bottom: 1px solid var(--line); padding: 6px 6px; text-align: left; vertical-align: top; }
+  th { font-size: 12px; color: var(--muted); font-weight: normal; }
+  td.n { text-align: right; white-space: nowrap; }
+  tr.click { cursor: pointer; } tr.click:hover td { background: var(--bg); }
+  .tag { display: inline-block; font-size: 11px; border-radius: 4px; padding: 0 6px; margin-right: 4px; white-space: nowrap; }
+  .tag.bad { background: var(--bad-bg); color: var(--bad); } .tag.warn { background: var(--warn-bg); color: var(--warn); } .tag.closed { background: var(--bg); color: var(--muted); border: 1px solid var(--line); }
+  .okbox { background: var(--ok-bg); color: var(--ok); border-radius: 8px; padding: 10px 12px; }
+  .muted { color: var(--muted); font-size: 13px; }
+  details summary { cursor: pointer; }
+  .who { font-weight: bold; margin: 10px 0 2px; }
+  .item { font-size: 14px; padding: 2px 0 2px 10px; border-left: 3px solid var(--line); margin: 2px 0; }
+  .bar { height: 6px; background: var(--line); border-radius: 3px; overflow: hidden; margin-top: 6px; } .bar > div { height: 100%; background: var(--accent); width: 0; }
+</style>
+</head>
+<body>
+<main>
+  <h1>記録の点検</h1>
+  <p class="sub">週間予定表ツールとは別に作った点検です。保存先は読むだけで、記録は変えません。直すときは週間予定表ツールで直してください。</p>
+
+  <div class="card">
+    <div class="row">
+      <label>合言葉 <input id="pass" type="password" size="8" autocomplete="off"></label>
+      <button class="primary" id="runBtn" onclick="run()">点検する</button>
+      <label class="muted"><input type="checkbox" id="showClosed" checked onchange="render()"> 締めた月も出す</label>
+      <label class="muted"><input type="checkbox" id="showClosedNew" onchange="render()"> 締めた月に今日（11/10）の決まりも当てる</label>
+      <span id="status" class="muted"></span>
+    </div>
+    <div class="bar"><div id="bar"></div></div>
+  </div>
+
+  <div id="result"></div>
+
+  <details class="card">
+    <summary>点検している決まり</summary>
+    <div id="rules" class="muted"></div>
+  </details>
+
+  <div class="card"><b>これまでの点検</b><div id="hist" class="muted"></div></div>
+</main>
+<script>
+'use strict';
+// ===== 保存先（読むだけ） =====
+const GAS_URL = 'https://script.google.com/macros/s/AKfycbxKEAUthQx9wiZKncHZR43jbSKjPfO2lYhlc2K5yXWJNXI_zA8wChdQTFlINEhLTDQO/exec';
+const READ_OPS = new Set(['list', 'meta', 'records', 'get']); // 書き込み（put・del など）は送らない
+async function call(body) {
+  if (!READ_OPS.has(body.op)) throw new Error('この点検では保存先に書き込みません');
+  for (let k = 0; k < 6; k++) {
+    try {
+      const r = await fetch(GAS_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ ...body, pass: PASS }), redirect: 'follow' });
+      const j = JSON.parse(await r.text());
+      if (j.ok && j.app) { await sleep(1500 * (k + 1)); continue; } // 返事が途中で消えたとき
+      if (!j.ok) throw new Error(j.error || 'error');
+      return j;
+    } catch (e) { if (/passcode/.test(e.message)) throw new Error('合言葉が違います'); if (k === 5) throw e; await sleep(2000 * (k + 1)); }
+  }
+}
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+let PASS = '';
+
+// ===== 小さな道具 =====
+const nameKey = n => String(n || '').normalize('NFKC').replace(/[\s・.．]/g, '');
+const hm = x => { const m = String(x || '').match(/(\d{1,2}):(\d{2})/); return m ? +m[1] * 60 + +m[2] : null; };
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const nextDay = d => { const x = new Date(d + 'T00:00:00'); x.setDate(x.getDate() + 1); return ymd(x); };
+const prevDay = d => { const x = new Date(d + 'T00:00:00'); x.setDate(x.getDate() - 1); return ymd(x); };
+const ymd = x => `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}-${String(x.getDate()).padStart(2, '0')}`;
+const sents = t => String(t || '').split(/(?<=。)/).filter(s => s.trim());
+const isBody = r => r.kind !== '家事援助';
+const shown = r => Array.isArray(r.kpShown) ? r.kpShown : [...(r.kp || []), ...(r.kpText || [])];
+const vals = r => r.vShown || r.v || {};
+const isBath = r => /入浴/.test(r.type || '') || shown(r).some(k => /^入浴・清拭\|(入浴介助|シャワー浴)$/.test(k));
+const isTogether = r => /共に|一緒/.test((r.type || '') + (r.detail || ''));
+const hour = r => Math.floor((hm(r.start) ?? 720) / 60);
+const PREP_RE = /寝る30分ほど前に服用/, NEXT_RE = /前日の眠前薬/;
+
+// ===== 決まり（週間予定表ツールの「決まり一覧」とメモから。ツールのプログラムは使わない） =====
+const RULES = [
+  ['シフト：記録が無い', 'bad', 'シフトにある訪問（利用者・日・開始時刻）の記録が無い'],
+  ['シフト：担当者が違う', 'bad', 'シフトの担当者（2人で入った訪問は2人とも）が記録の担当者に無い'],
+  ['担当者が空（シフトに担当がいる）', 'bad', 'シフトに担当者がいるのに、記録の担当者の欄が空'],
+  ['担当者が空（シフトにも無い）', 'warn', 'シフトにその人の予定が無い訪問で、担当者の欄が空（人×月で1行）'],
+  ['開始時刻が空', 'bad', '記録の開始時刻が空（Wordやカイポケに時刻が出ない）'],
+  ['シフト：時刻が違う', 'warn', '記録の開始時刻が、近いシフトの時刻と違う（30分以内のずれ）'],
+  ['シフト：シフトに無い記録', 'warn', 'その月のシフトがある人で、シフトに無い時刻の記録がある'],
+  ['同じ日の重なり', 'bad', '同じ日に時間の重なる記録が2つある'],
+  ['名前の重複', 'bad', '空白などだけ違う同じ名前が、予定表・利用者情報・記録に2つある'],
+  ['利用者の設定', 'warn', '手順書や予定表に「眠前薬」があるのに眠前薬の「あり／なし」が未設定・アセスメントが無い'],
+  ['眠前薬：言い回し', 'bad', '夜の文は「お薬」ではなく「眠前薬を準備し、寝る30分ほど前に服用する様お伝えさせて頂いております。」', 'new'],
+  ['眠前薬：次の朝の確認が無い', 'bad', '夜に眠前薬を準備した次の日の、最初の身体の訪問に「前日の眠前薬」の確認の文が無い'],
+  ['眠前薬：家事の訪問に確認', 'bad', '前日の眠前薬の確認は身体の訪問だけ（家事ではしない）'],
+  ['眠前薬：「あり」の人の抜け', 'bad', '眠前薬「あり」の人：夜の訪問（最後の身体の訪問・15時から、共には17時から・後に家事が来ても）に眠前薬の文、夜でない最初の身体の訪問に前日の確認', 'new'],
+  ['共に：服薬確認', 'bad', '共に（一緒に行う）の身体の訪問は「服薬介助・確認」にチェック', 'new'],
+  ['最後が入浴：服薬の声かけ', 'bad', 'その日の最後の身体の訪問が入浴なら「声掛け・見守り：服薬」にチェック（後に家事が来ても）', 'new'],
+  ['体調不良：髭', 'bad', '体調不良の日のシャワー浴は、整容（髭）にチェックしない', 'new'],
+  ['金額', 'bad', '預り−購入＝お釣・購入は預りより少ない・11/8からの見積りは内訳に「金額は見積り」'],
+  ['文字数', 'warn', '1訪問の文章は500字まで'],
+  ['チェックと文章', 'warn', '主なチェック（入浴・洗髪・調理・洗濯・買物・掃除・トイレ・起床・服薬）があるのに文章にその話が無い'],
+];
+const SEV = Object.fromEntries(RULES.map(([k, s]) => [k, s])), NEW = new Set(RULES.filter(r => r[3] === 'new').map(r => r[0])); // NEW＝11/10に足した決まり（締めた月に当てるかは未定）
+const MENTION = [
+  ['入浴・清拭|入浴介助', /入浴|浴槽|湯舟|湯船|洗身|お風呂/], ['入浴・清拭|シャワー浴', /シャワー/], ['入浴・清拭|洗髪', /洗髪|髪を洗|洗身・洗髪|洗身と洗髪/],
+  ['調理|調理', /調理|作っ|作り|焼|煮|炒|茹|用意|準備|料理|温め|盛り付|配膳/], ['洗濯|洗濯', /洗濯/], ['買物等|日常品等の買物', /買い物|買物|購入|代行/],
+  ['清掃|居室', /掃除|清掃|掃除機|拭/], ['排泄|トイレ介助', /トイレ|排泄/], ['起床・就寝|起床介助', /起床|起き/], ['服薬・医療|服薬介助・確認', /薬|服用/], ['自立支援|服薬', /薬|服用/],
+];
+
+// ===== 読み込み =====
+let DATA = null, FOUND = [];
+async function load(progress) {
+  const L = await call({ op: 'list', kinds: ['schedules', 'clients', 'settings'] }), meta = L.meta || {};
+  const pick = k => L.docs.filter(d => d.kind === k);
+  const settings = Object.fromEntries(pick('settings').map(d => [d.name, d.data]));
+  const names = [...new Set(Object.entries(meta).filter(([id]) => id.startsWith('records/')).map(([, m]) => m.n).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'ja'));
+  const records = [];
+  for (let i = 0; i < names.length; i++) { progress(i / names.length * 0.7, `記録を読んでいます（${i + 1}/${names.length}人）`); const j = await call({ op: 'records', client: names[i] }); (j.docs || []).forEach(d => records.push(d.data)); }
+  const want = Object.keys(meta).filter(id => id.startsWith('records/')).length; if (records.length < want) throw new Error(`記録を全部読めませんでした（${records.length}/${want}）`);
+  const months = [...new Set(records.map(d => d.month))].sort(), shift = {};
+  for (let i = 0; i < months.length; i++) { progress(0.7 + i / months.length * 0.2, `シフトを読んでいます（${months[i]}）`); shift[months[i]] = await loadShift(months[i], settings); }
+  return { schedules: pick('schedules').map(d => d.data), clients: pick('clients').map(d => d.data), settings, records, shift, closed: new Set(((settings.closedMonths || {}).list || []).map(x => x.month)) };
+}
+function canonFn(settings) { const users = (settings.users || {}).list || []; return n => { const k = nameKey(n); const u = users.find(x => nameKey(x.name) === k || (x.aliases || []).some(a => nameKey(a) === k)); return u ? u.name : n; }; }
+function parseCsv(text) {
+  const lines = String(text || '').replace(/^﻿/, '').split(/\r?\n/).filter(Boolean); if (!lines.length) return [];
+  const head = lines.shift().split(',').map(x => x.replace(/"/g, '').trim()), ix = k => head.findIndex(h => h.includes(k)), H = ix('ヘルパー'), D = ix('日付'), C = ix('利用者'), S = ix('開始'), E = ix('終了'), V = ix('サービス');
+  if (H < 0 || C < 0 || S < 0) return [];
+  return lines.map(l => l.split(',').map(x => x.replace(/"/g, '').trim())).filter(a => a[C] && a[H]).map(a => ({ h: a[H], d: parseInt(String(a[D]).replace(/^.*[\/月-]/, ''), 10), c: a[C], s: a[S], e: a[E] || '', v: V >= 0 ? a[V] : '' }));
+}
+async function loadShift(ym, settings) { // 業務日誌（カイポケのシフト）と、ツールに取り込んだCSVの両方。同じ枠は業務日誌を使う（ツールと同じ読み方）
+  let rows = ((settings['shift_' + ym] || {}).list || []).map(a => ({ h: a[0], d: +a[1], c: a[2], s: a[3], e: a[4] || '', v: a[5] || '' }));
+  const src = ((settings.shiftSource || {}).list || [])[0];
+  if (src) { try { const j = await (await fetch(src + '?json=1&run=shiftcsv&ym=' + ym)).json(); if (j && j.ok && j.csv) { const g = parseCsv(j.csv), key = r => nameKey(r.c) + '|' + r.d + '|' + r.s, gk = new Set(g.map(key)); rows = rows.filter(r => !gk.has(key(r))).concat(g); } } catch (e) {} }
+  const canon = canonFn(settings); rows.forEach(r => { r.c = canon(r.c); });
+  return rows;
+}
+
+// ===== 点検 =====
+function check(D) {
+  const out = [], add = (cat, who, month, date, start, msg) => out.push({ cat, who, month, date: date || '', start: start || '', msg, closed: D.closed.has(month) });
+  const clientOf = n => D.clients.find(c => nameKey(c.name) === nameKey(n)) || {}, schedOf = n => D.schedules.find(s => nameKey(s.name) === nameKey(n));
+  // 名前の重複
+  const all = [...D.schedules.map(s => s.name), ...D.clients.map(c => c.name), ...D.records.map(r => r.name)].filter(Boolean), byKey = {};
+  all.forEach(n => { (byKey[nameKey(n)] = byKey[nameKey(n)] || new Set()).add(n); });
+  Object.values(byKey).filter(s => s.size > 1).forEach(s => add('名前の重複', [...s].join(' ／ '), '', '', '', '空白などだけ違う同じ名前が2つある'));
+  [...new Set(D.records.map(r => r.name))].forEach(n => { if (!D.schedules.some(s => s.name === n)) add('名前の重複', n, '', '', '', '記録はあるのに、同じ名前の予定表が無い（消し忘れの重複かも）'); });
+  // 利用者の設定
+  [...new Set(D.records.map(r => r.name))].forEach(n => { const c = clientOf(n), s = schedOf(n) || {};
+    if (!c.minzen && /眠前薬/.test(JSON.stringify(c.procedures || '') + JSON.stringify(s.days || ''))) add('利用者の設定', n, '', '', '', '手順書か予定表に「眠前薬」があるのに、眠前薬の「あり／なし」が未設定');
+    if (!c.assessment || !Object.keys(c.assessment).length) add('利用者の設定', n, '', '', '', 'アセスメントが入っていない'); });
+  for (const doc of D.records) {
+    if (!D.schedules.some(s => s.name === doc.name)) continue; // 予定表の無い名前の記録（重複）は「名前の重複」だけに出す
+    const n = doc.name, ym = doc.month, c = clientOf(n), mz = c.minzen || '', a = c.assessment || {}, medNeed = mz === 'あり' || !Object.keys(a).length || (a.needs || []).some(x => /服用|服薬/.test(x)) || (a.notes || []).includes('服薬忘れ');
+    const rows = (doc.rows || []).filter(r => r.date && r.start !== undefined).slice().sort((x, y) => x.date.localeCompare(y.date) || (hm(x.start) ?? 0) - (hm(y.start) ?? 0));
+    const byDay = {}; rows.forEach(r => { (byDay[r.date] = byDay[r.date] || []).push(r); });
+    const A = (cat, r, msg) => add(cat, n, ym, r.date, r.start, `${r.type || ''}：${msg}`);
+    // シフトとの照らし合わせ
+    const sh = (D.shift[ym] || []).filter(x => nameKey(x.c) === nameKey(n));
+    if (sh.length) {
+      const slots = {}; sh.forEach(x => { const k = x.d + '|' + x.s; (slots[k] = slots[k] || { d: x.d, s: x.s, e: x.e, helpers: [] }).helpers.includes(x.h) || slots[k].helpers.push(x.h); });
+      const used = new Set();
+      Object.values(slots).forEach(sl => { const date = `${ym}-${String(sl.d).padStart(2, '0')}`, day = byDay[date] || [], st = hm(sl.s);
+        let r = day.find(x => x.start === sl.s && !used.has(x)); if (!r) { r = day.filter(x => !used.has(x) && Math.abs((hm(x.start) ?? -999) - st) <= 30).sort((p, q) => Math.abs(hm(p.start) - st) - Math.abs(hm(q.start) - st))[0]; if (r) A('シフト：時刻が違う', r, `記録は${r.start}、シフトは${sl.s}`); }
+        if (!r) { add('シフト：記録が無い', n, ym, date, sl.s, `シフト ${sl.s}〜${sl.e}（担当 ${sl.helpers.join('・')}）の記録が無い`); return; }
+        used.add(r); r._shift = sl; const have = String(r.staff || '').split(/[・,、\/]+/).map(x => nameKey(x)).filter(Boolean), miss = sl.helpers.filter(h => !have.includes(nameKey(h)));
+        if (!have.length) A('担当者が空（シフトに担当がいる）', r, `シフトの担当は ${sl.helpers.join('・')}`);
+        if (have.length && miss.length) A('シフト：担当者が違う', r, `シフトの担当 ${sl.helpers.join('・')}／記録の担当 ${r.staff}`); });
+      rows.filter(r => !used.has(r)).forEach(r => A('シフト：シフトに無い記録', r, `${r.start} の訪問がシフトに無い`));
+    }
+    rows.forEach(r => {
+      const kp = shown(r), v = vals(r), t = String(r.text || ''), off = r.kpOff || [], on = r.kpOn || [];
+      if (!String(r.start || '').trim()) A('開始時刻が空', r, `開始時刻が空（${String(r.text || '').slice(0, 20)}…）`);
+      if (t.length > 500) A('文字数', r, `${t.length}字`);
+      // 眠前薬
+      if (/お薬を準備し、寝る30分ほど前/.test(t)) A('眠前薬：言い回し', r, '「お薬を準備し…」→「眠前薬を準備し…」');
+      if (NEXT_RE.test(t) && !isBody(r)) A('眠前薬：家事の訪問に確認', r, '家事の訪問に「前日の眠前薬」の確認の文がある');
+      // 共に＝服薬確認・最後が入浴＝服薬の声かけ・体調不良の髭
+      if (isBody(r) && isTogether(r) && medNeed && !kp.includes('服薬・医療|服薬介助・確認') && !off.includes('服薬・医療|服薬介助・確認')) A('共に：服薬確認', r, '共にの訪問に「服薬介助・確認」のチェックが無い');
+      if (r.sick && kp.includes('入浴・清拭|シャワー浴') && kp.includes('身体整容|整容') && !on.includes('身体整容|整容')) A('体調不良：髭', r, '体調不良のシャワー浴に整容のチェックがある');
+      if (r.sick && (v.整容 || []).includes('髭') && !/髭|ひげ/.test(t)) A('体調不良：髭', r, '体調不良の日に整容の細目「髭」がある');
+      // 金額
+      const num = x => x === undefined || x === null || x === '' ? null : Number(String(x).replace(/[,円]/g, ''));
+      const az = num(v.預り), buy = num(v.購入), ch = num(v.お釣);
+      if (az != null && buy != null && ch != null && az - buy !== ch) A('金額', r, `預り${az}−購入${buy}≠お釣${ch}`);
+      if (az != null && buy != null && buy > az) A('金額', r, `購入${buy}円が預り${az}円より多い`);
+      if (r.date >= '2026-11-08' && az != null && !(r.vin && (r.vin.預り || r.vin.購入)) && !/見積/.test(v.内訳 || '')) A('金額', r, '見積りの金額なのに、内訳に「金額は見積り」が無い');
+      // チェックと文章
+      if (!r.sick) MENTION.forEach(([k, re]) => { if (kp.includes(k) && !re.test(t)) A('チェックと文章', r, `「${k.split('|')[1]}」にチェックがあるのに文章に無い`); });
+    });
+    { const empty = rows.filter(r => !String(r.staff || '').trim() && !r._shift); if (empty.length) add('担当者が空（シフトにも無い）', n, ym, '', '', `担当者が空の訪問が${empty.length}件（${sh.length ? 'シフトに無い時刻の訪問' : 'この月のシフトにこの人の予定が無い'}）`); }
+    Object.entries(byDay).forEach(([date, day]) => {
+      // 同じ日の重なり
+      for (let i = 0; i < day.length; i++) for (let j = i + 1; j < day.length; j++) { const p = day[i], q = day[j], ps = hm(p.start), pe = hm(p.end) ?? ps + 1, qs = hm(q.start), qe = hm(q.end) ?? qs + 1; if (ps != null && qs != null && ps < qe && qs < pe) add('同じ日の重なり', n, ym, date, p.start, `${p.start}〜${p.end} と ${q.start}〜${q.end} が重なる`); }
+      const body = day.filter(isBody), last = body[body.length - 1];
+      // 最後が入浴（後に家事が来ても）
+      if (last && isBath(last) && medNeed && mz !== 'なし' && !shown(last).includes('自立支援|服薬') && !(last.kpOff || []).includes('自立支援|服薬')) A('最後が入浴：服薬の声かけ', last, 'その日の最後の身体の訪問が入浴なのに「声掛け・見守り：服薬」が無い');
+      // 夜に準備 → 次の日の最初の身体の訪問で確認
+      if (day.some(r => PREP_RE.test(r.text || ''))) { const nx = (byDay[nextDay(date)] || []).filter(isBody), first = nx.find(r => hour(r) < 17); if (first && !first.sick && !NEXT_RE.test(first.text || '')) A('眠前薬：次の朝の確認が無い', first, `前の夜（${date.slice(5)}）に眠前薬を準備したのに、前日の眠前薬の確認の文が無い`); }
+      // 眠前薬「あり」の人
+      if (mz === 'あり') {
+        const night = last && hour(last) >= (isTogether(last) ? 17 : 15) ? last : null, first = body.find(r => r !== night && hour(r) < 17);
+        if (night && !night.sick && !PREP_RE.test(night.text || '')) A('眠前薬：「あり」の人の抜け', night, '夜の訪問に眠前薬の文が無い');
+        if (first && !first.sick && !NEXT_RE.test(first.text || '')) A('眠前薬：「あり」の人の抜け', first, '最初の身体の訪問に前日の眠前薬の確認の文が無い');
+      }
+    });
+  }
+  return out;
+}
+
+// ===== 画面 =====
+function render() {
+  const box = document.getElementById('result'); if (!DATA) { box.innerHTML = ''; return; }
+  const showClosed = document.getElementById('showClosed').checked, showNew = document.getElementById('showClosedNew').checked, L = FOUND.filter(x => !x.closed || (showClosed && (showNew || !NEW.has(x.cat))));
+  if (!L.length) { box.innerHTML = '<div class="card okbox">見つかったミスはありません。</div>'; return; }
+  const cats = RULES.map(([k]) => k).filter(k => L.some(x => x.cat === k));
+  const sum = cats.map(k => { const xs = L.filter(x => x.cat === k); return `<tr class="click" onclick="document.getElementById('cat-${RULES.findIndex(r => r[0] === k)}').open=true;document.getElementById('cat-${RULES.findIndex(r => r[0] === k)}').scrollIntoView()"><td><span class="tag ${SEV[k]}">${SEV[k] === 'bad' ? 'ミス' : '確認'}</span>${esc(k)}</td><td class="n">${xs.length}件</td><td class="n">${new Set(xs.map(x => x.who)).size}人</td><td class="muted">${esc([...new Set(xs.map(x => x.month).filter(Boolean))].sort().join('・'))}</td></tr>`; }).join('');
+  const list = cats.map(k => { const xs = L.filter(x => x.cat === k), by = {}; xs.forEach(x => { (by[x.who] = by[x.who] || []).push(x); });
+    return `<details class="card" id="cat-${RULES.findIndex(r => r[0] === k)}"><summary><b>${esc(k)}</b>（${xs.length}件）<span class="muted">　${esc(RULES.find(r => r[0] === k)[2])}</span></summary>` +
+      Object.entries(by).map(([who, ys]) => `<div class="who">${esc(who)}（${ys.length}件）</div>` + ys.slice(0, 200).map(y => `<div class="item">${y.closed ? '<span class="tag closed">締めた月</span>' : ''}${esc((y.date || y.month || '').replace(/^2026-/, ''))} ${esc(y.start || '')}　${esc(y.msg)}</div>`).join('') + (ys.length > 200 ? `<div class="muted">ほか${ys.length - 200}件</div>` : '')).join('') + '</details>'; }).join('');
+  const bad = L.filter(x => SEV[x.cat] === 'bad').length;
+  box.innerHTML = `<div class="card"><div class="row" style="justify-content:space-between"><b>見つかった所 ${L.length}件（ミス ${bad}件・確認 ${L.length - bad}件）</b><button onclick="saveCsv()">一覧をCSVで保存</button></div><table><tr><th>種類</th><th class="n">件数</th><th class="n">人数</th><th>月</th></tr>${sum}</table></div>${list}`;
+}
+function saveCsv() {
+  const q = s => '"' + String(s ?? '').replace(/"/g, '""') + '"';
+  const csv = '﻿種類,利用者,月,日付,開始,内容,締めた月\n' + FOUND.map(x => [x.cat, x.who, x.month, x.date, x.start, x.msg, x.closed ? '締め' : ''].map(q).join(',')).join('\n');
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' })); a.download = `記録の点検_${ymd(new Date())}.csv`; a.click();
+}
+function lsGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+function lsSet(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+function renderHist() {
+  let h = []; try { h = JSON.parse(lsGet('smilewan_check_hist') || '[]'); } catch (e) {}
+  document.getElementById('hist').innerHTML = h.length ? '<table><tr><th>日時</th><th class="n">ミス</th><th class="n">確認</th><th class="n">うち締めていない月</th></tr>' + h.slice(-10).reverse().map(x => `<tr><td>${esc(x.at)}</td><td class="n">${x.bad}</td><td class="n">${x.warn}</td><td class="n">${x.open}</td></tr>`).join('') + '</table>' : 'まだありません（この端末で点検した結果だけ残ります）';
+}
+async function run() {
+  PASS = document.getElementById('pass').value.trim(); if (!PASS) { alert('合言葉を入れてください'); return; }
+  const btn = document.getElementById('runBtn'), st = document.getElementById('status'), bar = document.getElementById('bar');
+  btn.disabled = true; DATA = null; FOUND = []; render();
+  try {
+    DATA = await load((p, msg) => { bar.style.width = Math.round(p * 100) + '%'; st.textContent = msg; });
+    lsSet('smilewan_pass', PASS);
+    st.textContent = '点検しています'; FOUND = check(DATA); bar.style.width = '100%';
+    const now = new Date(), bad = FOUND.filter(x => SEV[x.cat] === 'bad').length;
+    st.textContent = `点検しました（${now.getMonth() + 1}/${now.getDate()} ${now.getHours()}:${String(now.getMinutes()).padStart(2, '0')}・記録 ${DATA.records.length}件）`;
+    let h = []; try { h = JSON.parse(lsGet('smilewan_check_hist') || '[]'); } catch (e) {}
+    const V = FOUND.filter(x => !x.closed || !NEW.has(x.cat)), vb = V.filter(x => SEV[x.cat] === 'bad').length;
+    h.push({ at: `${now.getMonth() + 1}/${now.getDate()} ${now.getHours()}:${String(now.getMinutes()).padStart(2, '0')}`, bad: vb, warn: V.length - vb, open: FOUND.filter(x => !x.closed).length }); lsSet('smilewan_check_hist', JSON.stringify(h.slice(-60)));
+    render(); renderHist();
+  } catch (e) { st.textContent = '点検できませんでした：' + (e && e.message || e); }
+  finally { btn.disabled = false; }
+}
+document.getElementById('rules').innerHTML = '<table>' + RULES.map(([k, s, d]) => `<tr><td><span class="tag ${s}">${s === 'bad' ? 'ミス' : '確認'}</span>${esc(k)}</td><td>${esc(d)}</td></tr>`).join('') + '</table>';
+document.getElementById('pass').value = lsGet('smilewan_pass') || '';
+renderHist();
+window.__check = { load, check, run }; // 自動の点検（テスト）用
+</script>
+</body>
+</html>
