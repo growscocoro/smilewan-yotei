@@ -208,6 +208,9 @@ function check(D) {
       if (!r.sick) MENTION.forEach(([k, re]) => { if (kp.includes(k) && !re.test(t)) A('チェックと文章', r, `「${k.split('|')[1]}」にチェックがあるのに文章に無い`); });
     });
     { const empty = rows.filter(r => !String(r.staff || '').trim() && !r._shift); if (empty.length) add('担当者が空（シフトにも無い）', n, ym, '', '', `担当者が空の訪問が${empty.length}件（${sh.length ? 'シフトに無い時刻の訪問' : 'この月のシフトにこの人の予定が無い'}）`); }
+    { // 月初：前の月の最後の夜に眠前薬を準備した → 1日の最初の身体の訪問で確認（11/11 月初の1日に出ていなかった）
+      const pm = D.records.find(x => x.name === n && x.month === prevDay(ym + '-01').slice(0, 7)), last = prevDay(ym + '-01'), d1 = (byDay[ym + '-01'] || []).filter(isBody).find(r => hour(r) < 17);
+      if (pm && d1 && !d1.sick && (pm.rows || []).some(r => r.date === last && PREP_RE.test(r.text || '')) && !NEXT_RE.test(d1.text || '')) A('眠前薬：次の朝の確認が無い', d1, `前の月の最後の夜（${last.slice(5)}）に眠前薬を準備したのに、前日の眠前薬の確認の文が無い`); }
     Object.entries(byDay).forEach(([date, day]) => {
       // 同じ日の重なり
       for (let i = 0; i < day.length; i++) for (let j = i + 1; j < day.length; j++) { const p = day[i], q = day[j], ps = hm(p.start), pe = hm(p.end) ?? ps + 1, qs = hm(q.start), qe = hm(q.end) ?? qs + 1; if (ps != null && qs != null && ps < qe && qs < pe) add('同じ日の重なり', n, ym, date, p.start, `${p.start}〜${p.end} と ${q.start}〜${q.end} が重なる`); }
@@ -216,6 +219,7 @@ function check(D) {
       if (last && isBath(last) && medNeed && mz !== 'なし' && !shown(last).includes('自立支援|服薬') && !(last.kpOff || []).includes('自立支援|服薬')) A('最後が入浴：服薬の声かけ', last, 'その日の最後の身体の訪問が入浴なのに「声掛け・見守り：服薬」が無い');
       // 夜に準備 → 次の日の最初の身体の訪問で確認
       if (day.some(r => PREP_RE.test(r.text || ''))) { const nx = (byDay[nextDay(date)] || []).filter(isBody), first = nx.find(r => hour(r) < 17); if (first && !first.sick && !NEXT_RE.test(first.text || '')) A('眠前薬：次の朝の確認が無い', first, `前の夜（${date.slice(5)}）に眠前薬を準備したのに、前日の眠前薬の確認の文が無い`); }
+      { const first = body.find(r => hour(r) < 12); if (first && !first.sick && /眠前薬[^。\n]*確認/.test(first.detail || '') && !NEXT_RE.test(first.text || '')) A('眠前薬：次の朝の確認が無い', first, '予定の内容に「眠前薬服薬確認」があるのに、前日の眠前薬の確認の文が無い'); }
       // 眠前薬「あり」の人
       if (mz === 'あり') {
         const night = last && hour(last) >= (isTogether(last) ? 17 : 15) ? last : null, first = body.find(r => r !== night && hour(r) < 17);
