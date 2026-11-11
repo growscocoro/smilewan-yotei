@@ -830,7 +830,7 @@ async function setSetting(key, localKey, list, opt = {}) {
 const SUPA = { url: '', key: '' }; // 旧（使わない）
 const GAS = {"url": "https://script.google.com/macros/s/AKfycbxKEAUthQx9wiZKncHZR43jbSKjPfO2lYhlc2K5yXWJNXI_zA8wChdQTFlINEhLTDQO/exec"};           // 保存先（Googleドライブに保存するGAS）。build-site.sh が入れる
 // 版の確認：公開版が新しくなったら知らせ、古い版のままでは記録を保存しない（古い決まりで上書きしないため）
-const APP_VER = '20261110173810';
+const APP_VER = '20261111103751';
 let appOutdated = false;
 async function checkVer() {
   if (APP_VER === 'dev' || appOutdated) return appOutdated;
@@ -1847,7 +1847,7 @@ function withMedNext(r, t) {
   const mz = minzenOf(); if (mz === 'なし') return dropMinzen(t);
   const pv = nightMedBefore(r), m = String(t).match(MED_SENT_RE), first = firstBodyMorning(r);
   // 朝の業務手順書に「眠前薬服薬確認」がある人（10/31 新しい手順書・14人）は、その日の最初の朝の訪問で必ず書く
-  let planSays = false; if (first) { try { const pr = procedureFor(r.e, (state.name || '').trim()); planSays = !!pr && pr.steps.some(x => /眠前薬[^。]*確認/.test(x.text || '')); } catch (e) {} if (mz === 'あり') planSays = true; } // 「あり」の人は、その日の最初の朝の訪問で必ず確認の文
+  let planSays = false; if (first) { try { const pr = procedureFor(r.e, (state.name || '').trim()); planSays = !!pr && pr.steps.some(x => /眠前薬[^。]*確認/.test(x.text || '')); } catch (e) {} if (mz === 'あり' || /眠前薬[^。\n]*確認/.test((r.e && r.e.detail) || '')) planSays = true; } // 予定表の朝の内容に「眠前薬服薬確認」とある訪問も毎朝書く（11/11 月初の1日に出ていなかった：前の夜に訪問が無い日） // 「あり」の人は、その日の最初の朝の訪問で必ず確認の文
   // それ以外で、前の夜に眠前薬の訪問が無い時は、確認の文を入れない（10/31 ユーザー指示「ない場合は外しておいて」）
   if (!planSays && !pv) return m ? String(t).replace(m[0], '') : t;
   const all = String(t).split(/(?<=。)/).filter(y => y.trim()), isConf = y => y === MINZEN_NEXT || MED_SENT_RE.test(y), conf = all.filter(isConf), asa = all.indexOf(MED_ASA);
