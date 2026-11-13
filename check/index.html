@@ -110,6 +110,7 @@ const RULES = [
   ['眠前薬：次の朝の確認が無い', 'bad', '夜に眠前薬を準備した次の日の、最初の身体の訪問に「前日の眠前薬」の確認の文が無い'],
   ['眠前薬：家事の訪問に確認', 'bad', '前日の眠前薬の確認は身体の訪問だけ（家事ではしない）'],
   ['眠前薬：「あり」の人の抜け', 'bad', '眠前薬「あり」の人：夜の訪問（最後の身体の訪問・15時から、共には17時から・後に家事が来ても）に眠前薬の文、夜でない最初の身体の訪問に前日の確認', 'new'],
+  ['見本と違う', 'bad', '見本（記録用紙のチェックリスト）にある項目が付いていない（体調不良の日の入浴・清拭・整容、「どちらか」の項目、手で外した物は除く）。見本に無い項目が付いている方は、決まり・手順書の分を分けるためツールの点検で見る'],
   ['共に：服薬確認', 'bad', '共に（一緒に行う）の身体の訪問は「服薬介助・確認」にチェック', 'new'],
   ['最後が入浴：服薬の声かけ', 'bad', 'その日の最後の身体の訪問が入浴なら「声掛け・見守り：服薬」にチェック（後に家事が来ても）', 'new'],
   ['体調不良：髭', 'bad', '体調不良の日のシャワー浴は、整容（髭）にチェックしない', 'new'],
@@ -186,8 +187,11 @@ function check(D) {
         if (have.length && miss.length) A('シフト：担当者が違う', r, `シフトの担当 ${sl.helpers.join('・')}／記録の担当 ${r.staff}`); });
       rows.filter(r => !used.has(r)).forEach(r => A('シフト：シフトに無い記録', r, `${r.start} の訪問がシフトに無い`));
     }
+    const tmpls = (((D.settings.checkTemplates || {}).list) || []).filter(x => nameKey(x.name) === nameKey(n));
+    const tmplOf = r => { const dow = new Date(r.date + 'T00:00:00').getDay(), st = hm(r.start); if (st == null) return null; const c = tmpls.filter(x => (x.days || []).includes(dow) && Math.abs(hm(x.start) - st) <= 10); return c.find(x => /家事/.test(x.type || '') === (r.kind === '家事援助')) || c[0] || null; };
     rows.forEach(r => {
       const kp = shown(r), v = vals(r), t = String(r.text || ''), off = r.kpOff || [], on = r.kpOn || [];
+      { const tm = tmplOf(r), dow = new Date(r.date + 'T00:00:00').getDay(); if (tm) (tm.checked || []).forEach(k => { if (k === '食事|完食' || off.includes(k) || ((tm.dayOnly || {})[k] && !tm.dayOnly[k].includes(dow)) || (tm.either || []).some(g => g.includes(k)) || (r.sick && /入浴介助|清拭|身体整容\|整容/.test(k))) return; if (!kp.includes(k)) A('見本と違う', r, `見本（用紙p${tm.page || '?'}）にある「${k.split('|')[1]}」が付いていない`); }); }
       if (!String(r.start || '').trim()) A('開始時刻が空', r, `開始時刻が空（${String(r.text || '').slice(0, 20)}…）`);
       if (t.length > 500) A('文字数', r, `${t.length}字`);
       // 眠前薬
