@@ -830,7 +830,7 @@ async function setSetting(key, localKey, list, opt = {}) {
 const SUPA = { url: '', key: '' }; // 旧（使わない）
 const GAS = {"url": "https://script.google.com/macros/s/AKfycbxKEAUthQx9wiZKncHZR43jbSKjPfO2lYhlc2K5yXWJNXI_zA8wChdQTFlINEhLTDQO/exec"};           // 保存先（Googleドライブに保存するGAS）。build-site.sh が入れる
 // 版の確認：公開版が新しくなったら知らせ、古い版のままでは記録を保存しない（古い決まりで上書きしないため）
-const APP_VER = '20261111103751';
+const APP_VER = '20261113110921';
 let appOutdated = false;
 async function checkVer() {
   if (APP_VER === 'dev' || appOutdated) return appOutdated;
@@ -1767,11 +1767,10 @@ function lastOfDay(r) {
 }
 // 眠前薬「あり」の人の夜の訪問：その日の最後の身体の訪問で15時から（共には17時から）。後に家事が来る日も（11/10 手書きメモ：中原さん16時・大岩さん15時の入浴も夜／松山さん15:30の共には昼）
 const nightVisitAri = r => !!r && !!r.e && r.kind !== '家事援助' && planHour(r) >= (visTogether(r.e) ? 17 : 15) && lastOfDay(r);
-function firstBodyMorning(r) { // その日の最初の身体の訪問（12時まで）。眠前薬「あり」の人は、夜の訪問でない最初の身体の訪問（17時まで・昼の共にも＝前日の眠前薬の確認）
-  if (!r || !r.date || !r.e || r.kind === '家事援助') return false;
-  const ari = minzenOf() === 'あり', lim = ari ? 17 : 12; if (planHour(r) >= lim || (ari && nightVisitAri(r))) return false;
+function firstBodyMorning(r) { // 夜の訪問でない、その日の最初の身体の訪問（17時まで・昼の共にも）。11/13 未設定の人も同じ（高山秀都さん13時：前の夜に眠前薬なのに確認の文が出なかった）
+  if (!r || !r.date || !r.e || r.kind === '家事援助' || planHour(r) >= 17 || nightVisitAri(r)) return false;
   const d = ymd(r.date), st = entryTime(r.e).s || '';
-  return !recRows.some(x => x !== r && x.on !== false && x.kind !== '家事援助' && x.e && ymd(x.date) === d && planHour(x) < lim && !(ari && nightVisitAri(x)) && (entryTime(x.e).s || '99') < st);
+  return !recRows.some(x => x !== r && x.on !== false && x.kind !== '家事援助' && x.e && ymd(x.date) === d && planHour(x) < 17 && !nightVisitAri(x) && (entryTime(x.e).s || '99') < st);
 }
 function nightMedBefore(r) {
   if (!firstBodyMorning(r)) return false; const d = ymd(r.date);
