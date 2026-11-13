@@ -830,7 +830,7 @@ async function setSetting(key, localKey, list, opt = {}) {
 const SUPA = { url: '', key: '' }; // 旧（使わない）
 const GAS = {"url": "https://script.google.com/macros/s/AKfycbxKEAUthQx9wiZKncHZR43jbSKjPfO2lYhlc2K5yXWJNXI_zA8wChdQTFlINEhLTDQO/exec"};           // 保存先（Googleドライブに保存するGAS）。build-site.sh が入れる
 // 版の確認：公開版が新しくなったら知らせ、古い版のままでは記録を保存しない（古い決まりで上書きしないため）
-const APP_VER = '20261113110921';
+const APP_VER = '20261113112201';
 let appOutdated = false;
 async function checkVer() {
   if (APP_VER === 'dev' || appOutdated) return appOutdated;
@@ -1015,7 +1015,7 @@ window._bgQaOne = async skip => {
   const free = n => last[n] && n !== skip && now - new Date(last[n]).getTime() >= BGQA_QUIET;
   let name = names.find(n => _bgSeen[n] && free(n) && last[n] > _bgSeen[n]), turn = false; // 前に点検した後に保存された人が先
   if (!name) { const len = _bgOrder.length - _bgPos, retry = window._bgRetry = window._bgRetry || {}; for (let k = 0; k < len && !name; k++) { const n = _bgOrder[_bgPos++]; if (free(n)) { name = n; turn = true; } else if ((retry[n] = (retry[n] || 0) + 1) <= 5) _bgOrder.push(n); else _bgCycle.done++; } } // 今飛ばした人は後でもう一度（飛ばしただけで「一巡した」としない）
-  if (name) { const r = await qaOneClient(name); _bgSeen[name] = new Date().toISOString(); _bgLeft[name] = r.left; _bgCycle.left = Object.values(_bgLeft).reduce((a, b) => a + b, 0); if (turn) _bgCycle.done++; }
+  if (name) { const r = await qaOneClient(name); _bgSeen[name] = new Date().toISOString(); _bgLeft[name] = r.leftOpen ?? r.left; _bgCycle.left = Object.values(_bgLeft).reduce((a, b) => a + b, 0); if (turn) _bgCycle.done++; }
   const total = names.length, cycleEnd = _bgPos >= _bgOrder.length, res = { name, done: Math.min(_bgCycle.done, total), total, left: _bgCycle.left, cycleEnd };
   if (cycleEnd && !_bgCycle.logged) { _bgCycle.logged = true; await gasCall({ pass, op: 'log', item: { where: 'morning', ver: APP_VER, msg: `点検：裏で一巡（${total}人）・確認が必要な所${_bgCycle.left}件` } }); } // 一巡したときに1回だけ
   return res;
@@ -5922,7 +5922,7 @@ async function qaOneClient(name) {
     }
     if (items.length) gasCall({ pass: (lsGet('smilewan_pass') || '').trim(), op: 'qa', items }).catch(() => {});
   } finally { window._bulkQa = false; recRows = []; }
-  return { name, months, fixed, left: all.length };
+  return { name, months, fixed, left: all.length, leftOpen: all.filter(x => !monthClosed(String(x.date || '').slice(0, 7))).length }; // leftOpen＝締めていない月だけ（11/13 締めた月の分で2101件と出て見にくかった）
 }
 async function qaAllSaved(opt = {}) {
   if (!DB || !DB.loadAllRecords) { if (!opt.auto) alert('共有に接続してから押してください'); return { error: 'not connected' }; }
