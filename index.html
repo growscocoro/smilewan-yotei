@@ -830,7 +830,7 @@ async function setSetting(key, localKey, list, opt = {}) {
 const SUPA = { url: '', key: '' }; // 旧（使わない）
 const GAS = {"url": "https://script.google.com/macros/s/AKfycbxKEAUthQx9wiZKncHZR43jbSKjPfO2lYhlc2K5yXWJNXI_zA8wChdQTFlINEhLTDQO/exec"};           // 保存先（Googleドライブに保存するGAS）。build-site.sh が入れる
 // 版の確認：公開版が新しくなったら知らせ、古い版のままでは記録を保存しない（古い決まりで上書きしないため）
-const APP_VER = '20261113122933';
+const APP_VER = '20261113133105';
 let appOutdated = false;
 async function checkVer() {
   if (APP_VER === 'dev' || appOutdated) return appOutdated;
@@ -4611,8 +4611,9 @@ function fmtKaipoke(d, e) {
 // 記録の作り方：シフト（カイポケの実際の訪問日時）がある月はシフトの日時で作る。無い月は週間予定表の曜日・時刻で作る
 function shiftRowsFor(rows, name, day) {
   const n = normName(name), sur = String(name || '').trim().split(/[\s　]+/)[0], given = String(name || '').trim().split(/[\s　]+/)[1] || '';
-  let c = rows.filter(r => r.d === day && normName(r.c) === n);
+  let c = rows.filter(r => r.d === day && normName(r.c) === n && !/通院/.test(r.v || '')); // 11/13 通院介助はこのツールでは記録しない
   if (!c.length && !rows.some(r => normName(r.c) === n)) { const sim = x => { const [a, b = ''] = String(x).trim().split(/[\s　]+/); return a === sur && b[0] && b[0] === given[0]; }; if (new Set(rows.filter(r => sim(r.c)).map(r => r.c)).size === 1) c = rows.filter(r => r.d === day && sim(r.c)); }
+  c = c.filter(r => !/通院/.test(r.v || '')); // 名前の似た人の行も、通院は除く
   // 同じ時間に2人入っているときは1件にまとめる
   const g = new Map(); c.forEach(r => { const k = r.s + '-' + r.e; if (!g.has(k)) g.set(k, { s: r.s, e: r.e, v: r.v || '', helpers: [] }); if (!g.get(k).helpers.includes(r.h)) g.get(k).helpers.push(r.h); });
   return [...g.values()].sort((a, b) => a.s.localeCompare(b.s));
@@ -4654,11 +4655,11 @@ async function buildRecords() {
   const shift = {}; for (const ym of [...new Set(yms)]) shift[ym] = await loadShift(ym);
   const hasShift = ym => { const rows = shift[ym] || []; for (let dd = 1; dd <= 31; dd++) if (shiftRowsFor(rows, name, dd).length) return true; return false; };
   const useShift = {}; Object.keys(shift).forEach(ym => { useShift[ym] = hasShift(ym); });
-  const allEntries = [0, 1, 2, 3, 4, 5, 6].flatMap(w => dayEntries(state.days[w]) || []).filter(e => entryTime(e).s);
+  const allEntries = [0, 1, 2, 3, 4, 5, 6].flatMap(w => dayEntries(state.days[w]) || []).filter(e => entryTime(e).s && !/通院/.test(e.type || ''));
   const fam = x => /入浴/.test(x) ? '入浴' : /通院/.test(x) ? '通院' : /家事|生活援助|^生活/.test(x) ? '家事' : '身体';
   recRows = []; _recOwner = name; _buildingRows = true; let nShift = 0, nAdd = 0, nMiss = 0;
   for (let d = new Date(from + 'T00:00:00'); d <= new Date(to + 'T00:00:00'); d.setDate(d.getDate() + 1)) {
-    const ym = ymd(d).slice(0, 7), entries = uniqEntries(dayEntries(state.days[d.getDay()])).sort((a, b) => (a.start || '').localeCompare(b.start || ''));
+    const ym = ymd(d).slice(0, 7), entries = uniqEntries(dayEntries(state.days[d.getDay()]).filter(e => !/通院/.test(e.type || ''))).sort((a, b) => (a.start || '').localeCompare(b.start || ''));
     const plan = [];
     if (useShift[ym]) {
       const used = new Set();
@@ -6012,7 +6013,7 @@ function scheduleQa(name) {
   [0, 1, 2, 3, 4, 5, 6].forEach(w => dayEntries(state.days[w]).forEach(e => {
     const t = entryTime(e).s, what = `${W[w]}曜 ${t || '（時刻なし）'} ${e.type || '（種別なし）'}`;
     if (!e.start && t) out.push(`${what}：開始時刻の欄が空です（内容欄の「${t}」を使って作ります）。時刻欄に入れてください`);
-    else if (!t && (e.type || e.detail)) out.push(`${what}：予定表に時刻がありません（シフトに無い月は記録になりません）`);
+    else if (!t && (e.type || e.detail) && !/通院/.test(e.type || '')) out.push(`${what}：予定表に時刻がありません（シフトに無い月は記録になりません）`); // 通院介助は記録しない（11/13）
     if (t && dayEntries(state.days[w]).some(x => x !== e && entryTime(x).s === t && (entryTime(x).e || '') === (entryTime(e).e || '') && entFam(x) === entFam(e)) && dayEntries(state.days[w]).find(x => entryTime(x).s === t && (entryTime(x).e || '') === (entryTime(e).e || '') && entFam(x) === entFam(e)) === e) out.push(`${what}：同じ時間の予定が2つ入っています（記録は1つにまとめて作ります）。いらない方を消してください`);
     if (t && !e.type) out.push(`${what}：種別が空です`);
     else if (e.type && !TYPE_OK.test(e.type)) out.push(`${what}：種別「${e.type}」が身体・家事・入浴・通院・共に のどれか分かりません`);
