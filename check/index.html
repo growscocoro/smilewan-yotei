@@ -103,6 +103,7 @@ const RULES = [
   ['開始時刻が空', 'bad', '記録の開始時刻が空（Wordやカイポケに時刻が出ない）'],
   ['シフト：時刻が違う', 'warn', '記録の開始時刻が、近いシフトの時刻と違う（30分以内のずれ）'],
   ['シフト：シフトに無い記録', 'warn', 'その月のシフトがある人で、シフトに無い時刻の記録がある'],
+  ['通院介助の記録', 'bad', '通院介助はこのツールでは記録しない（11/13）。通院介助の記録が残っている'],
   ['同じ日の重なり', 'bad', '同じ日に時間の重なる記録が2つある'],
   ['名前の重複', 'bad', '空白などだけ違う同じ名前が、予定表・利用者情報・記録に2つある'],
   ['利用者の設定', 'warn', '手順書や予定表に「眠前薬」があるのに眠前薬の「あり／なし」が未設定・アセスメントが無い'],
@@ -175,7 +176,7 @@ function check(D) {
     const byDay = {}; rows.forEach(r => { (byDay[r.date] = byDay[r.date] || []).push(r); });
     const A = (cat, r, msg) => add(cat, n, ym, r.date, r.start, `${r.type || ''}：${msg}`);
     // シフトとの照らし合わせ
-    const sh = (D.shift[ym] || []).filter(x => nameKey(x.c) === nameKey(n));
+    const sh = (D.shift[ym] || []).filter(x => nameKey(x.c) === nameKey(n) && !/通院/.test(x.v || '')); // 通院介助は記録しない（11/13）
     if (sh.length) {
       const slots = {}; sh.forEach(x => { const k = x.d + '|' + x.s; (slots[k] = slots[k] || { d: x.d, s: x.s, e: x.e, helpers: [] }).helpers.includes(x.h) || slots[k].helpers.push(x.h); });
       const used = new Set();
@@ -192,6 +193,7 @@ function check(D) {
     rows.forEach(r => {
       const kp = shown(r), v = vals(r), t = String(r.text || ''), off = r.kpOff || [], on = r.kpOn || [];
       { const tm = tmplOf(r), dow = new Date(r.date + 'T00:00:00').getDay(); if (tm) (tm.checked || []).forEach(k => { if (k === '食事|完食' || off.includes(k) || ((tm.dayOnly || {})[k] && !tm.dayOnly[k].includes(dow)) || (tm.either || []).some(g => g.includes(k)) || (r.sick && /入浴介助|清拭|身体整容\|整容/.test(k))) return; if (!kp.includes(k)) A('見本と違う', r, `見本（用紙p${tm.page || '?'}）にある「${k.split('|')[1]}」が付いていない`); }); }
+      if (/通院/.test(r.type || '')) A('通院介助の記録', r, '通院介助の記録がある（いらない）');
       if (!String(r.start || '').trim()) A('開始時刻が空', r, `開始時刻が空（${String(r.text || '').slice(0, 20)}…）`);
       if (t.length > 500) A('文字数', r, `${t.length}字`);
       // 眠前薬
