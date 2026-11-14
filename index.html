@@ -830,7 +830,7 @@ async function setSetting(key, localKey, list, opt = {}) {
 const SUPA = { url: '', key: '' }; // 旧（使わない）
 const GAS = {"url": "https://script.google.com/macros/s/AKfycbxKEAUthQx9wiZKncHZR43jbSKjPfO2lYhlc2K5yXWJNXI_zA8wChdQTFlINEhLTDQO/exec"};           // 保存先（Googleドライブに保存するGAS）。build-site.sh が入れる
 // 版の確認：公開版が新しくなったら知らせ、古い版のままでは記録を保存しない（古い決まりで上書きしないため）
-const APP_VER = '20261114151237';
+const APP_VER = '20261114155512';
 let appOutdated = false;
 async function checkVer() {
   if (APP_VER === 'dev' || appOutdated) return appOutdated;
@@ -3626,6 +3626,38 @@ function checkSheetApply() {
   alert(`当てました。予定表の枠 ${nEnt}件・記録 ${nRow}件（自動で保存します）。` + (fixed ? `\n文章を直した訪問 ${fixed}件。` : '') + (miss.length ? `\n\n決まりで変わらなかった物・付けられない訪問：\n${miss.map(x => `${ckColLabel(x.c)} ${x.on ? '＋' : '－'}${x.k.replace('|', '：')}（${[x.n ? `変わらない${x.n}件` : '', x.skip ? `飛ばした${x.skip}件` : ''].filter(Boolean).join('・')}）`).join('\n')}` : ''));
   checkSheetOpen();
 }
+// ===== 点検サイトの「チェック確認表」から当てる（11/14 ユーザー「点検サイトで修正できるようにして欲しい」）=====
+//   点検サイトは読むだけのまま。点検サイトがこのツールを見えない枠（?autoqa=1）で開き、ここを呼ぶ。中身は📋チェック確認表の「当てる」と同じ（予定表の枠と開いている月の記録・文章もそろえる・締めた月は変えない）
+//   changes＝[{ start:'18:00', type:'身体', days:[1,3], k:'項目', on:true }]。点検サイトの列は見本ごとに曜日で分かれるので、曜日が一部だけの列はその曜日の分だけの列を作って当てる
+window._checkSiteApply = async (name, ym, changes) => {
+  const msgs = [], a0 = window.alert, c0 = window.confirm; window.alert = m => { msgs.push(String(m)); }; window.confirm = m => { msgs.push(String(m)); return true; };
+  try {
+    if (!DB || !GAS.url) throw new Error('保存先につながっていません（合言葉を確かめてください）');
+    if (monthClosed(ym)) throw new Error(`${ym} は締めた月なので変えません`);
+    if (!Array.isArray(changes) || !changes.length) throw new Error('変えたマスがありません');
+    await DB.loadAllRecords();
+    loadSaved(name); await new Promise(z => setTimeout(z, 50)); if ((state.name || '').trim() !== name) throw new Error(`${name} さんの予定表を開けません`);
+    refreshSavedMonths(); const sel = document.getElementById('recSavedMonth'); if (!sel || ![...sel.options].some(o => o.value === ym)) throw new Error(`${name} さんの ${ym} の記録がありません`);
+    sel.value = ym; recRows = []; openSavedRecords(); clearTimeout(recTimer); if (_recOwner !== name || !recRows.length) throw new Error('記録を開けません');
+    checkSheetOpen(); if (!_ck || _ck.name !== name) throw new Error('チェック確認表を開けません');
+    changes.forEach(x => {
+      const base = _ck.cols.find(c => fmtTime(c.start).padStart(5, '0') === String(x.start).padStart(5, '0') && (c.type || '') === (x.type || '')); if (!base) throw new Error(`${x.start} ${x.type} の時間が予定表にありません`);
+      const D = new Set(x.days || []); let c = base;
+      if ([...base.days].some(d => !D.has(d))) { const key = base.key + '|' + [...D].sort().join(''); c = _ck.cols.find(y => y._sub === key);
+        if (!c) { c = { ...base, _sub: key, days: D, rows: base.rows.filter(r => D.has(r.date.getDay())), entries: [...D].flatMap(d => dayEntries(state.days[d]).filter(e => base.entries.includes(e))), cnt: {} };
+          c.rows.forEach(r => kpAll(r).forEach(k => { c.cnt[k] = (c.cnt[k] || 0) + 1; })); c.init = new Set(Object.keys(c.cnt).filter(k => c.cnt[k] * 2 >= c.rows.length)); c.now = new Set(c.init); _ck.cols.push(c); } }
+      if (x.on) c.now.add(x.k); else c.now.delete(x.k); });
+    if (!ckChanges().length) return { ok: true, nothing: true, msgs: ['今の記録とすでに同じでした（変える所なし）'] };
+    const before = msgs.length; checkSheetApply(); if (msgs.slice(before).some(m => /失敗|もう一度開いて/.test(m))) throw new Error(msgs.slice(before).find(m => /失敗|もう一度開いて/.test(m)));
+    clearTimeout(sheetTimer); if (!(await saveSchedule(name, { name, days: state.days }))) throw new Error('予定表を保存できませんでした');
+    clearTimeout(recTimer); window._saveVia = 'チェック確認表（点検サイト）'; await saveRecords({ quiet: true });
+    const g = await gasCall({ pass: (lsGet('smilewan_pass') || '').trim(), op: 'get', kind: 'records', name: docId(name) + '_' + ym }), rows = (g.doc && g.doc.data && g.doc.data.rows) || [], res = [];
+    changes.forEach(x => { const D = new Set(x.days || []), rs = rows.filter(r => D.has(new Date(r.date + 'T00:00:00').getDay()) && Math.abs(hm(r.start) - hm(x.start)) <= 45 && (r.type || '') === (x.type || ''));
+      res.push({ ...x, n: rs.length, ok: rs.filter(r => (r.kpShown || []).includes(x.k) === !!x.on).length }); });
+    return { ok: true, res, msgs: msgs.slice(before) };
+  } catch (e) { return { ok: false, error: String(e && e.message || e), msgs }; }
+  finally { window.alert = a0; window.confirm = c0; }
+};
 // ---- カイポケ訪問記録の入力欄（顔色・発汗・バイタル・排泄・食事・買物など） ----
 //   ・文章から自動で入る欄（顔色・発汗・その他・実施項目）＝点線のチップ
 //   ・自分で入れた欄（体温・血圧・回数・cc・金額など）＝文章に自動で書き足す
