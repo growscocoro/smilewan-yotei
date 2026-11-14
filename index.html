@@ -830,7 +830,7 @@ async function setSetting(key, localKey, list, opt = {}) {
 const SUPA = { url: '', key: '' }; // 旧（使わない）
 const GAS = {"url": "https://script.google.com/macros/s/AKfycbxKEAUthQx9wiZKncHZR43jbSKjPfO2lYhlc2K5yXWJNXI_zA8wChdQTFlINEhLTDQO/exec"};           // 保存先（Googleドライブに保存するGAS）。build-site.sh が入れる
 // 版の確認：公開版が新しくなったら知らせ、古い版のままでは記録を保存しない（古い決まりで上書きしないため）
-const APP_VER = '20261114150500';
+const APP_VER = '20261114151237';
 let appOutdated = false;
 async function checkVer() {
   if (APP_VER === 'dev' || appOutdated) return appOutdated;
@@ -5611,11 +5611,11 @@ function mentionFix(r, i) {
   for (let n = 0; n < 2 && at < ss.length && /挨拶|体調|過ごされ|表情|顔色/.test(ss[at]) && !MENTION.some(([, re]) => re.test(ss[at])); n++) at++;
   const head = [], tail = [];
   // 11/14「なんで長い文になってんの」：排泄（トイレ介助・おむつ・パッド）を2つ以上足す時は、1文ずつ足さずに短い1文にまとめる
-  const exNeed = MENTION.filter(([k, re]) => EX_ONE[k] && kp.includes(k) && !re.test(ss.join(''))).map(([k]) => EX_ONE[k]).join('');
-  if (exNeed.length >= 2) head.push(exSay(exNeed, i));
+  const exNeed = MENTION.filter(([k, re]) => EX_ONE[k] && kp.includes(k) && !re.test(ss.join('')) && !(bath && k === '排泄|トイレ介助')).map(([k]) => EX_ONE[k]).join(''); // 入浴の訪問は「入浴の前にトイレ介助」を別に書き、入浴後のおむつ・パッドだけまとめる（文の順番に合わせる）
+  if (exNeed.length >= 2) head.push((bath ? '入浴後、' : '') + exSay(exNeed, i));
   MENTION.forEach(([k, re, pool, bathPool, last], j) => {
     if (!kp.includes(k) || re.test(ss.join(''))) return;
-    if (exNeed.length >= 2 && EX_ONE[k]) return;
+    if (exNeed.length >= 2 && EX_ONE[k] && exNeed.includes(EX_ONE[k])) return;
     const pl = (bath && bathPool) ? bathPool : pool, ok = pl.filter(x => !ng.some(w => w && x.includes(w)));
     if (!ok.length) return; let t = ok[((i || 0) + j) % ok.length]; if (K) t = t.replace(/本人/g, '利用者様');
     (last ? tail : head).push(t);
