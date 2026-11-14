@@ -830,7 +830,7 @@ async function setSetting(key, localKey, list, opt = {}) {
 const SUPA = { url: '', key: '' }; // 旧（使わない）
 const GAS = {"url": "https://script.google.com/macros/s/AKfycbxKEAUthQx9wiZKncHZR43jbSKjPfO2lYhlc2K5yXWJNXI_zA8wChdQTFlINEhLTDQO/exec"};           // 保存先（Googleドライブに保存するGAS）。build-site.sh が入れる
 // 版の確認：公開版が新しくなったら知らせ、古い版のままでは記録を保存しない（古い決まりで上書きしないため）
-const APP_VER = '20261113142504';
+const APP_VER = '20261114150500';
 let appOutdated = false;
 async function checkVer() {
   if (APP_VER === 'dev' || appOutdated) return appOutdated;
@@ -2505,7 +2505,7 @@ const PLAN_PHRASES = [
   { re: /タンス/, need: PB_CLOTH, has: /タンス/, say: ['タンスの中の衣類を整頓した。', 'タンスの中の衣類を整頓し、取り出しやすくした。'] },
   { re: /洗濯(中|している間)に/, need: ['洗濯|洗濯'], has: /洗濯(機を回している|の)間に|洗濯中に/, say: ['洗濯機を回している間に、衣類の整頓を行った。', '洗濯の間に、乾いた洗濯物を畳んで片付けた。'] },
   { re: /お急ぎ/, need: ['洗濯|洗濯'], has: /お急ぎ/, say: ['洗濯はお急ぎコースで回した。', '洗濯機をお急ぎコースで回し、洗濯を行った。'] },
-  { re: /分別/, need: ['清掃|ゴミ出し', '自立支援|掃除'], has: /分別/, swap: /^(ゴミをまとめ、ゴミ出しを行った|室内のゴミを集めて出した|ゴミを袋にまとめ)/, say: (st, r, kp, tog) => tog ? ['ゴミの分別を本人と一緒に行った。'] : ['ゴミを分別してまとめ、ゴミ出しを行った。', 'ゴミを分別し、まとめて出した。'] },
+  { re: /分別/, need: ['清掃|ゴミ出し', '自立支援|掃除'], has: /分別/, swap: /^(ゴミをまとめ、ゴミ出しを行った|室内のゴミを集めて出した|ゴミを出した|ゴミをまとめて出した|ゴミを分別して出した|ゴミを袋にまとめ)/, say: (st, r, kp, tog) => tog ? ['ゴミの分別を本人と一緒に行った。'] : ['ゴミを分別してまとめ、ゴミ出しを行った。', 'ゴミを分別し、まとめて出した。'] },
   { re: /退出時[、，]?ご?み捨て|退出時[^。]*ゴミ/, need: ['清掃|ゴミ出し'], has: /退出時/, say: st => /ご?み捨て場|ゴミ捨て場/.test(st) ? ['ゴミは退出時にゴミ捨て場へ持って行った。'] : ['ゴミは退出時に捨てた。'] },
   { re: /曜日をお伝え/, need: ['清掃|ゴミ出し', '自立支援|掃除'], has: /曜日/, say: ['次のゴミ出しの曜日を本人にお伝えした。'] },
   { re: /食器拭き/, need: ['清掃|台所', '調理|配・下膳', '自立支援|一般的な調理・配下膳', '自立支援|掃除'], has: /食器を拭/, say: ['洗い物の後、食器を拭いて片付けた。'] },
@@ -5546,7 +5546,7 @@ const MENTION = [
   ['清掃|台所', /台所|シンク|キッチン|調理台/, ['台所のシンクと調理台を拭き、整えた。', '台所を掃除し、シンク周りをきれいにした。', '台所の清掃を行い、水回りを整えた。']],
   ['清掃|浴室', /浴室(の|を|内の)(清掃|掃除|床)|浴室を(洗|掃)|浴槽の汚れ|浴槽や床|浴槽を洗/, ['浴室の床と浴槽を洗い、水気を拭き取った。', '浴室を掃除し、浴槽の汚れを落とした。', '浴室の清掃を行い、換気をした。']],
   ['清掃|玄関', /玄関/, ['玄関を掃き、靴を揃えた。', '玄関の掃除を行った。']],
-  ['清掃|ゴミ出し', /ゴミ/, ['ゴミをまとめ、ゴミ出しを行った。', '室内のゴミを集めて出した。', 'ゴミを分別し、所定の場所に出した。']],
+  ['清掃|ゴミ出し', /ゴミ/, ['ゴミを出した。', 'ゴミをまとめて出した。', 'ゴミを分別して出した。']], // 11/14 短く（「なんで長い文になってんの」）
   ['洗濯|洗濯', /洗濯/, ['洗濯機を回し、洗濯を行った。', '衣類を洗濯した。', '洗濯物を仕分けて洗濯した。']],
   ['洗濯|乾燥（物干し）', /干/, ['洗濯物を干した。', '洗い終えた衣類を干して乾かした。', '洗濯物をハンガーにかけて干した。']],
   ['洗濯|取入れ・収納', /取り込|取込|取り入れ/, ['乾いた洗濯物を取り込み、たたんで収納した。', '洗濯物を取り込み、引き出しにしまった。']],
@@ -5598,6 +5598,8 @@ function mentionNotFix(r) {
   const out = ss.filter(x => keep(x.trim()) || LINK_RE.test(x) || MED_FIXED.includes(x.trim()) || !rules.some(([keys, re]) => re.test(x) && !keys.some(k => kp.includes(k)))); // 見本どおりの服薬の文は、チェックの無い家事の訪問でも残す（11/5 家事は文章だけ・チェックは付けない）
   if (out.length && out.length !== ss.length) r.text = out.join('');
 }
+const EX_ONE = { '排泄|トイレ介助': 't', '排泄|おむつ交換': 'o', '排泄|パッド交換': 'p' };
+function exSay(need, i) { const o = need.includes('o'), p = need.includes('p'), x = o && p ? ((i || 0) % 2 ? 'リハパンとパッド' : 'おむつとパッド') : o ? 'おむつ' : 'パッド'; return need.includes('t') ? 'トイレ介助を行い、' + x + 'を交換した。' : x + 'を交換した。'; }
 function mentionFix(r, i) {
   if (!r || !r.text || r.on === false) return;
   mentionNotFix(r);
@@ -5608,8 +5610,12 @@ function mentionFix(r, i) {
   if (at < ss.length && /^(訪問|伺|朝|昼|夕方|夜)[^。]*(時|際|と)、/.test(ss[at])) at++;
   for (let n = 0; n < 2 && at < ss.length && /挨拶|体調|過ごされ|表情|顔色/.test(ss[at]) && !MENTION.some(([, re]) => re.test(ss[at])); n++) at++;
   const head = [], tail = [];
+  // 11/14「なんで長い文になってんの」：排泄（トイレ介助・おむつ・パッド）を2つ以上足す時は、1文ずつ足さずに短い1文にまとめる
+  const exNeed = MENTION.filter(([k, re]) => EX_ONE[k] && kp.includes(k) && !re.test(ss.join(''))).map(([k]) => EX_ONE[k]).join('');
+  if (exNeed.length >= 2) head.push(exSay(exNeed, i));
   MENTION.forEach(([k, re, pool, bathPool, last], j) => {
     if (!kp.includes(k) || re.test(ss.join(''))) return;
+    if (exNeed.length >= 2 && EX_ONE[k]) return;
     const pl = (bath && bathPool) ? bathPool : pool, ok = pl.filter(x => !ng.some(w => w && x.includes(w)));
     if (!ok.length) return; let t = ok[((i || 0) + j) % ok.length]; if (K) t = t.replace(/本人/g, '利用者様');
     (last ? tail : head).push(t);
