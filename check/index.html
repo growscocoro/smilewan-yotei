@@ -90,7 +90,14 @@
         <li>決まりで付けられない日（体調不良の日など）は変わりません。その時は「変わらなかった訪問があります」と出ます。</li>
         <li>当てずに相談したいときは「結果をコピー」で、表の中身をチャットに貼れます。</li>
       </ul>
-      <h3>⑤ ほかの記録</h3>
+      <h3>⑤ シフトと予定表</h3>
+      <ul>
+        <li>記録はシフトにある訪問だけで作ります。予定表にあってもシフトに無い訪問は、記録に入りません。</li>
+        <li>「シフトと予定表」を押し、月を選ぶと、人ごとに「予定表にあってシフトに無い」「シフトにあって予定表に無い」を日付つきで出します。</li>
+        <li>行った訪問がシフトに無かったときは、ツールで記録を作るときにその行のチェックを入れてください。毎週は行っていない予定なら、予定表を直してください。</li>
+        <li>人を開いた中の「この月のシフト」で、その人のシフト（日・時刻・サービス・担当）を全部見られます。</li>
+      </ul>
+      <h3>⑥ ほかの記録</h3>
       <ul>
         <li><b>毎朝の点検の記録</b>：事業所のMacが毎朝6:30に全員を点検した結果です（失敗した日は12:30・17:30にやり直します）。「読む」で出ます。</li>
         <li><b>この端末で点検した記録</b>：このスマホ・パソコンで「点検する」を押した日時と件数です。</li>
@@ -115,7 +122,7 @@
     <div class="bar"><div id="bar"></div></div>
   </div>
 
-  <div class="row" style="margin:6px 0"><button id="tabFind" class="primary" onclick="setTab('find')">点検の一覧</button><button id="tabTmpl" onclick="setTab('tmpl')">チェックリスト（見本）から見る</button><button id="tabSheet" onclick="setTab('sheet')">チェック確認表（全員）</button></div>
+  <div class="row" style="margin:6px 0"><button id="tabFind" class="primary" onclick="setTab('find')">点検の一覧</button><button id="tabTmpl" onclick="setTab('tmpl')">チェックリスト（見本）から見る</button><button id="tabSheet" onclick="setTab('sheet')">チェック確認表（全員）</button><button id="tabShift" onclick="setTab('shift')">シフトと予定表</button></div>
   <div id="result"></div>
   <div id="tmplView" style="display:none">
     <div class="card"><div class="row"><label>利用者 <select id="tmplWho" onchange="renderTmpl()"></select></label><label>月 <select id="tmplMonth" onchange="renderTmpl()"></select></label><label>出す物 <select id="tmplDiffOnly" onchange="renderTmpl()"><option value="bad">理由なしだけ</option><option value="diff" selected>違うもの</option><option value="all">全部</option></select></label></div>
@@ -127,6 +134,12 @@
     <div class="card"><div class="row"><label>利用者 <select id="shWho" onchange="renderSheet()"></select></label><label>月 <select id="shMonth" onchange="renderSheet()"></select></label><label>出す項目 <select id="shRows" onchange="renderSheet()"><option value="used" selected>付いている・見本・計の項目だけ</option><option value="all">全部の項目</option></select></label><button onclick="sheetCopy()">表示中の結果をコピー</button></div>
     <div class="muted" style="margin-top:4px">列＝予定表の時間（開始時刻・種別・曜日）。☑＝その時間の記録の半分以上で付いている項目　<b>3/9</b>＝一部の日だけ付いている（9件中3件）。<span class="mk">見</span>＝見本（記録用紙）で付ける　<span class="mk">○</span>＝見本の丸囲み（予定表に書いてある日だけ）　<span class="mk">計</span>＝手順書（計画書）にある（点検サイトが手順書から読んだ物）。<br><span class="cx extra">赤</span>＝見本に無いのに付いている　<span class="cx miss">黄</span>＝見本にあるのに付いていない　<span class="cx why">灰</span>＝見本と違うが理由がある（決まり・手順書・文章から・手で足した／外した・曜日の決まり。マスに指を置くと理由）。見本の無い時間は手順書（計）で比べます。マスを押して付ける物を直し、「✓ 記録に当てる」を押すと、その月の記録と予定表の枠に入ります（ツールの📋チェック確認表の「当てる」と同じ：チェックに合わせて文章もそろえる・締めた月は変えない・変更履歴に名前が残る）。</div></div>
     <div id="sheetBody"></div>
+  </div>
+
+  <div id="shiftView" style="display:none">
+    <div class="card"><div class="row"><label>利用者 <select id="sfWho" onchange="renderShiftView()"></select></label><label>月 <select id="sfMonth" onchange="renderShiftView()"></select></label><label>出す人 <select id="sfOnly" onchange="renderShiftView()"><option value="diff" selected>違いのある人だけ</option><option value="all">全員</option></select></label></div>
+    <div class="muted" style="margin-top:4px">記録はシフトにある訪問だけで作ります（11/14〜）。ここでは、その月の<b>予定表</b>（毎週の決まった予定）と<b>カイポケのシフト</b>（実際の日ごとの予定）をくらべて出します。<br>・<b>予定表にあってシフトに無い</b>：記録には入っていません。行った日なら、ツールで記録を作るときにその行のチェックを入れてください。毎週行っていないなら予定表を直します。<br>・<b>シフトにあって予定表に無い</b>：記録はシフトから作っています（近い予定を手本にします）。予定表に足すと記録が正確になります。<br>・人を開いた中の「この月のシフト」で、その人のシフトを全部見られます。</div></div>
+    <div id="shiftBody"></div>
   </div>
 
   <details class="card">
@@ -349,8 +362,9 @@ function renderHist() {
 }
 // ===== チェックリスト（見本）から見る（11/14 ユーザー「チェックリストの一覧開いてそこから違うものを出せるようにしてほしい」）=====
 let TAB = 'find';
-function setTab(t) { TAB = t; document.getElementById('result').style.display = t === 'find' ? '' : 'none'; document.getElementById('tmplView').style.display = t === 'tmpl' ? '' : 'none'; document.getElementById('sheetView').style.display = t === 'sheet' ? '' : 'none';
+function setTab(t) { TAB = t; document.getElementById('result').style.display = t === 'find' ? '' : 'none'; document.getElementById('tmplView').style.display = t === 'tmpl' ? '' : 'none'; document.getElementById('sheetView').style.display = t === 'sheet' ? '' : 'none'; document.getElementById('shiftView').style.display = t === 'shift' ? '' : 'none'; document.getElementById('tabShift').className = t === 'shift' ? 'primary' : '';
   document.getElementById('tabFind').className = t === 'find' ? 'primary' : ''; document.getElementById('tabTmpl').className = t === 'tmpl' ? 'primary' : ''; document.getElementById('tabSheet').className = t === 'sheet' ? 'primary' : '';
+  if (t === 'shift') { if (!DATA) { document.getElementById('shiftBody').innerHTML = '<div class="card muted">先に「点検する」を押して、記録を読み込んでください。</div>'; return; } fillShiftSelects(); renderShiftView(); return; }
   if (t === 'sheet') { if (!DATA) { document.getElementById('sheetBody').innerHTML = '<div class="card muted">先に「点検する」を押して、記録を読み込んでください。</div>'; return; } fillSheetSelects(); renderSheet(); return; }
   if (t === 'tmpl') { if (!DATA) { document.getElementById('tmplBody').innerHTML = '<div class="card muted">先に「点検する」を押して、記録を読み込んでください。</div>'; return; } fillTmplSelects(); renderTmpl(); } }
 const tmplsAll = () => (((DATA.settings.checkTemplates || {}).list) || []);
@@ -636,6 +650,46 @@ async function sheetApply(ni) {
     S2.msgOk = !bad.length; st.textContent = `${n}さん ${ym} に当てました`; }
   else { S2.msg = '当てられませんでした：' + (r && r.error || '不明') + '\n下の表は、保存先から読み直した今の記録です。'; S2.msgOk = false; st.textContent = '当てられませんでした'; }
   renderSheet();
+}
+// ===== シフトと予定表（11/14 ユーザー「シフトはいざという時にどっかに表示されるようにしてほしい」）=====
+//   記録はシフトにある訪問だけで作る（決まり14・11/14〜）ので、予定表にあってシフトに無い予定は記録に出てこない → ここで見られるようにする（読むだけ）
+//   くらべ方はツールの記録の作り方と同じ：シフトの訪問ごとに、同じ種類で45分以内（無ければ種類を問わず30分以内）の、いちばん近い予定を1つ当てる
+const svcFamOf = v => /通院/.test(v || '') ? '通院' : /^家事|生活援助/.test(v || '') ? '家事' : '身体';
+function shiftCompare(name, ym) {
+  const sc = DATA.schedules.find(x => nameKey(x.name) === nameKey(name)), sh = (DATA.shift[ym] || []).filter(x => nameKey(x.c) === nameKey(name) && !/通院/.test(x.v || ''));
+  const doc = DATA.records.find(d => nameKey(d.name) === nameKey(name) && d.month === ym), recs = (doc && doc.rows) || [];
+  const [y, m] = ym.split('-').map(Number), last = new Date(y, m, 0).getDate(), noShift = [], noPlan = [];
+  if (!sh.length) return { name, ym, hasShift: false, sh, noShift, noPlan };
+  for (let dd = 1; dd <= last; dd++) {
+    const date = `${ym}-${String(dd).padStart(2, '0')}`, dow = new Date(date + 'T00:00:00').getDay();
+    const ents = sc && Array.isArray(sc.days) ? ['upper', 'middle', 'lower'].flatMap(k => (sc.days[dow] && sc.days[dow][k]) || []).map(e => ({ e, t: entStart(e) })).filter(x => x.t.s && famOf(x.e.type) !== '通院') : [];
+    const slots = []; sh.filter(x => x.d === dd).forEach(x => { const g = slots.find(s => s.s === x.s && s.e === x.e); if (g) { if (!g.h.includes(x.h)) g.h.push(x.h); } else slots.push({ s: x.s, e: x.e, v: x.v, h: [x.h] }); });
+    const used = new Set();
+    slots.sort((a, b) => hm(a.s) - hm(b.s)).forEach(sl => { const st = hm(sl.s), near = (lim, same) => ents.filter(x => !used.has(x) && Math.abs(hm(x.t.s) - st) <= lim && (!same || !sl.v || famOf(x.e.type) === svcFamOf(sl.v))).sort((a, b) => Math.abs(hm(a.t.s) - st) - Math.abs(hm(b.t.s) - st));
+      const c = near(45, true)[0] || near(30, false)[0]; if (c) used.add(c); else noPlan.push({ date, dow, s: sl.s, e: sl.e, v: sl.v, h: sl.h }); });
+    ents.filter(x => !used.has(x)).forEach(x => { const rec = recs.find(r => r.date === date && r.start === x.t.s); noShift.push({ date, dow, s: x.t.s, e: x.t.e, type: x.e.type || '', detail: x.e.detail || '', rec: !!rec }); });
+  }
+  return { name, ym, hasShift: true, sh, noShift, noPlan };
+}
+function fillShiftSelects() {
+  const who = document.getElementById('sfWho'), mon = document.getElementById('sfMonth'), ms = Object.keys(DATA.shift).filter(m => (DATA.shift[m] || []).length).sort().reverse();
+  if (!mon.options.length) mon.innerHTML = ms.map(m => `<option value="${m}">${m}${DATA.closed.has(m) ? '（締め）' : ''}</option>`).join('');
+  const names = DATA.schedules.map(x => x.name).sort((a, b) => a.localeCompare(b, 'ja'));
+  if (!who.options.length) who.innerHTML = '<option value="">（全員）</option>' + names.map(n => `<option>${esc(n)}</option>`).join('');
+}
+function renderShiftView() {
+  const box = document.getElementById('shiftBody'); if (!DATA) return; const who = document.getElementById('sfWho').value, ym = document.getElementById('sfMonth').value, only = document.getElementById('sfOnly').value === 'diff';
+  if (!ym) { box.innerHTML = '<div class="card muted">シフトを読み込んだ月がありません</div>'; return; }
+  const dl = r => `${r.date.slice(5).replace('-', '/')}(${DOWS[r.dow]})`;
+  const L = (who ? [who] : DATA.schedules.map(x => x.name)).map(n => shiftCompare(n, ym)).sort((a, b) => (b.noShift.length + b.noPlan.length) - (a.noShift.length + a.noPlan.length) || a.name.localeCompare(b.name, 'ja'));
+  const noSh = L.filter(x => !x.hasShift), act = L.filter(x => x.hasShift), cards = act.filter(x => !only || who || x.noShift.length || x.noPlan.length).map(x => {
+    const shRows = x.sh.slice().sort((a, b) => a.d - b.d || hm(a.s) - hm(b.s)).map(r => { const date = `${ym}-${String(r.d).padStart(2, '0')}`; return `<tr><td>${dl({ date, dow: new Date(date + 'T00:00:00').getDay() })}</td><td>${esc(r.s)}〜${esc(r.e)}</td><td>${esc(r.v)}</td><td>${esc(r.h)}</td></tr>`; }).join('');
+    return `<details class="card" ${who || x.noShift.length || x.noPlan.length ? 'open' : ''}><summary><b>${esc(x.name)}</b>　${esc(ym)}・シフト${x.sh.length}件　${x.noShift.length ? `<span class="tag warn">予定表にあってシフトに無い ${x.noShift.length}</span>` : ''}${x.noPlan.length ? `<span class="tag warn">シフトにあって予定表に無い ${x.noPlan.length}</span>` : ''}${!x.noShift.length && !x.noPlan.length ? '<span class="muted">予定表とシフトは同じ</span>' : ''}</summary>
+      ${x.noShift.length ? `<div class="who">予定表にあってシフトに無い（記録には入っていません）</div><table><tr><th>日</th><th>予定表の時刻</th><th>種別・内容</th><th>記録</th></tr>${x.noShift.map(r => `<tr><td>${dl(r)}</td><td>${esc(r.s)}${r.e ? '〜' + esc(r.e) : ''}</td><td>${esc(r.type)}<span class="muted">　${esc(r.detail.split('\n').slice(0, 2).join('・'))}</span></td><td>${r.rec ? '<span class="tag bad">記録あり</span>' : '<span class="muted">なし</span>'}</td></tr>`).join('')}</table>` : ''}
+      ${x.noPlan.length ? `<div class="who">シフトにあって予定表に無い（記録はシフトから作っています）</div><table><tr><th>日</th><th>シフトの時刻</th><th>サービス</th><th>担当</th></tr>${x.noPlan.map(r => `<tr><td>${dl(r)}</td><td>${esc(r.s)}〜${esc(r.e)}</td><td>${esc(r.v)}</td><td>${esc(r.h.join('・'))}</td></tr>`).join('')}</table>` : ''}
+      <details style="margin-top:6px"><summary class="muted">この月のシフト（${x.sh.length}件）</summary><table><tr><th>日</th><th>時刻</th><th>サービス</th><th>担当</th></tr>${shRows}</table></details></details>`; });
+  const nNS = act.reduce((n, x) => n + x.noShift.length, 0), nNP = act.reduce((n, x) => n + x.noPlan.length, 0);
+  box.innerHTML = `<div class="card"><b>${esc(ym)}</b>　予定表にあってシフトに無い <b>${nNS}</b>件・シフトにあって予定表に無い <b>${nNP}</b>件（${act.filter(x => x.noShift.length || x.noPlan.length).length}人）${noSh.length ? `<div class="muted">この月のシフトが無い人：${noSh.map(x => esc(x.name)).join('・')}（予定表の曜日・時刻で記録を作ります）</div>` : ''}</div>` + (cards.join('') || '<div class="card okbox">予定表とシフトの違いはありません。</div>');
 }
 async function run() {
   PASS = document.getElementById('pass').value.trim(); if (!PASS) { alert('合言葉を入れてください'); return; }
