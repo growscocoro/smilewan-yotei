@@ -249,6 +249,8 @@ function check(D) {
 }
 
 // ===== 画面 =====
+// 画面に出している物（締めた月を出すか・今日の決まりを締めた月に当てるか・そのままと決めた物）。CSVも同じ物だけ（11/14 CSVに締めた月の今日の決まりの分まで入っていた）
+function visibleFound() { const showClosed = document.getElementById('showClosed').checked, showNew = document.getElementById('showClosedNew').checked; return FOUND.filter(x => (!x.closed || (showClosed && (showNew || !NEW.has(x.cat)))) && !kept(x)); }
 function render() {
   const box = document.getElementById('result'); if (!DATA) { box.innerHTML = ''; return; }
   const showClosed = document.getElementById('showClosed').checked, showNew = document.getElementById('showClosedNew').checked, L0 = FOUND.filter(x => !x.closed || (showClosed && (showNew || !NEW.has(x.cat)))), L = L0.filter(x => !kept(x)), K = L0.filter(x => kept(x));
@@ -264,7 +266,7 @@ function render() {
 }
 function saveCsv() {
   const q = s => '"' + String(s ?? '').replace(/"/g, '""') + '"';
-  const csv = '﻿種類,利用者,月,日付,開始,内容,締めた月\n' + FOUND.map(x => [x.cat, x.who, x.month, x.date, x.start, x.msg, x.closed ? '締め' : ''].map(q).join(',')).join('\n');
+  const csv = '﻿種類,利用者,月,日付,開始,内容,締めた月\n' + visibleFound().map(x => [x.cat, x.who, x.month, x.date, x.start, x.msg, x.closed ? '締め' : ''].map(q).join(',')).join('\n');
   const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' })); a.download = `記録の点検_${ymd(new Date())}.csv`; a.click();
 }
 function lsGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
