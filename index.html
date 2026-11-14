@@ -830,7 +830,7 @@ async function setSetting(key, localKey, list, opt = {}) {
 const SUPA = { url: '', key: '' }; // 旧（使わない）
 const GAS = {"url": "https://script.google.com/macros/s/AKfycbxKEAUthQx9wiZKncHZR43jbSKjPfO2lYhlc2K5yXWJNXI_zA8wChdQTFlINEhLTDQO/exec"};           // 保存先（Googleドライブに保存するGAS）。build-site.sh が入れる
 // 版の確認：公開版が新しくなったら知らせ、古い版のままでは記録を保存しない（古い決まりで上書きしないため）
-const APP_VER = '20261114162801';
+const APP_VER = '20261114170229';
 let appOutdated = false;
 async function checkVer() {
   if (APP_VER === 'dev' || appOutdated) return appOutdated;
@@ -6060,6 +6060,9 @@ function scheduleQa(name) {
   if (add.length) out.push(`シフトにあって予定表に無い訪問が ${add.length} 件（${add.slice(0, 5).map(r => ymd(r.date).slice(5) + ' ' + (r.e.start || '')).join('・')}${add.length > 5 ? '…' : ''}）：近い予定を手本に作りました。予定表に足すと正確になります`);
   const warn = recRows.filter(r => r.on !== false && (r.noShift || /シフトに無い予定（(シフトを確認|記録に入れない)/.test(r.flag || '')));
   if (warn.length) out.push(`⚠ シフトに無い訪問が ${warn.length} 件（${warn.slice(0, 5).map(r => ymd(r.date).slice(5) + ' ' + (r.e.start || entryTime(r.e).s || '')).join('・')}${warn.length > 5 ? '…' : ''}）：チェックはそのままです。行っていない訪問ならチェックを外してください`);
+  // 11/14 シフトがある月は、予定表だけの訪問はチェックを外して出す（記録に入れない）→ どれが外れたかを参考に出す（点検サイトの「シフトと予定表」でも見られる）
+  const offMiss = recRows.filter(r => r.on === false && /シフトに無い予定（記録に入れない/.test(r.flag || ''));
+  if (offMiss.length) out.push(`（参考）予定表にあってシフトに無い予定が ${offMiss.length} 件（${offMiss.slice(0, 5).map(r => ymd(r.date).slice(5) + ' ' + (r.e.start || entryTime(r.e).s || '')).join('・')}${offMiss.length > 5 ? '…' : ''}）：記録には入れていません。行った日はその行のチェックを入れてください（点検サイトの「シフトと予定表」でも見られます）`);
   if (similarNames(name).length) out.push(`似た名前の利用者がいます：${similarNames(name).join('・')}`);
   return out;
 }
