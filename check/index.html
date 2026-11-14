@@ -40,7 +40,7 @@
 <body>
 <main>
   <h1>記録の点検</h1>
-  <p class="sub">週間予定表ツールとは別に作った点検です。保存先は読むだけで、記録は変えません。直すときは週間予定表ツールで直してください。</p>
+  <p class="sub">週間予定表ツールとは別に作った点検です。点検は読むだけで、記録は変えません。「チェック確認表」の「✓ 記録に当てる」を押したときだけ、週間予定表ツール本体を裏で開いて、ツールと同じ決まりで保存します。</p>
 
   <div class="card">
     <div class="row">
@@ -63,7 +63,7 @@
 
   <div id="sheetView" style="display:none">
     <div class="card"><div class="row"><label>利用者 <select id="shWho" onchange="renderSheet()"></select></label><label>月 <select id="shMonth" onchange="renderSheet()"></select></label><label>出す項目 <select id="shRows" onchange="renderSheet()"><option value="used" selected>付いている・見本・計の項目だけ</option><option value="all">全部の項目</option></select></label><button onclick="sheetCopy()">表示中の結果をコピー</button></div>
-    <div class="muted" style="margin-top:4px">列＝予定表の時間（開始時刻・種別・曜日）。☑＝その時間の記録の半分以上で付いている項目　<b>3/9</b>＝一部の日だけ付いている（9件中3件）。<span class="mk">見</span>＝見本（記録用紙）で付ける　<span class="mk">○</span>＝見本の丸囲み（予定表に書いてある日だけ）　<span class="mk">計</span>＝手順書（計画書）にある（点検サイトが手順書から読んだ物）。<br><span class="cx extra">赤</span>＝見本に無いのに付いている　<span class="cx miss">黄</span>＝見本にあるのに付いていない　<span class="cx why">灰</span>＝見本と違うが理由がある（決まり・手順書・文章から・手で足した／外した・曜日の決まり。マスに指を置くと理由）。見本の無い時間は手順書（計）で比べます。マスを押して付ける物を直し、「結果をコピー」でチャットに貼ってください（ここでは保存しません）。</div></div>
+    <div class="muted" style="margin-top:4px">列＝予定表の時間（開始時刻・種別・曜日）。☑＝その時間の記録の半分以上で付いている項目　<b>3/9</b>＝一部の日だけ付いている（9件中3件）。<span class="mk">見</span>＝見本（記録用紙）で付ける　<span class="mk">○</span>＝見本の丸囲み（予定表に書いてある日だけ）　<span class="mk">計</span>＝手順書（計画書）にある（点検サイトが手順書から読んだ物）。<br><span class="cx extra">赤</span>＝見本に無いのに付いている　<span class="cx miss">黄</span>＝見本にあるのに付いていない　<span class="cx why">灰</span>＝見本と違うが理由がある（決まり・手順書・文章から・手で足した／外した・曜日の決まり。マスに指を置くと理由）。見本の無い時間は手順書（計）で比べます。マスを押して付ける物を直し、「✓ 記録に当てる」を押すと、その月の記録と予定表の枠に入ります（ツールの📋チェック確認表の「当てる」と同じ：チェックに合わせて文章もそろえる・締めた月は変えない・変更履歴に名前が残る）。</div></div>
     <div id="sheetBody"></div>
   </div>
 
@@ -521,7 +521,7 @@ function renderSheet() {
   const names = who ? [who] : sheetNames(ym);
   const cards = names.map((n, ni) => { const S = sheetFor(n, ym); if (!S) return null; const C = S.cols;
     if (!C.length) return { diff: 0, html: `<details class="card"><summary><b>${esc(n)}</b>　<span class="muted">予定表の時間に合う記録がありません（記録${S.other}件）</span></summary></details>` };
-    let diff = 0; C.forEach(c => CK_KEYS.forEach(k => { const x = cellState(c, k); if (x.extra || x.miss) diff++; }));
+    let diff = 0, chgN = 0; C.forEach(c => CK_KEYS.forEach(k => { const x = cellState(c, k); if (x.extra || x.miss) diff++; if (x.chg) chgN++; }));
     const head = `<tr><th>項目</th>${C.map(c => `<th class="c">${esc(colLabel(c))}<br><small>記録${c.rows.length}件${c.tmpl ? `・見本p${esc(c.tmpl.page || '?')}` : '・見本なし'}${c.planNo ? `・手順書No.${esc(c.planNo)}` : ''}</small></th>`).join('')}</tr>`;
     const body = CK_ITEMS.map(([lb, cat, its]) => { const rows = its.map(it => { const k = cat + '|' + it, st = C.map(c => cellState(c, k));
         if (!allRows && !st.some(x => x.on || x.inT || x.circ || x.inP) && !C.some(c => c.cnt[k])) return '';
@@ -530,9 +530,9 @@ function renderSheet() {
           return `<td class="c ${x.extra ? 'extra' : ''} ${x.miss ? 'miss' : ''} ${x.why ? 'why' : ''} ${x.chg ? 'chg' : ''}" title="${esc(tip)}"><input type="checkbox" ${x.on ? 'checked' : ''} onclick="sheetToggle(${ni},${ci},'${k}')">${part}${x.inT ? '<span class="mk">見</span>' : ''}${x.circ ? '<span class="mk">○</span>' : ''}${x.inP ? '<span class="mk">計</span>' : ''}</td>`; }).join('')}</tr>`; }).join('');
       return rows ? `<tr><td class="cat" colspan="${1 + C.length}">${esc(lb)}</td></tr>` + rows : ''; }).join('');
     const notes = [S.other ? `予定表の時間に合わない記録 ${S.other}件（表に入れていません）` : '', S.empty.length ? `記録の無い予定表の時間：${S.empty.map(c => esc(colLabel(c))).join('／')}` : '', S.closed ? '締めた月です（見るだけ）' : ''].filter(Boolean).join('　');
-    return { diff, html: `<details class="card" ${who || diff ? 'open' : ''}><summary><b>${esc(n)}</b>　${esc(ym)}・時間${C.length}列${diff ? `・<b style="color:var(--bad)">見本（無い時間は手順書）と違うマス ${diff}</b>` : '・違うマスなし'}</summary>
+    return { diff, html: `<details class="card" ${who || diff || chgN || S.msg ? 'open' : ''}><summary><b>${esc(n)}</b>　${esc(ym)}・時間${C.length}列${diff ? `・<b style="color:var(--bad)">見本（無い時間は手順書）と違うマス ${diff}</b>` : '・違うマスなし'}</summary>
       ${notes ? `<div class="muted">${notes}</div>` : ''}<div class="sh"><table><thead>${head}</thead><tbody>${body}</tbody></table></div>
-      <div class="row" style="margin-top:6px"><button onclick="sheetCopy(${ni})">${esc(n)}さんの結果をコピー</button><button onclick="sheetReset(${ni})">元に戻す</button></div></details>` }; }).filter(Boolean);
+      <div class="row" style="margin-top:6px"><button class="primary" onclick="sheetApply(${ni})" ${chgN && !S.closed ? '' : 'disabled'}>✓ 記録に当てる（${chgN}か所）</button><button onclick="sheetReset(${ni})">元に戻す</button><button onclick="sheetCopy(${ni})">結果をコピー</button>${S.closed ? '<span class="muted">締めた月は当てられません</span>' : chgN ? '<span class="muted">青い枠＝変えたマス</span>' : ''}</div>${S.msg ? `<div class="${S.msgOk ? 'okbox' : 'card'}" style="margin-top:6px;white-space:pre-wrap">${esc(S.msg)}</div>` : ''}</details>` }; }).filter(Boolean);
   cards.sort((a, b) => (b.diff > 0) - (a.diff > 0)); const nd = cards.filter(c => c.diff).length;
   box.innerHTML = cards.length ? `<div class="card"><b>${cards.length}人を表示</b>　${nd ? `<b style="color:var(--bad)">違うマスのある人 ${nd}人</b>（上に出しています）` : '違うマスはありません'}</div>` + cards.map(c => c.html).join('') : '<div class="card muted">この月の記録がありません</div>';
 }
@@ -544,6 +544,36 @@ function sheetCopy(ni) {
   const ym = document.getElementById('shMonth').value, names = ni == null ? (document.getElementById('shWho').value ? [document.getElementById('shWho').value] : sheetNames(ym)) : [sheetWho(ni)];
   const t = names.map(x => sheetText(x, ym)).filter(Boolean).join('\n\n'); if (!t) { alert('コピーする物がありません'); return; }
   const manual = () => prompt('コピーしてください', t); try { navigator.clipboard.writeText(t).then(() => alert('コピーしました'), manual); } catch (e) { manual(); }
+}
+// ===== チェック確認表の「✓ 記録に当てる」（11/14 ユーザー「点検サイトで修正できるようにして欲しい」）=====
+//   点検サイトは保存先に書かない。週間予定表ツール本体を見えない枠（同じサイトの ../?autoqa=1）で開き、ツールの _checkSiteApply（📋チェック確認表の「当てる」と同じ）を呼んで保存してもらう
+//   当てる前に、その人のその月の記録と予定表の写しをこの端末に残す（最新5回分）。だれが直したかはツールの変更履歴に残る
+function toolFrame() {
+  return new Promise((ok, ng) => { const f = document.createElement('iframe'); f.style.cssText = 'position:fixed;width:1px;height:1px;left:-9999px;top:-9999px;border:0'; f.src = '../?autoqa=1&checksite=1&t=' + Date.now(); document.body.appendChild(f);
+    const t0 = Date.now(), tick = () => { let w = null; try { w = f.contentWindow; if (w && w._bgReady && typeof w._checkSiteApply === 'function') return ok({ f, w }); } catch (e) { f.remove(); return ng(new Error('ツールを開けません（' + e.message + '）')); }
+      if (Date.now() - t0 > 180000) { f.remove(); return ng(new Error('ツールの読み込みが3分で終わりませんでした')); } setTimeout(tick, 1000); }; setTimeout(tick, 1500); });
+}
+async function sheetApply(ni) {
+  const ym = document.getElementById('shMonth').value, n = sheetWho(ni), S = sheetFor(n, ym); if (!S || S.closed) return;
+  const changes = []; S.cols.forEach(c => CK_KEYS.forEach(k => { if (c.now.has(k) !== c.init.has(k)) changes.push({ start: c.start, type: c.type, days: [...c.days], k, on: c.now.has(k), label: colLabel(c) }); }));
+  if (!changes.length) { alert('変えたマスがありません'); return; }
+  let who = (lsGet('smilewan_actor') || '').trim(); if (!who) { who = (prompt('直した人の名前を入れてください（変更履歴に残ります）') || '').trim(); if (!who) return; lsSet('smilewan_actor', who); }
+  const lines = changes.map(x => `【${x.label}】${x.on ? '＋' : '－'}${x.k.replace('|', '：')}`);
+  if (!confirm(`${n}さん ${ym} に次のとおり当てます（${who}）。\n\n${lines.join('\n')}\n\n・その時間の予定表の枠（これから作る記録）と、${ym} の記録に入ります\n・チェックと文章が合わなくなった訪問は、その訪問の文章だけツールの決まりで直します\n・締めた月は変えません\n\nよろしいですか？`)) return;
+  try { const B = JSON.parse(lsGet('smilewan_check_backup') || '[]'); B.push({ at: new Date().toISOString(), who, name: n, ym, changes, record: DATA.records.find(d => d.name === n && d.month === ym) || null, schedule: DATA.schedules.find(x => nameKey(x.name) === nameKey(n)) || null }); lsSet('smilewan_check_backup', JSON.stringify(B.slice(-5))); } catch (e) {}
+  const st = document.getElementById('status'); S.msg = '当てています…（ツールを裏で開いています。1〜2分かかります。この画面を閉じないでください）'; S.msgOk = false; renderSheet();
+  let fr = null, r = null;
+  try { st.textContent = 'ツールを開いています'; fr = await toolFrame(); st.textContent = '当てています'; r = await fr.w._checkSiteApply(n, ym, changes.map(({ label, ...x }) => x)); }
+  catch (e) { r = { ok: false, error: e.message, msgs: [] }; }
+  finally { if (fr) fr.f.remove(); }
+  // 読み直す（その人の記録・予定表）
+  try { const j = await call({ op: 'records', client: n }); DATA.records = DATA.records.filter(d => d.name !== n).concat((j.docs || []).map(d => d.data)); const L = await call({ op: 'list', kinds: ['schedules'] }); DATA.schedules = L.docs.filter(d => d.kind === 'schedules').map(d => d.data); FOUND = check(DATA); render(); } catch (e) {}
+  Object.keys(SHEET).filter(id => id.startsWith(n + '|')).forEach(id => delete SHEET[id]); const S2 = sheetFor(n, ym);
+  if (r && r.ok) { const bad = (r.res || []).filter(x => x.ok < x.n);
+    S2.msg = r.nothing ? r.msgs.join('\n') : `当てました（${who}）。\n` + (r.res || []).map(x => `${x.on ? '＋' : '－'}${x.k.replace('|', '：')} ${x.start}：${x.ok}/${x.n}訪問`).join('\n') + (bad.length ? '\n\n※ 決まりで変わらなかった訪問があります（付けられない日・体調不良の日など）。' : '') + (r.msgs.length ? '\n\nツールから：\n' + r.msgs.filter(m => !/よろしいですか/.test(m)).join('\n') : '');
+    S2.msgOk = !bad.length; st.textContent = `${n}さん ${ym} に当てました`; }
+  else { S2.msg = '当てられませんでした：' + (r && r.error || '不明') + '\n下の表は、保存先から読み直した今の記録です。'; S2.msgOk = false; st.textContent = '当てられませんでした'; }
+  renderSheet();
 }
 async function run() {
   PASS = document.getElementById('pass').value.trim(); if (!PASS) { alert('合言葉を入れてください'); return; }
