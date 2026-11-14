@@ -328,7 +328,7 @@ function renderTmpl() {
     const lines = mine.map(r => { const dow = new Date(r.date + 'T00:00:00').getDay(), kp = shown(r), off = r.kpOff || [];
       const need = (t.checked || []).filter(k => k !== '食事|完食' && !((t.dayOnly || {})[k] && !t.dayOnly[k].includes(dow)) && !(t.either || []).some(g => g.includes(k)) && !(r.sick && /入浴介助|清拭|身体整容\|整容/.test(k)));
       const miss = need.filter(k => !kp.includes(k)).map(k => ({ k, why: off.includes(k) ? '手で外した' : '' }));
-      const extra = kp.filter(k => !(t.checked || []).includes(k) && !(t.circled || []).includes(k)).map(k => ({ k, why: extraWhy(k, r, byDay[r.date] || [], DATA, t.name) }));
+      const extra = kp.filter(k => !(t.checked || []).includes(k) && !(t.circled || []).includes(k)).map(k => ({ k, why: (t.either || []).some(g => g.includes(k)) ? '見本で「どちらか」（日ごとに交互）' : extraWhy(k, r, byDay[r.date] || [], DATA, t.name) }));
       return { r, dow, miss, extra, bad: miss.filter(x => !x.why).length + extra.filter(x => !x.why).length };
     });
     const diff = lines.filter(l => l.miss.length || l.extra.length), bad = lines.filter(l => l.bad);
@@ -504,7 +504,8 @@ function fillSheetSelects() {
 const SCHED_RE = { '清掃|台所': /調理|朝食|昼食|夕食|配膳|弁当|台所/, '清掃|卓上': /調理|朝食|昼食|夕食|配膳|弁当|卓上|テーブル/, '清掃|浴室': /入浴|シャワー|お風呂|風呂|浴室/, '清掃|トイレ': /トイレ/, '清掃|居室': /起床|就寝|居室|部屋|掃除/, '清掃|ゴミ出し': /ゴミ/,
   '起床・就寝|就寝介助': /就寝/, '起床・就寝|起床介助': /起床/, '入浴・清拭|入浴介助': /入浴/, '洗濯|洗濯': /洗濯/, '買物等|日常品等の買物': /買い物|買物/, '調理|調理': /調理|朝食|昼食|夕食/, '服薬・医療|服薬介助・確認': /服薬|薬/, '身体整容|更衣介助': /更衣|着替/, '身体整容|洗面': /洗面/, '排泄|トイレ介助': /トイレ/, '衣類・寝具|シーツ・カバー交換': /シーツ/, '衣類・寝具|衣類の整理': /衣類/ };
 function cellWhy(c, k, kind) { const id = kind + k; if (id in c.why) return c.why[id]; let why = '';
-  if (kind === 'extra') { const rs = c.rows.filter(r => shown(r).includes(k)), ws = rs.map(r => extraWhy(k, r, c.byDay[r.date] || [], DATA, c.name)); if (rs.length && ws.every(Boolean)) { const n = {}; ws.forEach(w => { n[w] = (n[w] || 0) + 1; }); why = Object.keys(n).sort((a, b) => n[b] - n[a])[0]; }
+  if (kind === 'extra' && c.tmpl && (c.tmpl.either || []).some(g => g.includes(k))) why = '見本で「どちらか」（日ごとに交互）';
+  else if (kind === 'extra') { const rs = c.rows.filter(r => shown(r).includes(k)), ws = rs.map(r => extraWhy(k, r, c.byDay[r.date] || [], DATA, c.name)); if (rs.length && ws.every(Boolean)) { const n = {}; ws.forEach(w => { n[w] = (n[w] || 0) + 1; }); why = Object.keys(n).sort((a, b) => n[b] - n[a])[0]; }
     const sd = (c.e.type || '') + ' ' + (c.e.detail || ''); if (!why && SCHED_RE[k] && SCHED_RE[k].test(sd)) why = `予定表に書いてある（「${(sd.match(SCHED_RE[k]) || [''])[0]}」）`; }
   else { const t = c.tmpl, rs = c.rows.filter(r => { const dow = new Date(r.date + 'T00:00:00').getDay(); return !(t && t.dayOnly && t.dayOnly[k] && !t.dayOnly[k].includes(dow)) && !(r.sick && /入浴介助|清拭|身体整容\|整容/.test(k)); });
     if (k === '食事|完食') why = '完食は日によって'; else if (t && (t.either || []).some(g => g.includes(k))) why = '見本で「どちらか」の項目'; else if (t && t.dayOnly && t.dayOnly[k]) why = '見本で曜日を決めた項目';
