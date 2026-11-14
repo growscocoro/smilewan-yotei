@@ -49,20 +49,27 @@
     <div class="bar"><div id="bar"></div></div>
   </div>
 
+  <div class="row" style="margin:6px 0"><button id="tabFind" class="primary" onclick="setTab('find')">点検の一覧</button><button id="tabTmpl" onclick="setTab('tmpl')">チェックリスト（見本）から見る</button></div>
   <div id="result"></div>
+  <div id="tmplView" style="display:none">
+    <div class="card"><div class="row"><label>利用者 <select id="tmplWho" onchange="renderTmpl()"></select></label><label>月 <select id="tmplMonth" onchange="renderTmpl()"></select></label><label>出す物 <select id="tmplDiffOnly" onchange="renderTmpl()"><option value="bad">理由なしだけ</option><option value="diff" selected>違うもの</option><option value="all">全部</option></select></label></div>
+    <div class="muted" style="margin-top:4px">●＝見本で付ける項目　○＝丸囲み（予定表のその訪問に書いてある日だけ付ける）。訪問ごとに「見本にあるのに無い」と「見本に無いのに付いている（理由）」を出します。<span class="tag closed">灰</span>決まり・手順書・手で足した物　<span class="tag warn">黄</span>文章から拾った物　<span class="tag bad">赤</span>理由なし（確かめてほしい所）</div></div>
+    <div id="tmplBody"></div>
+  </div>
 
   <details class="card">
     <summary>点検している決まり</summary>
     <div id="rules" class="muted"></div>
   </details>
 
-  <div class="card"><b>これまでの点検</b><div id="hist" class="muted"></div></div>
+  <div class="card"><div class="row" style="justify-content:space-between"><b>毎朝の点検の記録（Macで自動・6:30）</b><button onclick="loadMorning()">読む</button></div><div id="morning" class="muted">「点検する」か「読む」を押すと出ます</div></div>
+  <div class="card"><b>この端末で点検した記録</b><div id="hist" class="muted"></div></div>
 </main>
 <script>
 'use strict';
 // ===== 保存先（読むだけ） =====
 const GAS_URL = 'https://script.google.com/macros/s/AKfycbxKEAUthQx9wiZKncHZR43jbSKjPfO2lYhlc2K5yXWJNXI_zA8wChdQTFlINEhLTDQO/exec';
-const READ_OPS = new Set(['list', 'meta', 'records', 'get']); // 書き込み（put・del など）は送らない
+const READ_OPS = new Set(['list', 'meta', 'records', 'get', 'status']); // status＝毎朝の点検の記録を読むだけ // 書き込み（put・del など）は送らない
 async function call(body) {
   if (!READ_OPS.has(body.op)) throw new Error('この点検では保存先に書き込みません');
   for (let k = 0; k < 6; k++) {
@@ -127,6 +134,9 @@ const MENTION = [
   ['清掃|居室', /掃除|清掃|掃除機|拭/], ['排泄|トイレ介助', /トイレ|排泄/], ['排泄|おむつ交換', /おむつ|オムツ|リハパン|リハビリパンツ/], ['排泄|パッド交換', /パッド|パット/], ['起床・就寝|起床介助', /起床|起き/], ['服薬・医療|服薬介助・確認', /薬|服用/], ['自立支援|服薬', /薬|服用/],
 ];
 
+// ユーザーが「そのまま」と決めた物（ミスの件数から分けて出す）
+const KEEP = [{ cat: '金額', who: '西村 侑也', why: '見積りが預かり金の上限5,000円を超える（11/8 ユーザー「そのまま」）' }];
+const kept = x => KEEP.find(k => k.cat === x.cat && k.who === x.who);
 // ===== 読み込み =====
 let DATA = null, FOUND = [];
 async function load(progress) {
@@ -167,11 +177,12 @@ function check(D) {
   [...new Set(D.records.map(r => r.name))].forEach(n => { if (!D.schedules.some(s => s.name === n)) add('名前の重複', n, '', '', '', '記録はあるのに、同じ名前の予定表が無い（消し忘れの重複かも）'); });
   // 利用者の設定
   [...new Set(D.records.map(r => r.name))].forEach(n => { const c = clientOf(n), s = schedOf(n) || {};
-    if (!c.minzen && /眠前薬/.test(JSON.stringify(c.procedures || '') + JSON.stringify(s.days || ''))) add('利用者の設定', n, '', '', '', '手順書か予定表に「眠前薬」があるのに、眠前薬の「あり／なし」が未設定');
+    const kg = c.kubun === '介護' || (!c.kubun && /身体\s*\d|生活\s*\d/.test(JSON.stringify(s.days || '')));
+    if (!kg && !c.minzen && /眠前薬/.test(JSON.stringify(c.procedures || '') + JSON.stringify(s.days || ''))) add('利用者の設定', n, '', '', '', '手順書か予定表に「眠前薬」があるのに、眠前薬の「あり／なし」が未設定');
     if (!c.assessment || !Object.keys(c.assessment).length) add('利用者の設定', n, '', '', '', 'アセスメントが入っていない'); });
   for (const doc of D.records) {
     if (!D.schedules.some(s => s.name === doc.name)) continue; // 予定表の無い名前の記録（重複）は「名前の重複」だけに出す
-    const n = doc.name, ym = doc.month, c = clientOf(n), mz = c.minzen || '', a = c.assessment || {}, medNeed = mz === 'あり' || !Object.keys(a).length || (a.needs || []).some(x => /服用|服薬/.test(x)) || (a.notes || []).includes('服薬忘れ');
+    const n = doc.name, ym = doc.month, c = clientOf(n), kaigo = c.kubun === '介護' || (!c.kubun && /身体\s*\d|生活\s*\d/.test(JSON.stringify((schedOf(n) || {}).days || ''))), mz = kaigo ? 'なし' : (c.minzen || ''), /* 介護の方は眠前薬なし（11/13） */ a = c.assessment || {}, medNeed = mz === 'あり' || !Object.keys(a).length || (a.needs || []).some(x => /服用|服薬/.test(x)) || (a.notes || []).includes('服薬忘れ');
     const rows = (doc.rows || []).filter(r => r.date && r.start !== undefined).slice().sort((x, y) => x.date.localeCompare(y.date) || (hm(x.start) ?? 0) - (hm(y.start) ?? 0));
     const byDay = {}; rows.forEach(r => { (byDay[r.date] = byDay[r.date] || []).push(r); });
     const A = (cat, r, msg) => add(cat, n, ym, r.date, r.start, `${r.type || ''}：${msg}`);
@@ -240,15 +251,16 @@ function check(D) {
 // ===== 画面 =====
 function render() {
   const box = document.getElementById('result'); if (!DATA) { box.innerHTML = ''; return; }
-  const showClosed = document.getElementById('showClosed').checked, showNew = document.getElementById('showClosedNew').checked, L = FOUND.filter(x => !x.closed || (showClosed && (showNew || !NEW.has(x.cat))));
-  if (!L.length) { box.innerHTML = '<div class="card okbox">見つかったミスはありません。</div>'; return; }
+  const showClosed = document.getElementById('showClosed').checked, showNew = document.getElementById('showClosedNew').checked, L0 = FOUND.filter(x => !x.closed || (showClosed && (showNew || !NEW.has(x.cat)))), L = L0.filter(x => !kept(x)), K = L0.filter(x => kept(x));
+  const keptHtml = K.length ? `<details class="card"><summary><b>そのままと決めた物</b>（${K.length}件・ミスの件数には入れていません）</summary>${KEEP.map(k => { const n = K.filter(x => x.cat === k.cat && x.who === k.who).length; return n ? `<div class="item">${esc(k.who)}：${esc(k.cat)} ${n}件　${esc(k.why)}</div>` : ''; }).join('')}</details>` : '';
+  if (!L.length) { box.innerHTML = '<div class="card okbox">見つかったミスはありません。</div>' + keptHtml; return; }
   const cats = RULES.map(([k]) => k).filter(k => L.some(x => x.cat === k));
   const sum = cats.map(k => { const xs = L.filter(x => x.cat === k); return `<tr class="click" onclick="document.getElementById('cat-${RULES.findIndex(r => r[0] === k)}').open=true;document.getElementById('cat-${RULES.findIndex(r => r[0] === k)}').scrollIntoView()"><td><span class="tag ${SEV[k]}">${SEV[k] === 'bad' ? 'ミス' : '確認'}</span>${esc(k)}</td><td class="n">${xs.length}件</td><td class="n">${new Set(xs.map(x => x.who)).size}人</td><td class="muted">${esc([...new Set(xs.map(x => x.month).filter(Boolean))].sort().join('・'))}</td></tr>`; }).join('');
   const list = cats.map(k => { const xs = L.filter(x => x.cat === k), by = {}; xs.forEach(x => { (by[x.who] = by[x.who] || []).push(x); });
     return `<details class="card" id="cat-${RULES.findIndex(r => r[0] === k)}"><summary><b>${esc(k)}</b>（${xs.length}件）<span class="muted">　${esc(RULES.find(r => r[0] === k)[2])}</span></summary>` +
       Object.entries(by).map(([who, ys]) => `<div class="who">${esc(who)}（${ys.length}件）</div>` + ys.slice(0, 200).map(y => `<div class="item">${y.closed ? '<span class="tag closed">締めた月</span>' : ''}${esc((y.date || y.month || '').replace(/^2026-/, ''))} ${esc(y.start || '')}　${esc(y.msg)}</div>`).join('') + (ys.length > 200 ? `<div class="muted">ほか${ys.length - 200}件</div>` : '')).join('') + '</details>'; }).join('');
   const bad = L.filter(x => SEV[x.cat] === 'bad').length;
-  box.innerHTML = `<div class="card"><div class="row" style="justify-content:space-between"><b>見つかった所 ${L.length}件（ミス ${bad}件・確認 ${L.length - bad}件）</b><button onclick="saveCsv()">一覧をCSVで保存</button></div><table><tr><th>種類</th><th class="n">件数</th><th class="n">人数</th><th>月</th></tr>${sum}</table></div>${list}`;
+  box.innerHTML = `<div class="card"><div class="row" style="justify-content:space-between"><b>見つかった所 ${L.length}件（ミス ${bad}件・確認 ${L.length - bad}件）</b><button onclick="saveCsv()">一覧をCSVで保存</button></div><table><tr><th>種類</th><th class="n">件数</th><th class="n">人数</th><th>月</th></tr>${sum}</table></div>${keptHtml}${list}`;
 }
 function saveCsv() {
   const q = s => '"' + String(s ?? '').replace(/"/g, '""') + '"';
@@ -261,6 +273,62 @@ function renderHist() {
   let h = []; try { h = JSON.parse(lsGet('smilewan_check_hist') || '[]'); } catch (e) {}
   document.getElementById('hist').innerHTML = h.length ? '<table><tr><th>日時</th><th class="n">ミス</th><th class="n">確認</th><th class="n">うち締めていない月</th></tr>' + h.slice(-10).reverse().map(x => `<tr><td>${esc(x.at)}</td><td class="n">${x.bad}</td><td class="n">${x.warn}</td><td class="n">${x.open}</td></tr>`).join('') + '</table>' : 'まだありません（この端末で点検した結果だけ残ります）';
 }
+// ===== チェックリスト（見本）から見る（11/14 ユーザー「チェックリストの一覧開いてそこから違うものを出せるようにしてほしい」）=====
+let TAB = 'find';
+function setTab(t) { TAB = t; document.getElementById('result').style.display = t === 'find' ? '' : 'none'; document.getElementById('tmplView').style.display = t === 'tmpl' ? '' : 'none';
+  document.getElementById('tabFind').className = t === 'find' ? 'primary' : ''; document.getElementById('tabTmpl').className = t === 'tmpl' ? 'primary' : '';
+  if (t === 'tmpl') { if (!DATA) { document.getElementById('tmplBody').innerHTML = '<div class="card muted">先に「点検する」を押して、記録を読み込んでください。</div>'; return; } fillTmplSelects(); renderTmpl(); } }
+const tmplsAll = () => (((DATA.settings.checkTemplates || {}).list) || []);
+function fillTmplSelects() {
+  const who = document.getElementById('tmplWho'), mon = document.getElementById('tmplMonth'), names = [...new Set(tmplsAll().map(t => t.name))].sort((a, b) => a.localeCompare(b, 'ja'));
+  if (!who.options.length) who.innerHTML = '<option value="">（全員）</option>' + names.map(n => `<option>${esc(n)}</option>`).join('');
+  const ms = [...new Set(DATA.records.map(d => d.month))].sort().reverse(); if (!mon.options.length) mon.innerHTML = ms.map(m => `<option>${m}</option>`).join('');
+}
+// 見本に無いのに付いている物の理由（ツールの決まりの一覧から。分からない物は「理由なし」）
+function extraWhy(k, r, day, D, n) {
+  const kp = shown(r), c = D.clients.find(x => nameKey(x.name) === nameKey(n)) || {}, steps = JSON.stringify(c.procedures || ''), body = day.filter(isBody), last = body[body.length - 1];
+  if ((r.kpOn || []).includes(k)) return '手で足した';
+  if (r.sick && /^入浴・清拭\|(シャワー浴|清拭)$/.test(k)) return '体調不良の日';
+  if (k === '自立支援|服薬' && last === r) return '決まり：夜の訪問・最後の入浴は服薬の声かけ';
+  if (k === '服薬・医療|服薬介助・確認' && isTogether(r)) return '決まり26：共には服薬確認';
+  if (k === '清掃|ゴミ出し' && kp.includes('調理|調理')) return '決まり30：調理はゴミ出し';
+  if (k === '清掃|居室' && kp.some(x => x.startsWith('清掃|') && x !== k)) return '決まり6：清掃があれば居室';
+  if (k === '自立支援|起床就寝介助' && kp.some(x => /^起床・就寝\|/.test(x))) return '決まり7：起床・就寝介助';
+  if (/^衣類・寝具\|(シーツ・カバー交換|ベッドメイク)$/.test(k)) return '決まり22：シーツは週1回';
+  if (/^調理\|(下拵え|配・下膳)$/.test(k) && kp.includes('調理|調理')) return '決まり：調理の3つ';
+  if (k === '洗濯|乾燥（物干し）' && kp.includes('洗濯|洗濯')) return '決まり：洗濯と物干し';
+  if (k === '食事|水分補給' && r.vin && r.vin.水分) return '記録欄に水分の量'; if (k === '入浴・清拭|シャワー浴' && /シャワー/.test((r.detail || '') + (r.type || ''))) return '予定表にシャワー';
+  if (/^清掃\|/.test(k) && hm(r.end) - hm(r.start) >= 90 && !kp.includes('調理|調理')) return '決まり20：長い家事は清掃';
+  const W = { 洗濯: /洗濯/, '乾燥（物干し）': /干/, 居室: /掃除|清掃|居室/, トイレ: /トイレ/, 卓上: /卓上|テーブル|食卓/, 台所: /台所|キッチン|シンク|洗い物/, 浴室: /浴室|風呂/, 玄関: /玄関/, ゴミ出し: /ゴミ/, 調理: /調理|作/, 下拵え: /下拵|切/, '配・下膳': /配膳|下膳/, '服薬介助・確認': /服薬|薬/, 起床介助: /起床/, 就寝介助: /就寝/, 洗面: /洗面/, 口腔ケア: /歯磨|口腔/, 更衣介助: /更衣|着替/, 整容: /整容|髭|整髪/, トイレ介助: /トイレ|排泄/, 衣類の整理: /衣類/, 日常品等の買物: /買い物|買物|代行/, 洗髪: /洗髪/, 入浴介助: /入浴/, 被服の補修: /補修|繕|ボタン|裾/, '衣類の整理・被服の補修': /衣類|補修|繕/, '清拭・入浴・身体整容': /入浴|清拭|整容|洗身/, 服薬: /服薬|薬/, '排泄・食事': /排泄|トイレ|食事/, 掃除: /掃除|清掃/, '一般的な調理・配下膳': /調理|配膳/, ベッドメイク: /ベッド|シーツ/, '買い物・薬の受け取り': /買い物|買物|代行|薬/ }, it = k.split('|')[1];
+  if (W[it] && W[it].test(steps)) return '手順書にある（決まり25）';
+  if ((r.kpText || []).includes(k)) return '文章から（文章に書いてあるので付いた）';
+  return '';
+}
+function renderTmpl() {
+  const box = document.getElementById('tmplBody'); if (!DATA) return; const who = document.getElementById('tmplWho').value, ym = document.getElementById('tmplMonth').value, mode = document.getElementById('tmplDiffOnly').value, only = mode !== 'all';
+  const T = tmplsAll().filter(t => !who || t.name === who).sort((a, b) => a.name.localeCompare(b.name, 'ja') || (hm(a.start) - hm(b.start)));
+  const DOW = '日月火水木金土'; const cards = []; let shownN = 0;
+  T.forEach(t => {
+    const doc = DATA.records.find(d => d.name === t.name && d.month === ym); if (!doc) return;
+    const rows = (doc.rows || []).filter(r => r.date && r.start), byDay = {}; rows.forEach(r => { (byDay[r.date] = byDay[r.date] || []).push(r); }); Object.values(byDay).forEach(a => a.sort((x, y) => hm(x.start) - hm(y.start)));
+    const fam = /家事/.test(t.type || ''), mine = rows.filter(r => { const dow = new Date(r.date + 'T00:00:00').getDay(); return (t.days || []).includes(dow) && Math.abs(hm(r.start) - hm(t.start)) <= 10 && (r.kind === '家事援助') === fam; }).sort((a, b) => a.date.localeCompare(b.date));
+    const lines = mine.map(r => { const dow = new Date(r.date + 'T00:00:00').getDay(), kp = shown(r), off = r.kpOff || [];
+      const need = (t.checked || []).filter(k => k !== '食事|完食' && !((t.dayOnly || {})[k] && !t.dayOnly[k].includes(dow)) && !(t.either || []).some(g => g.includes(k)) && !(r.sick && /入浴介助|清拭|身体整容\|整容/.test(k)));
+      const miss = need.filter(k => !kp.includes(k)).map(k => ({ k, why: off.includes(k) ? '手で外した' : '' }));
+      const extra = kp.filter(k => !(t.checked || []).includes(k) && !(t.circled || []).includes(k)).map(k => ({ k, why: extraWhy(k, r, byDay[r.date] || [], DATA, t.name) }));
+      return { r, dow, miss, extra, bad: miss.filter(x => !x.why).length + extra.filter(x => !x.why).length };
+    });
+    const diff = lines.filter(l => l.miss.length || l.extra.length), bad = lines.filter(l => l.bad);
+    if (only && !diff.length) return; if (mode === 'bad' && !bad.length) return; shownN++;
+    const item = (k, why) => `<span class="tag ${!why ? 'bad' : /^文章/.test(why) ? 'warn' : 'closed'}" title="${esc(why || '理由なし')}">${esc(k.split('|')[1])}${why ? '' : '（理由なし）'}</span>`;
+    const rowsHtml = (mode === 'bad' ? bad : only ? diff : lines).map(l => `<tr><td style="white-space:nowrap">${esc(l.r.date.slice(5))}(${DOW[l.dow]})${l.r.sick ? '<br><span class="muted">体調不良</span>' : ''}</td><td>${l.miss.map(x => item(x.k, x.why)).join(' ') || '<span class="muted">—</span>'}</td><td>${l.extra.map(x => `${item(x.k, x.why)}${x.why ? `<span class="muted" style="font-size:11px">${esc(x.why)}</span>` : ''}`).join('<br>') || '<span class="muted">—</span>'}</td></tr>`).join('');
+    cards.push({ bad: bad.length, html: `<details class="card" ${bad.length ? 'open' : ''}><summary><b>${esc(t.name)}</b>　${esc(t.start)} ${esc(t.type || '')}（${(t.days || []).map(d => DOW[d]).join('')}曜・用紙p${esc(t.page || '?')}）　訪問${mine.length}件・違う${diff.length}件${bad.length ? `・<b style="color:var(--bad)">理由なし${bad.length}件</b>` : ''}</summary>
+      <div class="muted" style="margin:4px 0">見本：${(t.checked || []).map(k => '●' + esc(k.split('|')[1])).join(' ')} ${(t.circled || []).map(k => '○' + esc(k.split('|')[1])).join(' ')}</div>
+      ${mine.length ? `<table><tr><th>日</th><th>見本にあるのに無い</th><th>見本に無いのに付いている（理由）</th></tr>${rowsHtml}</table>` : '<div class="muted">この月にこの見本の訪問はありません</div>'}</details>` });
+  });
+  cards.sort((a, b) => (b.bad > 0) - (a.bad > 0)); const nb = cards.filter(c => c.bad).length;
+  box.innerHTML = cards.length ? `<div class="card"><b>見本 ${cards.length}枠を表示</b>　${nb ? `<b style="color:var(--bad)">理由なしのある枠 ${nb}</b>（上に出しています）` : '理由なしはありません'}</div>` + cards.map(c => c.html).join('') : `<div class="card okbox">${mode === 'bad' ? 'この月に理由なしの違いはありません。' : only ? 'この月に見本と違う訪問はありません。' : '見本がありません。'}</div>`;
+}
 async function run() {
   PASS = document.getElementById('pass').value.trim(); if (!PASS) { alert('合言葉を入れてください'); return; }
   const btn = document.getElementById('runBtn'), st = document.getElementById('status'), bar = document.getElementById('bar');
@@ -272,15 +340,23 @@ async function run() {
     const now = new Date(), bad = FOUND.filter(x => SEV[x.cat] === 'bad').length;
     st.textContent = `点検しました（${now.getMonth() + 1}/${now.getDate()} ${now.getHours()}:${String(now.getMinutes()).padStart(2, '0')}・記録 ${DATA.records.length}件）`;
     let h = []; try { h = JSON.parse(lsGet('smilewan_check_hist') || '[]'); } catch (e) {}
-    const V = FOUND.filter(x => !x.closed || !NEW.has(x.cat)), vb = V.filter(x => SEV[x.cat] === 'bad').length;
+    const V = FOUND.filter(x => (!x.closed || !NEW.has(x.cat)) && !kept(x)), vb = V.filter(x => SEV[x.cat] === 'bad').length;
     h.push({ at: `${now.getMonth() + 1}/${now.getDate()} ${now.getHours()}:${String(now.getMinutes()).padStart(2, '0')}`, bad: vb, warn: V.length - vb, open: FOUND.filter(x => !x.closed).length }); lsSet('smilewan_check_hist', JSON.stringify(h.slice(-60)));
-    render(); renderHist();
+    render(); renderHist(); loadMorning(); if (TAB === 'tmpl') setTab('tmpl');
   } catch (e) { st.textContent = '点検できませんでした：' + (e && e.message || e); }
   finally { btn.disabled = false; }
 }
 document.getElementById('rules').innerHTML = '<table>' + RULES.map(([k, s, d]) => `<tr><td><span class="tag ${s}">${s === 'bad' ? 'ミス' : '確認'}</span>${esc(k)}</td><td>${esc(d)}</td></tr>`).join('') + '</table>';
 document.getElementById('pass').value = lsGet('smilewan_pass') || '';
 renderHist();
+async function loadMorning() {
+  PASS = document.getElementById('pass').value.trim(); const box = document.getElementById('morning'); if (!PASS) { box.textContent = '合言葉を入れてください'; return; }
+  box.textContent = '読んでいます…';
+  try { const j = await call({ op: 'status' }), W = { morning: 'ツールの点検', 'morning-fail': '⚠ できなかった', 'check-site': '点検サイト', 'check-site-up': '⚠ 前の日より増えた' };
+    const L = (j.log || []).filter(x => W[x.where]).slice(-30).reverse();
+    box.innerHTML = L.length ? '<table><tr><th>日時</th><th>種類</th><th>中身</th></tr>' + L.map(x => { const t = new Date(x.t); return `<tr><td style="white-space:nowrap">${t.getMonth() + 1}/${t.getDate()} ${t.getHours()}:${String(t.getMinutes()).padStart(2, '0')}</td><td style="white-space:nowrap">${esc(W[x.where])}</td><td>${esc(x.msg || '')}</td></tr>`; }).join('') + '</table>' : 'まだ記録がありません';
+  } catch (e) { box.textContent = '読めませんでした：' + (e && e.message || e); }
+}
 window.__check = { load, check, run }; // 自動の点検（テスト）用
 </script>
 </body>
