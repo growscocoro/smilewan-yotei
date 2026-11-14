@@ -30,6 +30,10 @@
   details summary { cursor: pointer; }
   .who { font-weight: bold; margin: 10px 0 2px; }
   .item { font-size: 14px; padding: 2px 0 2px 10px; border-left: 3px solid var(--line); margin: 2px 0; }
+  .sh { overflow-x: auto; } .sh table { font-size: 13px; } .sh th.c, .sh td.c { text-align: center; min-width: 92px; } .sh td.cat { background: var(--bg); font-size: 12px; color: var(--muted); padding: 2px 6px; }
+  .mk { display: inline-block; font-size: 10px; font-weight: bold; color: var(--accent); border: 1px solid var(--accent); border-radius: 3px; padding: 0 2px; margin-left: 2px; line-height: 1.3; }
+  .cnt { font-size: 10px; color: var(--muted); margin-left: 2px; } .cx { display: inline-block; border-radius: 3px; padding: 0 4px; font-size: 11px; }
+  td.why, .cx.why { background: var(--bg); color: var(--muted); } td.extra, .cx.extra { background: var(--bad-bg); } td.miss, .cx.miss { background: var(--warn-bg); } td.chg { outline: 2px solid var(--accent); outline-offset: -2px; }
   .bar { height: 6px; background: var(--line); border-radius: 3px; overflow: hidden; margin-top: 6px; } .bar > div { height: 100%; background: var(--accent); width: 0; }
 </style>
 </head>
@@ -49,12 +53,18 @@
     <div class="bar"><div id="bar"></div></div>
   </div>
 
-  <div class="row" style="margin:6px 0"><button id="tabFind" class="primary" onclick="setTab('find')">点検の一覧</button><button id="tabTmpl" onclick="setTab('tmpl')">チェックリスト（見本）から見る</button></div>
+  <div class="row" style="margin:6px 0"><button id="tabFind" class="primary" onclick="setTab('find')">点検の一覧</button><button id="tabTmpl" onclick="setTab('tmpl')">チェックリスト（見本）から見る</button><button id="tabSheet" onclick="setTab('sheet')">チェック確認表（全員）</button></div>
   <div id="result"></div>
   <div id="tmplView" style="display:none">
     <div class="card"><div class="row"><label>利用者 <select id="tmplWho" onchange="renderTmpl()"></select></label><label>月 <select id="tmplMonth" onchange="renderTmpl()"></select></label><label>出す物 <select id="tmplDiffOnly" onchange="renderTmpl()"><option value="bad">理由なしだけ</option><option value="diff" selected>違うもの</option><option value="all">全部</option></select></label></div>
     <div class="muted" style="margin-top:4px">●＝見本で付ける項目　○＝丸囲み（予定表のその訪問に書いてある日だけ付ける）。訪問ごとに「見本にあるのに無い」と「見本に無いのに付いている（理由）」を出します。<span class="tag closed">灰</span>決まり・手順書・手で足した物　<span class="tag warn">黄</span>文章から拾った物　<span class="tag bad">赤</span>理由なし（確かめてほしい所）</div></div>
     <div id="tmplBody"></div>
+  </div>
+
+  <div id="sheetView" style="display:none">
+    <div class="card"><div class="row"><label>利用者 <select id="shWho" onchange="renderSheet()"></select></label><label>月 <select id="shMonth" onchange="renderSheet()"></select></label><label>出す項目 <select id="shRows" onchange="renderSheet()"><option value="used" selected>付いている・見本・計の項目だけ</option><option value="all">全部の項目</option></select></label><button onclick="sheetCopy()">表示中の結果をコピー</button></div>
+    <div class="muted" style="margin-top:4px">列＝予定表の時間（開始時刻・種別・曜日）。☑＝その時間の記録の半分以上で付いている項目　<b>3/9</b>＝一部の日だけ付いている（9件中3件）。<span class="mk">見</span>＝見本（記録用紙）で付ける　<span class="mk">○</span>＝見本の丸囲み（予定表に書いてある日だけ）　<span class="mk">計</span>＝手順書（計画書）にある（点検サイトが手順書から読んだ物）。<br><span class="cx extra">赤</span>＝見本に無いのに付いている　<span class="cx miss">黄</span>＝見本にあるのに付いていない　<span class="cx why">灰</span>＝見本と違うが理由がある（決まり・手順書・文章から・手で足した／外した・曜日の決まり。マスに指を置くと理由）。見本の無い時間は手順書（計）で比べます。マスを押して付ける物を直し、「結果をコピー」でチャットに貼ってください（ここでは保存しません）。</div></div>
+    <div id="sheetBody"></div>
   </div>
 
   <details class="card">
@@ -277,8 +287,9 @@ function renderHist() {
 }
 // ===== チェックリスト（見本）から見る（11/14 ユーザー「チェックリストの一覧開いてそこから違うものを出せるようにしてほしい」）=====
 let TAB = 'find';
-function setTab(t) { TAB = t; document.getElementById('result').style.display = t === 'find' ? '' : 'none'; document.getElementById('tmplView').style.display = t === 'tmpl' ? '' : 'none';
-  document.getElementById('tabFind').className = t === 'find' ? 'primary' : ''; document.getElementById('tabTmpl').className = t === 'tmpl' ? 'primary' : '';
+function setTab(t) { TAB = t; document.getElementById('result').style.display = t === 'find' ? '' : 'none'; document.getElementById('tmplView').style.display = t === 'tmpl' ? '' : 'none'; document.getElementById('sheetView').style.display = t === 'sheet' ? '' : 'none';
+  document.getElementById('tabFind').className = t === 'find' ? 'primary' : ''; document.getElementById('tabTmpl').className = t === 'tmpl' ? 'primary' : ''; document.getElementById('tabSheet').className = t === 'sheet' ? 'primary' : '';
+  if (t === 'sheet') { if (!DATA) { document.getElementById('sheetBody').innerHTML = '<div class="card muted">先に「点検する」を押して、記録を読み込んでください。</div>'; return; } fillSheetSelects(); renderSheet(); return; }
   if (t === 'tmpl') { if (!DATA) { document.getElementById('tmplBody').innerHTML = '<div class="card muted">先に「点検する」を押して、記録を読み込んでください。</div>'; return; } fillTmplSelects(); renderTmpl(); } }
 const tmplsAll = () => (((DATA.settings.checkTemplates || {}).list) || []);
 function fillTmplSelects() {
@@ -331,6 +342,208 @@ function renderTmpl() {
   cards.sort((a, b) => (b.bad > 0) - (a.bad > 0)); const nb = cards.filter(c => c.bad).length;
   box.innerHTML = cards.length ? `<div class="card"><b>見本 ${cards.length}枠を表示</b>　${nb ? `<b style="color:var(--bad)">理由なしのある枠 ${nb}</b>（上に出しています）` : '理由なしはありません'}</div>` + cards.map(c => c.html).join('') : `<div class="card okbox">${mode === 'bad' ? 'この月に理由なしの違いはありません。' : only ? 'この月に見本と違う訪問はありません。' : '見本がありません。'}</div>`;
 }
+// ===== チェック確認表（11/14「これを全員分作って点検の方に入れて」：松川さんの確認表と同じ形を全員分） =====
+//   列＝予定表の時間（開始時刻＋種別）。☑＝その月の、その時間の記録の半分以上で付いている項目。見＝見本、計＝手順書（下の表で点検サイトが読む）
+const CK_ITEMS = [['排泄', '排泄', ['トイレ介助', 'ポータブルトイレ介助', 'おむつ交換', 'パッド交換', 'リネン等交換', '陰部清潔介助', '尿器洗浄']], ['食事', '食事', ['姿勢の確保', '摂食介助', '水分補給', '完食', '食べ残しあり']], ['入浴・清拭', '入浴・清拭', ['入浴介助', 'シャワー浴', '洗髪', '部分浴', '清拭']], ['身体整容', '身体整容', ['洗面', '口腔ケア', '更衣介助', '整容']], ['移動', '移動', ['体位変換', '移乗介助', '移動介助', '外出準備介助', '帰宅受入介助', '通院介助', '買物介助']], ['起床・就寝', '起床・就寝', ['起床介助', '就寝介助']], ['服薬・医療', '服薬・医療', ['服薬介助・確認', '薬の塗布', '点眼', '痰の吸引', '浣腸', '経管栄養', '院内介助', '見守り']], ['声掛け・見守り', '自立支援', ['排泄・食事', '清拭・入浴・身体整容', '通院・外出介助', '起床就寝介助', '服薬']], ['共に行う', '自立支援', ['掃除', '洗濯', 'ベッドメイク', '衣類の整理・被服の補修', '一般的な調理・配下膳', '買い物・薬の受け取り']], ['清掃', '清掃', ['居室', 'トイレ', 'ポータブルトイレ', '卓上', '台所', '浴室', '玄関', 'ゴミ出し']], ['洗濯', '洗濯', ['洗濯', '乾燥（物干し）', '取入れ・収納', 'アイロン']], ['衣類・寝具', '衣類・寝具', ['ベッドメイク', 'シーツ・カバー交換', '布団干し', '衣類の整理', '被服の補修']], ['調理', '調理', ['調理', '下拵え', '配・下膳']], ['買物等', '買物等', ['日常品等の買物', '薬の受取り']]];
+const CK_KEYS = CK_ITEMS.flatMap(([, c, its]) => its.map(it => c + '|' + it));
+const z2h = s => String(s || '').normalize('NFKC');
+const famOf = type => /通院/.test(type || '') ? '通院' : /家事|生活/.test(type || '') && !/身体/.test(type || '') ? '家事' : '身体';
+const todOf = st => { const h = Math.floor((hm(st) ?? 720) / 60); return h < 11 ? '朝' : h < 16 ? '昼' : h < 18 ? '夕' : '夜'; };
+const DOWS = '日月火水木金土';
+function entStart(e) { if (e.start) return { s: e.start, e: e.end || '' }; const t = z2h(e.detail), m = t.match(/(\d{1,2}):(\d{2})\s*[～~〜-]\s*(\d{1,2}):(\d{2})/) || t.match(/(\d{1,2}):(\d{2})/); return m ? { s: m[1].padStart(2, '0') + ':' + m[2], e: m[3] ? m[3].padStart(2, '0') + ':' + m[4] : '' } : { s: '', e: '' }; }
+function sheetCols(name) {
+  const sc = DATA.schedules.find(x => nameKey(x.name) === nameKey(name)); if (!sc || !Array.isArray(sc.days)) return [];
+  const map = new Map();
+  [1, 2, 3, 4, 5, 6, 0].forEach(d => ['upper', 'middle', 'lower'].flatMap(k => (sc.days[d] && sc.days[d][k]) || []).forEach(e => { const t = entStart(e); if (!t.s || famOf(e.type) === '通院') return; const key = t.s + '|' + (e.type || '');
+    if (!map.has(key)) map.set(key, { key, start: t.s, end: t.e, type: e.type || '', fam: famOf(e.type), days: new Set(), e }); map.get(key).days.add(d); }));
+  return [...map.values()].sort((a, b) => hm(a.start) - hm(b.start));
+}
+function sheetColOf(cols, r) { const st = hm(r.start), dow = new Date(r.date + 'T00:00:00').getDay(), fam = famOf(r.type); if (st == null) return null;
+  const near = L => L.filter(c => Math.abs(hm(c.start) - st) <= 45).sort((a, b) => Math.abs(hm(a.start) - st) - Math.abs(hm(b.start) - st))[0];
+  return near(cols.filter(c => c.days.has(dow) && c.fam === fam)) || near(cols.filter(c => c.fam === fam)) || null; }
+const colLabel = c => `${todOf(c.start)} ${c.start}${c.end ? '〜' + c.end : ''}（${c.type || '種別なし'}・${c.days.size === 7 ? '毎日' : [...c.days].sort((a, b) => ((a + 6) % 7) - ((b + 6) % 7)).map(d => DOWS[d]).join('')}）`;
+// --- 手順書（計画書）から項目を読む（週間予定表ツールの手順書の読み方の表を写した物。ツールのプログラムは動かさない） ---
+const PROC_FEAT = { 調理: /調理|朝食|昼食|夕食|食事|配膳|メニュー/, 掃除: /掃除|清掃|片付|片づけ|整理整頓/, 洗濯: /洗濯|シーツ/, 入浴: /入浴|全身浴|洗身|湯舟|湯船|シャワー/, 買物: /買い物|買物|代行|スーパ/, 起床: /起床|起き/, 就寝: /就寝|眠前|寝る/, 服薬: /服薬|薬/, 衣類: /衣類|タンス/, 通院: /通院|受診|病院|クリニック/, 洗面: /洗面|洗顔|顔洗い|顔を(洗|拭)|歯磨き|口腔/, 身支度: /身支度|更衣|着替|洗面|洗顔|顔洗い|顔を(洗|拭)|歯磨き|口腔/ };
+const featOf = t => Object.keys(PROC_FEAT).filter(k => PROC_FEAT[k].test(t));
+const PROC_LABEL = { '更衣介助': ['身体整容|更衣介助'], '全身浴': ['入浴・清拭|入浴介助'], '入浴': ['入浴・清拭|入浴介助'], 'シャワー浴': ['入浴・清拭|シャワー浴'], '洗髪': ['入浴・清拭|洗髪'], '清拭': ['入浴・清拭|清拭'], '洗面': ['身体整容|洗面'], '口腔ケア': ['身体整容|口腔ケア'], '整容': ['身体整容|整容'],
+  'トイレ介助': ['排泄|トイレ介助'], '排泄介助': ['排泄|トイレ介助'], 'おむつ交換': ['排泄|おむつ交換'], '起床介助': ['起床・就寝|起床介助'], '就寝介助': ['起床・就寝|就寝介助'], '服薬介助': ['服薬・医療|服薬介助・確認'], '通院介助': ['移動|通院介助'], '移動介助': ['移動|移動介助'], '移乗介助': ['移動|移乗介助'], '体位変換': ['移動|体位変換'],
+  '洗面等': ['身体整容|洗面'], '食事介助': ['食事|摂食介助'], '衣類の整理・被服の補修': ['衣類・寝具|衣類の整理'], '掃除、整理整頓': ['清掃|居室'],
+  '一般的な調理・配下膳': ['調理|調理', '調理|配・下膳'], '調理': ['調理|調理'], '洗濯': ['洗濯|洗濯'], '掃除': ['清掃|居室'], '買い物': ['買物等|日常品等の買物'], 'ベッドメイク': ['衣類・寝具|ベッドメイク'], '衣類の整理': ['衣類・寝具|衣類の整理'] };
+const TEXT_KP = [
+  // 排泄
+  [/トイレ(へ|まで|に)?(の)?(誘導|介助|移動|同行|付き添)|トイレで(の)?排泄|排泄(の)?(介助|誘導|見守り|確認)|排泄を(済ませ|促|行)|排泄介助|トイレ介助|(排尿|排便)(が)?(あり|あった|を確認)/, '排泄|トイレ介助', 'body'],
+  [/ポータブル(トイレ)?(への|での|で|へ|に|の|を)?(排泄|移乗|介助|使用|誘導)|ポータブルトイレ介助/, '排泄|ポータブルトイレ介助', 'body'],
+  [/(おむつ|オムツ|紙パンツ|リハパン|リハビリパンツ)[^。]{0,8}(交換|取り替|履き替)/, '排泄|おむつ交換', 'body'],
+  [/(パッド|パット|尿取り)[^。]{0,8}(交換|取り替|当て)/, '排泄|パッド交換', 'body'],
+  [/(汚れ|失禁|漏れ)[^。]{0,15}(シーツ|リネン|寝具)[^。]{0,8}(交換|取り替)|リネン(等)?(の)?交換/, '排泄|リネン等交換', 'body'],
+  [/陰部|臀部|お尻を(拭|洗)|おしりを(拭|洗)|陰洗/, '排泄|陰部清潔介助', 'body'],
+  [/尿器|尿瓶|しびん|溲瓶/, '排泄|尿器洗浄', 'body'],
+  // 食事
+  [/(食事|食べ|摂取|食卓)[^。]*(姿勢|座位)|姿勢を(整え|保)|座位(を)?(保持|確保)|背上げ|ギャッチ/, '食事|姿勢の確保', 'body'],
+  [/摂食|食事(の)?介助|食事を介助|口(元)?(まで|に)運|食べるのを(介助|手伝)|全介助にて摂取|一部介助を行い/, '食事|摂食介助', 'body'],
+  [/水分|お茶を(飲|勧|提供|出)|飲水|水を(飲|勧)/, '食事|水分補給'],
+  [/完食|全部召し上が|残さず(召し上が|食べ)|10割(摂取|召し上が)/, '食事|完食'],
+  [/食べ残し|残され|[1-9]割(摂取|召し上が|食べ)|半分(程度|ほど)?(召し上が|食べ)/, '食事|食べ残しあり'],
+  // 入浴・清拭
+  [/入浴(?!後の片付け)|湯船|浴槽(に|へ|で|内)|全身浴|洗身|お風呂に入/, '入浴・清拭|入浴介助', 'body'],
+  [/シャワー(浴|で|を浴)/, '入浴・清拭|シャワー浴', 'body'],
+  [/洗髪|髪を洗|シャンプー(を|で|し)/, '入浴・清拭|洗髪', 'body'],
+  [/部分浴|手浴|足浴/, '入浴・清拭|部分浴', 'body'],
+  [/(?<!(排泄|陰部)[^。]{0,10})清拭|(体|身体|からだ|背中)を(拭|清拭)/, '入浴・清拭|清拭', 'body'], // 「排泄の後に清拭し」は陰部の清潔の話なので清拭にしない（11/13 介護の4人の1日だけの清拭）
+  // 身体整容
+  [/洗面(?!所|台)|洗顔|顔洗い|顔を(洗|拭)|顔拭き/, '身体整容|洗面', 'body'],
+  [/口腔|歯磨き|歯みがき|うがい|義歯|入れ歯/, '身体整容|口腔ケア', 'body'],
+  [/更衣|着替|着脱|寝間着|寝衣|パジャマ/, '身体整容|更衣介助', 'body'],
+  [/整容|整髪|髪を(とか|整|梳)|ブラッシング|爪(切り|を切)|耳(掃除|そうじ)|髭|ひげ(剃|そ)|化粧|身だしなみ/, '身体整容|整容', 'body'],
+  // 移動（移動介助は文ごとに別で判断）
+  [/体位変換|体位を(変|整)|寝返り|側臥位|仰臥位/, '移動|体位変換', 'body'],
+  [/移乗|(車いす|車椅子)(へ|に)(移|乗)|立ち上がり(の)?介助/, '移動|移乗介助', 'body'],
+  [/外出(の)?準備|出かける準備|靴を履/, '移動|外出準備介助', 'body'],
+  [/帰宅(時|後)?(の)?(受け?入|介助|迎え)|帰宅を迎|帰宅された/, '移動|帰宅受入介助', 'body'],
+  [/通院|受診|病院|クリニック|診察/, '移動|通院介助', 'body'],
+  [/買い物(に|へ)?(同行|付き添)|一緒に(買い物|店)|店(まで|へ)(同行|付き添|一緒)/, '移動|買物介助', 'body'],
+  // 起床・就寝
+  [/起床|起き上が|目覚め/, '起床・就寝|起床介助', 'body'],
+  [/就寝|ベッドへ(誘導|移動)|布団を敷|寝る(前|準備)/, '起床・就寝|就寝介助', 'body'],
+  // 服薬・医療（見守りは文ごとに別で判断）
+  [/服薬|服用|内服|薬を(確認|準備|飲|渡|セット)|薬を[^。]{0,12}セット|薬(の)?(セット|準備)|飲み忘れ|眠前薬|お薬/, '服薬・医療|服薬介助・確認'],
+  [/塗布|軟膏|塗り薬|湿布(を)?(貼|交換)|保湿剤/, '服薬・医療|薬の塗布', 'body'],
+  [/点眼|目薬/, '服薬・医療|点眼', 'body'],
+  [/吸引|痰/, '服薬・医療|痰の吸引', 'body'],
+  [/浣腸/, '服薬・医療|浣腸', 'body'],
+  [/経管|胃ろう|胃瘻|経鼻/, '服薬・医療|経管栄養', 'body'],
+  [/院内|受付|会計|診察室|待合/, '服薬・医療|院内介助', 'body'],
+  // 清掃
+  [/(居室|部屋|室内|生活スペース|床|掃除機)[^。]{0,10}(掃除|清掃|拭|掃)|(掃除|清掃)[^。]{0,6}(居室|部屋|室内)|居室の清掃|室内の清掃/, '清掃|居室'],
+  [/トイレ(の)?(清掃|掃除)|便器/, '清掃|トイレ'],
+  [/ポータブルトイレ(の)?(清掃|掃除|洗浄|後始末)/, '清掃|ポータブルトイレ'],
+  [/卓上|テーブル(を|の上を)?(拭|片付|整)/, '清掃|卓上'],
+  [/台所|キッチン|シンク/, '清掃|台所', 'house'],
+  [/浴室[^。]*(掃除|清掃|片付|拭)|(掃除|清掃)[^。]*浴室|浴槽(を|の)?(洗|掃除)|お風呂(の)?掃除/, '清掃|浴室'],
+  [/玄関/, '清掃|玄関'],
+  [/ゴミ/, '清掃|ゴミ出し'],
+  // 洗濯
+  [/洗濯(機)?(を)?(行|回|し)|洗濯物を確認|手洗い/, '洗濯|洗濯'],
+  [/(洗濯物|衣類)[^。]{0,8}干|物干|乾燥機|部屋干し/, '洗濯|乾燥（物干し）'],
+  [/(洗濯物|衣類)[^。]{0,10}(取り?入れ|たたん|畳ん|収納|しまっ)|畳んで収納|衣類を整理/, '洗濯|取入れ・収納'],
+  [/アイロン/, '洗濯|アイロン'],
+  // 衣類・寝具
+  [/ベッドメイク|ベッドを整/, '衣類・寝具|ベッドメイク'],
+  [/シーツ(の)?(交換|取り替)|(布団|枕)カバー/, '衣類・寝具|シーツ・カバー交換'],
+  [/布団(を)?干/, '衣類・寝具|布団干し'],
+  [/衣替え|タンス(の)?整理|衣類(の)?整理/, '衣類・寝具|衣類の整理'],
+  [/補修|ボタン付け|繕|裾上げ|ほつれ/, '衣類・寝具|被服の補修'],
+  // 調理
+  [/調理(?!台|器具)|料理|献立/, '調理|調理'],
+  [/下拵え|下ごしらえ|下処理|皮をむ|切り分け/, '調理|下拵え'],
+  [/配膳|下膳|食器(類)?を(下げ|片付|洗)|後片付け/, '調理|配・下膳'],
+  // 買物等
+  [/買い物|買物|購入|代行/, '買物等|日常品等の買物'],
+  [/薬(の)?(受け?取|受取)|薬局/, '買物等|薬の受取り'],
+];
+const TO_TOGETHER = k => /^清掃\|/.test(k) ? '自立支援|掃除' : /^洗濯\|/.test(k) ? '自立支援|洗濯' : /^衣類・寝具\|(衣類|被服)/.test(k) ? '自立支援|衣類の整理・被服の補修' : /^衣類・寝具\|/.test(k) ? '自立支援|ベッドメイク' : /^調理\|/.test(k) ? '自立支援|一般的な調理・配下膳' : /^買物等\|/.test(k) ? '自立支援|買い物・薬の受け取り' : k;
+function procFor(e, procs) {
+  if (!procs.length) return null; const t = (e.type || '') + ' ' + (e.detail || ''), body = famOf(e.type) !== '家事', st = entStart(e), mins = st.s && st.e ? hm(st.e) - hm(st.s) : 0, h = parseInt(st.s || '12', 10);
+  const vf = featOf(t.replace(/入浴後の片付け|お風呂掃除/g, '掃除')), night = h >= 16, morning = h < 11; if (body && /起床|就寝/.test(t) && !vf.includes('身支度')) vf.push('身支度');
+  const sc = procs.filter(p => !p.type || (/家事/.test(p.type) ? !body : body)).map(p => { const all = (p.steps || []).map(s => (s.label || '') + (s.text || '')).join(''), pf = featOf(all.replace(/お風呂の掃除|お風呂掃除|浴室の掃除/g, '掃除')), at = all.replace(/眠前薬(の)?服薬確認/g, '');
+    const timeNg = (night && /起床|朝食/.test(at) && !/就寝|眠前|夕食/.test(at)) || (morning && /就寝|眠前|夕食/.test(at) && !/起床|朝食/.test(at)), vm = (t.match(/朝食|昼食|夕食/) || [])[0], pm = all.match(/朝食|昼食|夕食/g) || [];
+    return { p, all, score: vf.filter(f => pf.includes(f)).length, ng: timeNg || (vm && pm.length && !pm.includes(vm)) }; })
+    .filter(x => !x.ng && (vf.length ? x.score > 0 : true)).filter(x => { const pf = featOf(x.all);
+      if ((/入浴/.test(e.type || '') || /^入浴/m.test(e.detail || '')) && !pf.includes('入浴')) return false; if (pf.includes('起床') && !vf.includes('起床') && h >= 11) return false; if (pf.includes('入浴') && !vf.includes('入浴') && !/入浴/.test(e.type || '')) return false; return true; });
+  if (!sc.length) return null; const eff = x => x.score - (mins && x.p.minutes && !/通院/.test(x.p.type || '') && Math.abs(x.p.minutes - mins) > 30 ? 1 : 0);
+  const p = sc.sort((a, b) => (eff(b) - eff(a)) || (Math.abs((a.p.minutes || 0) - mins) - Math.abs((b.p.minutes || 0) - mins)) || (b.score - a.score))[0].p;
+  if (p.minutes && mins > 0 && !/通院/.test(p.type || '') && Math.abs(p.minutes - mins) > 30) return null; return p;
+}
+function planKeys(c, name) {
+  const cl = DATA.clients.find(x => nameKey(x.name) === nameKey(name)) || {}, procs = (cl.procedures || []).filter(p => p && Array.isArray(p.steps)), p = procFor(c.e, procs); if (!p) return { keys: new Set(), no: '' };
+  const body = !/家事/.test(p.type || ''), tog = /共に|一緒/.test((c.e.type || '') + (c.e.detail || '')), out = new Set(), bath = p.steps.some(s => /全身浴|入浴|浴/.test((s.label || '') + (s.text || '')));
+  p.steps.forEach(s => { const lb = (s.label || '').replace(/\s/g, ''), txt = ((s.label || '') + '。' + (s.text || '')).replace(/[－‐−―]/g, 'ー'), selfEat = lb === '食事介助' && !/摂食|食事(の)?介助を|口(元)?(まで|に)運|食べさせ|全介助|一部介助/.test(s.text || '');
+    (PROC_LABEL[lb] || []).forEach(k => { if (!(selfEat && k === '食事|摂食介助')) out.add(k); }); if (selfEat && body) out.add('自立支援|排泄・食事');
+    TEXT_KP.forEach(([re, k, scp]) => { if ((scp === 'body' && !body) || (scp === 'house' && body)) return; if (selfEat && k === '食事|摂食介助') return; if (bath && /入浴・清拭\|清拭|トイレ介助/.test(k) && !PROC_LABEL[s.label]) return; if (re.test(txt)) out.add(k); });
+    if (/お風呂|浴室/.test(s.text || '') && /掃除|清掃/.test(s.text || '')) out.add('清掃|浴室'); if (/トイレ/.test(s.text || '') && /掃除|清掃/.test(s.text || '')) out.add('清掃|トイレ'); if (/片付|片づけ|整理/.test(txt) && !bath) out.add('清掃|居室');
+    if (/見守|声掛け|声かけ|促し/.test(s.text || '') && body && bath) out.add('自立支援|清拭・入浴・身体整容'); });
+  out.delete('衣類・寝具|シーツ・カバー交換');
+  const vf = featOf((c.e.type || '') + ' ' + (c.e.detail || '')), NEED = [[/^(調理\||自立支援\|一般的な調理)/, '調理'], [/^(買物等\|日常品|自立支援\|買い物)/, '買物'], [/^入浴・清拭\|(入浴介助|シャワー浴|洗髪)/, '入浴']];
+  let ks = [...new Set([...out].map(k => body && tog ? TO_TOGETHER(k) : k))].filter(k => { const n = NEED.find(([re]) => re.test(k)); return !n || !vf.length || vf.includes(n[1]) || (n[1] === '入浴' && /入浴/.test(c.e.type || '')); });
+  // ツールの kpFinal と同じ：声掛け・見守りは付けない・家事の訪問に身体の項目を付けない・入浴の訪問は更衣介助を足し、清掃などを外す
+  ks = ks.map(k => k === '自立支援|服薬' ? '服薬・医療|見守り' : k).filter(k => k !== '自立支援|声掛け・見守り');
+  const BODY_ONLY = /^(排泄|入浴・清拭|身体整容|起床・就寝|服薬・医療|食事\|(摂食介助|姿勢の確保)|移動\|(体位変換|移乗介助|移動介助)|自立支援\|(声掛け・見守り|排泄・食事|清拭・入浴・身体整容|起床就寝介助))/, BATH_NO = /^(清掃\||移動\|移動介助|洗濯\||自立支援\|洗濯|調理\||自立支援\|一般的な調理|自立支援\|排泄・食事)/;
+  if (famOf(c.e.type) === '家事') ks = ks.filter(k => !BODY_ONLY.test(k));
+  else if (ks.includes('入浴・清拭|入浴介助') || ks.includes('入浴・清拭|シャワー浴')) { ks.push('身体整容|更衣介助'); ks = ks.filter(k => !BATH_NO.test(k) || (/生活/.test(c.e.type || '') && !/^(調理\||自立支援\|(一般的な調理|排泄・食事))/.test(k))); }
+  ks = ks.filter(k => k !== '洗濯|取入れ・収納' && k !== '食事|水分補給');
+  if (c.fam !== '家事' && !tog && !/生活|家事/.test(c.e.type || '')) ks = ks.filter(k => !/^(清掃|洗濯|衣類・寝具|調理|買物等)\|/.test(k));
+  if (ks.includes('洗濯|洗濯')) ks.push('洗濯|乾燥（物干し）'); if (ks.includes('調理|調理')) ks.push('調理|下拵え', '調理|配・下膳');
+  return { keys: new Set(ks.filter(k => CK_KEYS.includes(k))), no: p.no || '' };
+}
+let SHEET = {}; // 人＋月 → 列ごとの今のマス（押して直した物。保存はしない）
+function sheetFor(name, ym) {
+  const id = name + '|' + ym; if (SHEET[id]) return SHEET[id];
+  const doc = DATA.records.find(d => d.name === name && d.month === ym); if (!doc) return null;
+  const T = tmplsAll().filter(t => nameKey(t.name) === nameKey(name)), isB = x => /入浴/.test(x || ''); // 同じ時間でも曜日で見本が違う時（日曜は調理・火木土は掃除など）は、見本ごとに列を分ける
+  const pickT = (c, d) => { const L = T.filter(t => Math.abs(hm(t.start) - hm(c.start)) <= 10 && /家事/.test(t.type || '') === (c.fam === '家事'));
+    return L.find(t => isB(t.type) === isB(c.type) && (t.days || []).includes(d)) || L.find(t => isB(t.type) === isB(c.type)) || L.find(t => (t.days || []).includes(d)) || null; };
+  const cols = []; sheetCols(name).forEach(c => { const g = new Map(); [...c.days].forEach(d => { const t = pickT(c, d), key = t ? T.indexOf(t) : -1; if (!g.has(key)) g.set(key, { ...c, days: new Set(), tmpl: t }); g.get(key).days.add(d); }); cols.push(...g.values()); });
+  cols.sort((a, b) => hm(a.start) - hm(b.start) || Math.min(...[...a.days].map(d => (d + 6) % 7)) - Math.min(...[...b.days].map(d => (d + 6) % 7)));
+  cols.forEach(c => { c.rows = []; }); let other = 0;
+  (doc.rows || []).filter(r => r.date && r.start && r.on !== false && famOf(r.type) !== '通院').forEach(r => { const c = sheetColOf(cols, r); if (c) c.rows.push(r); else other++; });
+  const byDay = {}; (doc.rows || []).filter(r => r.date && r.start).forEach(r => { (byDay[r.date] = byDay[r.date] || []).push(r); }); Object.values(byDay).forEach(a => a.sort((x, y) => hm(x.start) - hm(y.start)));
+  const use = cols.filter(c => c.rows.length); use.forEach(c => { c.cnt = {}; c.rows.forEach(r => shown(r).forEach(k => { c.cnt[k] = (c.cnt[k] || 0) + 1; }));
+    c.init = new Set(Object.keys(c.cnt).filter(k => c.cnt[k] * 2 >= c.rows.length)); c.now = new Set(c.init);
+    const t = c.tmpl;
+    c.name = name; c.byDay = byDay; c.why = {}; c.mi = new Set((t && t.checked) || []); c.ci = new Set((t && t.circled) || []); const pk = planKeys(c, name); c.plan = pk.keys; c.planNo = pk.no; });
+  return (SHEET[id] = { name, ym, cols: use, empty: cols.filter(c => !c.rows.length), other, closed: DATA.closed.has(ym) });
+}
+function fillSheetSelects() {
+  const who = document.getElementById('shWho'), mon = document.getElementById('shMonth'), ms = [...new Set(DATA.records.map(d => d.month))].sort().reverse();
+  if (!mon.options.length) mon.innerHTML = ms.map(m => `<option value="${m}">${m}${DATA.closed.has(m) ? '（締め）' : ''}</option>`).join('');
+  const names = [...new Set(DATA.records.map(d => d.name))].sort((a, b) => a.localeCompare(b, 'ja'));
+  if (!who.options.length) who.innerHTML = '<option value="">（全員）</option>' + names.map(n => `<option>${esc(n)}</option>`).join('');
+}
+// 見本（無い時間は手順書）と違うマスの理由。見本に無いのに付いている物は「見本から見る」と同じ理由（決まり・手順書・文章・手で足した）を、付いている訪問の全部で探す
+// 予定表の内容に書いてある支援（ツールは予定表の言葉からも付ける。調理・食事の訪問は台所と卓上、入浴の訪問は浴室の掃除＝使った所の掃除）
+const SCHED_RE = { '清掃|台所': /調理|朝食|昼食|夕食|配膳|弁当|台所/, '清掃|卓上': /調理|朝食|昼食|夕食|配膳|弁当|卓上|テーブル/, '清掃|浴室': /入浴|シャワー|お風呂|風呂|浴室/, '清掃|トイレ': /トイレ/, '清掃|居室': /起床|就寝|居室|部屋|掃除/, '清掃|ゴミ出し': /ゴミ/,
+  '起床・就寝|就寝介助': /就寝/, '起床・就寝|起床介助': /起床/, '入浴・清拭|入浴介助': /入浴/, '洗濯|洗濯': /洗濯/, '買物等|日常品等の買物': /買い物|買物/, '調理|調理': /調理|朝食|昼食|夕食/, '服薬・医療|服薬介助・確認': /服薬|薬/, '身体整容|更衣介助': /更衣|着替/, '身体整容|洗面': /洗面/, '排泄|トイレ介助': /トイレ/, '衣類・寝具|シーツ・カバー交換': /シーツ/, '衣類・寝具|衣類の整理': /衣類/ };
+function cellWhy(c, k, kind) { const id = kind + k; if (id in c.why) return c.why[id]; let why = '';
+  if (kind === 'extra') { const rs = c.rows.filter(r => shown(r).includes(k)), ws = rs.map(r => extraWhy(k, r, c.byDay[r.date] || [], DATA, c.name)); if (rs.length && ws.every(Boolean)) { const n = {}; ws.forEach(w => { n[w] = (n[w] || 0) + 1; }); why = Object.keys(n).sort((a, b) => n[b] - n[a])[0]; }
+    const sd = (c.e.type || '') + ' ' + (c.e.detail || ''); if (!why && SCHED_RE[k] && SCHED_RE[k].test(sd)) why = `予定表に書いてある（「${(sd.match(SCHED_RE[k]) || [''])[0]}」）`; }
+  else { const t = c.tmpl, rs = c.rows.filter(r => { const dow = new Date(r.date + 'T00:00:00').getDay(); return !(t && t.dayOnly && t.dayOnly[k] && !t.dayOnly[k].includes(dow)) && !(r.sick && /入浴介助|清拭|身体整容\|整容/.test(k)); });
+    if (k === '食事|完食') why = '完食は日によって'; else if (t && (t.either || []).some(g => g.includes(k))) why = '見本で「どちらか」の項目'; else if (t && t.dayOnly && t.dayOnly[k]) why = '見本で曜日を決めた項目';
+    else if (!rs.length) why = '体調不良の日だけ'; else { const lack = rs.filter(r => !shown(r).includes(k)); if (lack.length * 2 <= rs.length) why = '体調不良の日を除くと半分以上に付いている'; else if (lack.filter(r => (r.kpOff || []).includes(k)).length * 2 > lack.length) why = '手で外した'; } }
+  return (c.why[id] = why); }
+function cellState(c, k) { const on = c.now.has(k), hasT = !!c.tmpl, inT = c.mi.has(k), circ = c.ci.has(k), inP = c.plan.has(k), chg = on !== c.init.has(k);
+  const ex0 = on && (hasT ? !inT && !circ : !inP && c.plan.size > 0), mi0 = !on && (hasT ? inT : inP);
+  const why = chg ? '' : ex0 ? cellWhy(c, k, 'extra') : mi0 ? cellWhy(c, k, 'miss') : '';
+  return { on, inT, circ, inP, extra: ex0 && !why, miss: mi0 && !why, why, chg }; }
+const sheetNames = ym => [...new Set(DATA.records.filter(d => d.month === ym).map(d => d.name))].sort((a, b) => a.localeCompare(b, 'ja'));
+function renderSheet() {
+  const box = document.getElementById('sheetBody'); if (!DATA) return; const who = document.getElementById('shWho').value, ym = document.getElementById('shMonth').value, allRows = document.getElementById('shRows').value === 'all';
+  const names = who ? [who] : sheetNames(ym);
+  const cards = names.map((n, ni) => { const S = sheetFor(n, ym); if (!S) return null; const C = S.cols;
+    if (!C.length) return { diff: 0, html: `<details class="card"><summary><b>${esc(n)}</b>　<span class="muted">予定表の時間に合う記録がありません（記録${S.other}件）</span></summary></details>` };
+    let diff = 0; C.forEach(c => CK_KEYS.forEach(k => { const x = cellState(c, k); if (x.extra || x.miss) diff++; }));
+    const head = `<tr><th>項目</th>${C.map(c => `<th class="c">${esc(colLabel(c))}<br><small>記録${c.rows.length}件${c.tmpl ? `・見本p${esc(c.tmpl.page || '?')}` : '・見本なし'}${c.planNo ? `・手順書No.${esc(c.planNo)}` : ''}</small></th>`).join('')}</tr>`;
+    const body = CK_ITEMS.map(([lb, cat, its]) => { const rows = its.map(it => { const k = cat + '|' + it, st = C.map(c => cellState(c, k));
+        if (!allRows && !st.some(x => x.on || x.inT || x.circ || x.inP) && !C.some(c => c.cnt[k])) return '';
+        return `<tr><td>${esc(it)}</td>${C.map((c, ci) => { const x = st[ci], m = c.cnt[k] || 0, part = m && m < c.rows.length ? `<span class="cnt">${m}/${c.rows.length}</span>` : '';
+          const tip = `${c.rows.length}件のうち${m}件に付いている${x.extra ? (c.tmpl ? '・見本に無い（理由なし）' : '・手順書に無い（理由なし）') : ''}${x.miss ? (c.tmpl ? '・見本にあるのに付いていない（半分未満）' : '・手順書にあるのに付いていない（半分未満）') : ''}${x.why ? '・' + (x.on ? (c.tmpl ? '見本に無いが' : '手順書に無いが') : (c.tmpl ? '見本にあるが' : '手順書にあるが')) + x.why : ''}`;
+          return `<td class="c ${x.extra ? 'extra' : ''} ${x.miss ? 'miss' : ''} ${x.why ? 'why' : ''} ${x.chg ? 'chg' : ''}" title="${esc(tip)}"><input type="checkbox" ${x.on ? 'checked' : ''} onclick="sheetToggle(${ni},${ci},'${k}')">${part}${x.inT ? '<span class="mk">見</span>' : ''}${x.circ ? '<span class="mk">○</span>' : ''}${x.inP ? '<span class="mk">計</span>' : ''}</td>`; }).join('')}</tr>`; }).join('');
+      return rows ? `<tr><td class="cat" colspan="${1 + C.length}">${esc(lb)}</td></tr>` + rows : ''; }).join('');
+    const notes = [S.other ? `予定表の時間に合わない記録 ${S.other}件（表に入れていません）` : '', S.empty.length ? `記録の無い予定表の時間：${S.empty.map(c => esc(colLabel(c))).join('／')}` : '', S.closed ? '締めた月です（見るだけ）' : ''].filter(Boolean).join('　');
+    return { diff, html: `<details class="card" ${who || diff ? 'open' : ''}><summary><b>${esc(n)}</b>　${esc(ym)}・時間${C.length}列${diff ? `・<b style="color:var(--bad)">見本（無い時間は手順書）と違うマス ${diff}</b>` : '・違うマスなし'}</summary>
+      ${notes ? `<div class="muted">${notes}</div>` : ''}<div class="sh"><table><thead>${head}</thead><tbody>${body}</tbody></table></div>
+      <div class="row" style="margin-top:6px"><button onclick="sheetCopy(${ni})">${esc(n)}さんの結果をコピー</button><button onclick="sheetReset(${ni})">元に戻す</button></div></details>` }; }).filter(Boolean);
+  cards.sort((a, b) => (b.diff > 0) - (a.diff > 0)); const nd = cards.filter(c => c.diff).length;
+  box.innerHTML = cards.length ? `<div class="card"><b>${cards.length}人を表示</b>　${nd ? `<b style="color:var(--bad)">違うマスのある人 ${nd}人</b>（上に出しています）` : '違うマスはありません'}</div>` + cards.map(c => c.html).join('') : '<div class="card muted">この月の記録がありません</div>';
+}
+const sheetWho = ni => { const who = document.getElementById('shWho').value; return who || sheetNames(document.getElementById('shMonth').value)[ni]; };
+function sheetToggle(ni, ci, k) { const ym = document.getElementById('shMonth').value, S = sheetFor(sheetWho(ni), ym), c = S && S.cols[ci]; if (!c) return; if (c.now.has(k)) c.now.delete(k); else c.now.add(k); const y = window.scrollY; renderSheet(); window.scrollTo(0, y); }
+function sheetReset(ni) { delete SHEET[sheetWho(ni) + '|' + document.getElementById('shMonth').value]; renderSheet(); }
+function sheetText(n, ym) { const S = sheetFor(n, ym); if (!S || !S.cols.length) return ''; return `${n}さん チェック（確認表より・${ym}）\n` + S.cols.map(c => `【${colLabel(c)}】` + CK_KEYS.filter(k => c.now.has(k)).map(k => k.replace('|', '：')).join('、')).join('\n'); }
+function sheetCopy(ni) {
+  const ym = document.getElementById('shMonth').value, names = ni == null ? (document.getElementById('shWho').value ? [document.getElementById('shWho').value] : sheetNames(ym)) : [sheetWho(ni)];
+  const t = names.map(x => sheetText(x, ym)).filter(Boolean).join('\n\n'); if (!t) { alert('コピーする物がありません'); return; }
+  const manual = () => prompt('コピーしてください', t); try { navigator.clipboard.writeText(t).then(() => alert('コピーしました'), manual); } catch (e) { manual(); }
+}
 async function run() {
   PASS = document.getElementById('pass').value.trim(); if (!PASS) { alert('合言葉を入れてください'); return; }
   const btn = document.getElementById('runBtn'), st = document.getElementById('status'), bar = document.getElementById('bar');
@@ -344,7 +557,7 @@ async function run() {
     let h = []; try { h = JSON.parse(lsGet('smilewan_check_hist') || '[]'); } catch (e) {}
     const V = FOUND.filter(x => (!x.closed || !NEW.has(x.cat)) && !kept(x)), vb = V.filter(x => SEV[x.cat] === 'bad').length;
     h.push({ at: `${now.getMonth() + 1}/${now.getDate()} ${now.getHours()}:${String(now.getMinutes()).padStart(2, '0')}`, bad: vb, warn: V.length - vb, open: FOUND.filter(x => !x.closed).length }); lsSet('smilewan_check_hist', JSON.stringify(h.slice(-60)));
-    render(); renderHist(); loadMorning(); if (TAB === 'tmpl') setTab('tmpl');
+    SHEET = {}; render(); renderHist(); loadMorning(); if (TAB !== 'find') setTab(TAB);
   } catch (e) { st.textContent = '点検できませんでした：' + (e && e.message || e); }
   finally { btn.disabled = false; }
 }
