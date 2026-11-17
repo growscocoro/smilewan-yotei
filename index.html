@@ -389,6 +389,7 @@
       <summary>📇 利用者情報（住所・電話・緊急連絡先・メモ） <span id="clientState" class="sync local"></span></summary>
       <label>区分</label><select id="ciKubun" onchange="setKubun((state.name||'').trim(), this.value)"><option value="介護">介護</option><option value="障害">障害</option></select>
       <label>眠前薬（寝る前のお薬）</label><select id="ciMinzen" onchange="setMinzen(this.value)"><option value="">自動（予定表・手順書・文章から判断）</option><option value="あり">あり</option><option value="なし">なし</option></select>
+      <label>性別</label><select id="ciSex" onchange="setSex(this.value)"><option value="">未設定</option><option value="男">男性</option><option value="女">女性</option></select><div class="hint" style="margin:0 0 6px">女性の方は、整容の細目の「髭」と髭剃りの文を付けません（11/17）</div>
       <label>住所</label><input type="text" id="ciAddress" placeholder="利用者CSVから自動で入ります" oninput="clientDirty()">
       <label>電話番号</label><input type="text" id="ciPhone" oninput="clientDirty()">
       <label>緊急連絡先（続柄・名前・電話）</label><input type="text" id="ciEmergency" oninput="clientDirty()">
@@ -830,7 +831,7 @@ async function setSetting(key, localKey, list, opt = {}) {
 const SUPA = { url: '', key: '' }; // 旧（使わない）
 const GAS = {"url": "https://script.google.com/macros/s/AKfycbxKEAUthQx9wiZKncHZR43jbSKjPfO2lYhlc2K5yXWJNXI_zA8wChdQTFlINEhLTDQO/exec"};           // 保存先（Googleドライブに保存するGAS）。build-site.sh が入れる
 // 版の確認：公開版が新しくなったら知らせ、古い版のままでは記録を保存しない（古い決まりで上書きしないため）
-const APP_VER = '20261117092053';
+const APP_VER = '20261117124501';
 let appOutdated = false;
 async function checkVer() {
   if (APP_VER === 'dev' || appOutdated) return appOutdated;
@@ -1370,6 +1371,7 @@ function renderClientBox(force) {
   document.getElementById('ciAddress').value = i.address; document.getElementById('ciPhone').value = i.phone;
   document.getElementById('ciEmergency').value = i.emergency; document.getElementById('ciMemo').value = i.memo;
   { const mz = document.getElementById('ciMinzen'); if (mz) mz.value = (name && (clientDoc(name) || {}).minzen) || ''; }
+  { const sx = document.getElementById('ciSex'); if (sx) sx.value = (name && (clientDoc(name) || {}).sex) || ''; }
   renderShop();
   const st = document.getElementById('clientState');
   st.textContent = !name ? '' : i.manual ? '保存済み' : (i.address || i.phone) ? 'CSVから' : '未入力'; st.className = 'sync ' + (i.manual ? 'ok' : 'local');
@@ -1382,6 +1384,13 @@ async function setMinzen(v) {
   const name = (state.name || '').trim(); if (!name) { alert('先に利用者を選んでください'); renderClientBox(true); return; }
   const c = clientDoc(name) || { name }, ok = await putDoc('clients', clientKey(name), { ...c, name: c.name || name, minzen: v, updatedAt: new Date().toISOString() });
   if (ok) alert(`「${name}」の眠前薬を「${v || '自動'}」にしました。\n今月の記録は「確認が必要」の「直す案」で文がそろいます（締めた月は変えません）。`);
+}
+// 性別（11/17 ユーザー「女性か男性かの判断できてる？」「時々ミスってる」：川瀬さん（女性）の記録に髭が入っていた）。女性の方には髭を付けない。未設定は今までどおり
+const sexOf = () => { const n = (state.name || '').trim(); return n ? ((clientDoc(n) || {}).sex || '') : ''; };
+async function setSex(v) {
+  const name = (state.name || '').trim(); if (!name) { alert('先に利用者を選んでください'); renderClientBox(true); return; }
+  const c = clientDoc(name) || { name }, ok = await putDoc('clients', clientKey(name), { ...c, name: c.name || name, sex: v, updatedAt: new Date().toISOString() });
+  if (ok) alert(`「${name}」の性別を「${v === '男' ? '男性' : v === '女' ? '女性' : '未設定'}」にしました。${v === '女' ? '\n整容の細目の「髭」と髭剃りの文は付けません（締めた月の記録は変えません）。' : ''}`);
 }
 async function saveClientInfo() {
   const name = (state.name || '').trim();
@@ -2595,7 +2604,8 @@ function planCands(r, cur) {
   const strict = [['入浴・清拭|入浴介助', /入浴介助を行|浴槽への出入り|浴槽に/], ['入浴・清拭|洗髪', /洗髪/], ['起床・就寝|起床介助', /起床介助|起き上がり/], ['起床・就寝|就寝介助', /就寝介助|就寝の準備を手伝/]];
   const said = x => { const tmp = { ...r, text: x, kp: [], kpOff: [] }; kpFromText(tmp); return new Set((tmp.kpText || []).filter(k => /^文章から/.test((tmp.kpSrc || {})[k] || ''))); };
   const was = said(cur || ''), rules = mnRules(r), ng = [...getNgList(), ...clientNg(name)], fine = k => kp.includes(k) || was.has(k) || k === '食事|水分補給' || kp.includes(TO_TOGETHER(k)) || (r.kind === '家事援助' && /^服薬・医療\|/.test(k));
-  const ok = s => !ng.some(w => w && s.includes(w)) && !rules.some(([keys, re]) => re.test(s) && !keys.some(k => kp.includes(k))) && !strict.some(([k, re]) => !kp.includes(k) && re.test(s))
+  const woman = sexOf() === '女'; // 女性の方は髭の文を作らない（11/17）
+  const ok = s => !(woman && /髭|ひげ/.test(s)) && !ng.some(w => w && s.includes(w)) && !rules.some(([keys, re]) => re.test(s) && !keys.some(k => kp.includes(k))) && !strict.some(([k, re]) => !kp.includes(k) && re.test(s))
     && [...said(s)].every(fine);
   const out = [], grps = new Set();
   PLAN_PHRASES.forEach(p => {
@@ -3701,6 +3711,8 @@ function vOf(r) { if (r.vFrozen && rowClosed(r)) return { ...r.vFrozen }; const 
   // 整容にチェックがあるのに細目（髭・髪など）が空のとき：利用者情報の「お風呂のときの整容」→ 同じ人の見本の整容の細目を使う（11/3「チェック入ってないところもある」：見本の無い訪問で空になっていた）
   { const kp = kpAll(r); if (!m.整容 && !(v.整容 || []).length && kp.includes('身体整容|整容')) { const nm = (state.name || '').trim(), own = tmplList().find(x => x.name === nm && (x.checked || []).includes('身体整容|整容') && (x.seiyo || []).length), pick = seiyoBathOf() || (own && own.seiyo); if (pick) v.整容 = [...pick]; } }
   if (r.sick && Array.isArray(v.整容) && v.整容.includes('髭') && !/髭|ひげ/.test(r.text || '')) v.整容 = v.整容.filter(x => x !== '髭'); // 体調不良の日は髭の細目を付けない（11/10）
+  if (sexOf() === '女' && Array.isArray(v.整容) && v.整容.includes('髭')) v.整容 = v.整容.filter(x => x !== '髭'); // 女性の方に髭は付けない（11/17）
+  if (!m.整容 && Array.isArray(v.整容) && v.整容.length && !kpAll(r).includes('身体整容|整容')) v.整容 = []; // 整容にチェックが無い訪問（体調不良の日など）は細目も付けない（11/17 川瀬さんの髪）
   v.その他 = ['環境整備', '相談援助', '情報収集・提供', '記録']; return v; } // その他は毎回4つとも（事業所の決まり）
 // 買い物の見積り（決まり21・11/7）：買い物リストの品物を統計価格で計算する。乱数は使わない。内訳に「金額は見積り」と残す。手入力・献立買い物支援の実際の金額があれば、そちらを出す
 const EST_FROM = '2026-11-08', AZU_CAP = 5000, BUY_RATE = 0.9;
@@ -4207,7 +4219,7 @@ function kpAll(r) {
   // 11/10 手書きメモ「体調不良のシャワー浴は髭にチェック入らない」：体調不良の日は整容（髭）を付けない。手で付けた時・文に髭以外の整容（爪・耳・整髪・化粧）がある時だけ残す
   if (r.sick && !(r.kpOn || []).includes('身体整容|整容') && !SEIYO_OTHER.test(r.text || '')) { const i = o.indexOf('身体整容|整容'); if (i >= 0) o.splice(i, 1); }
   // 11/10 介護の方の入浴の訪問：トイレ介助・おむつ交換・パッド交換・整容（髭）・声掛け見守りの「排泄・食事」「清拭・入浴・身体整容」も付ける（体調不良の日の髭は付けない・手で外した物は外したまま）
-  if (kubunOf((state.name || '').trim()) === '介護' && o.some(k => /^入浴・清拭\|(入浴介助|シャワー浴)$/.test(k))) KAIGO_BATH.forEach(k => { if (k === '身体整容|整容' && r.sick && !(r.kpOn || []).includes(k)) return; if (!o.includes(k) && !(r.kpOff || []).includes(k)) o.push(k); });
+  if (kubunOf((state.name || '').trim()) === '介護' && o.some(k => /^入浴・清拭\|(入浴介助|シャワー浴)$/.test(k))) KAIGO_BATH.forEach(k => { if (k === '身体整容|整容' && (r.sick || sexOf() === '女') && !(r.kpOn || []).includes(k)) return; /* この整容は髭のため（女性の方は付けない・11/17） */ if (!o.includes(k) && !(r.kpOff || []).includes(k)) o.push(k); });
   // 11/10 手書きメモ：「共に」の訪問は服薬確認にチェック・その日の最後が入浴の訪問は服薬の声かけ（声掛け・見守り：服薬）にチェック。手で外したとき・アセスメントで服薬の支援が無い人は付けない
   const off = r.kpOff || [], mzAri = minzenOf() === 'あり', noMed = k => { if (mzAri) return false; try { return !!assessBlock((state.name || '').trim(), k); } catch (e) { return false; } }; // 眠前薬「あり」の人はアセスメントに服薬が無くても付ける（11/10 金さん）
   if (r.kind !== '家事援助' && r.e && visTogether(r.e) && !o.includes('服薬・医療|服薬介助・確認') && !off.includes('服薬・医療|服薬介助・確認') && !noMed('服薬・医療|服薬介助・確認')) o.push('服薬・医療|服薬介助・確認');
