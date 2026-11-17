@@ -830,7 +830,7 @@ async function setSetting(key, localKey, list, opt = {}) {
 const SUPA = { url: '', key: '' }; // 旧（使わない）
 const GAS = {"url": "https://script.google.com/macros/s/AKfycbxKEAUthQx9wiZKncHZR43jbSKjPfO2lYhlc2K5yXWJNXI_zA8wChdQTFlINEhLTDQO/exec"};           // 保存先（Googleドライブに保存するGAS）。build-site.sh が入れる
 // 版の確認：公開版が新しくなったら知らせ、古い版のままでは記録を保存しない（古い決まりで上書きしないため）
-const APP_VER = '20261116212530';
+const APP_VER = '20261117092053';
 let appOutdated = false;
 async function checkVer() {
   if (APP_VER === 'dev' || appOutdated) return appOutdated;
@@ -5749,7 +5749,7 @@ async function showStaffMonth() {
   if (cl) cl.innerHTML = '<p class="hint">読み込み中…</p>';
   if (!DB || !DB.loadRecords) { out.innerHTML = '<p class="hint" style="color:var(--danger)">保存先に接続してから押してください。</p>'; return; }
   if (staffBusy) return; staffBusy = true; btn.disabled = true;
-  const k = nmz(st), keep = state.name;
+  const k = nmz(st), keep = state.name, keepRows = recRows;
   try {
     // その月の記録に、この担当者が入っている利用者（保存先の一覧＋読み込み済みの記録から）
     const set = new Set();
@@ -5761,17 +5761,18 @@ async function showStaffMonth() {
     for (const c of clients) {
       const d = Object.values(getColl('records')).find(x => x.name === c && x.month === ym); if (!d) continue;
       state.name = c; // 見本・区分などはその利用者の物で計算する（終わったら元に戻す）
+      const rs = d.rows.map(savedRowToRec); recRows = rs; // その利用者のその月の全訪問を recRows に（「その日の最後の訪問」の決まり＝服薬の声かけなどは、同じ日のほかの訪問を見て決まる。11/17 担当者別のWordで服薬の声かけが抜けた）
       d.rows.filter(x => splitStaff(x.staff).includes(k)).forEach(x => {
-        const r = savedRowToRec(x), tm = entryTime(r.e);
+        const r = rs[d.rows.indexOf(x)], tm = entryTime(r.e);
         items.push({ c, kub: kubunOf(c), date: r.date, s: tm.s || '', e: tm.e || '', min: tm.s && tm.e ? Math.max(0, hm(tm.e) - hm(tm.s)) : 0, type: r.e.type || '', label: recLabel(r), staff: r.staff || '', text: String(r.text || ''), fields: kpFieldsLine(r), lines: kpLinesHtml(r), check: checkText(r) });
       });
     }
-    state.name = keep;
+    state.name = keep; recRows = keepRows;
     items.sort((a, b) => (a.date - b.date) || a.s.localeCompare(b.s) || a.c.localeCompare(b.c, 'ja'));
     staffMonthData = { st, ym, items };
     renderStaffMonth();
   } catch (e) { state.name = keep; reportError('showStaffMonth: ' + (e && e.message || e), 'staff'); out.innerHTML = `<p class="hint" style="color:var(--danger)">読み込めませんでした：${esc(e && e.message || e)}（時間をおいてもう一度押してください）</p>`; }
-  finally { state.name = keep; staffBusy = false; btn.disabled = false; }
+  finally { state.name = keep; recRows = keepRows; staffBusy = false; btn.disabled = false; }
 }
 function renderStaffMonth() {
   const out = document.getElementById('staffView'), D = staffMonthData; if (!D) return;
@@ -6478,7 +6479,11 @@ async function exportStaffDocx() {
     [...new Set(M.items.map(it => it.c))].forEach(c => { const d = Object.values(getColl('records')).find(x => x.name === c && x.month === M.ym); if (d) d.rows.filter(x => x.on !== false && splitStaff(x.staff).includes(k)).forEach(x => list.push({ c, x })); });
     list.sort((a, b) => a.x.date.localeCompare(b.x.date) || String(a.x.start || '').localeCompare(String(b.x.start || '')) || a.c.localeCompare(b.c, 'ja'));
     const children = [];
-    list.forEach(({ c, x }, i) => { state.name = c; children.push(...docxVisit(D, savedRowToRec(x), i, c.replace(/[\s　]+/g, ''), kubunOf(c), FONT)); }); // 見本・区分などはその利用者の物で
+    const keepRows = recRows, ctx = new Map(); // 利用者ごとに、その月の全訪問を recRows に入れて計算する（記録の画面と同じチェックになる。「その日の最後の訪問」の服薬の声かけなどは同じ日のほかの訪問を見る・11/17）
+    try { list.forEach(({ c, x }, i) => { state.name = c;
+      if (!ctx.has(c)) { const d = Object.values(getColl('records')).find(y => y.name === c && y.month === M.ym), rs = d.rows.map(savedRowToRec); ctx.set(c, { rs, by: new Map(d.rows.map((y, j) => [y, rs[j]])) }); }
+      const C = ctx.get(c); recRows = C.rs; children.push(...docxVisit(D, C.by.get(x) || savedRowToRec(x), i, c.replace(/[\s　]+/g, ''), kubunOf(c), FONT)); }); } // 見本・区分などはその利用者の物で
+    finally { recRows = keepRows; }
     state.name = keep;
     const blob = await D.Packer.toBlob(docxDoc(D, children, FONT));
     await download(blob, `${M.st.replace(/[\s　]+/g, '')}　${+M.ym.slice(5)}月担当分特記事項.docx`);
