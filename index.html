@@ -831,7 +831,7 @@ async function setSetting(key, localKey, list, opt = {}) {
 const SUPA = { url: '', key: '' }; // 旧（使わない）
 const GAS = {"url": "https://script.google.com/macros/s/AKfycbxKEAUthQx9wiZKncHZR43jbSKjPfO2lYhlc2K5yXWJNXI_zA8wChdQTFlINEhLTDQO/exec"};           // 保存先（Googleドライブに保存するGAS）。build-site.sh が入れる
 // 版の確認：公開版が新しくなったら知らせ、古い版のままでは記録を保存しない（古い決まりで上書きしないため）
-const APP_VER = '20261119102449';
+const APP_VER = '20261119103924';
 let appOutdated = false;
 async function checkVer() {
   if (APP_VER === 'dev' || appOutdated) return appOutdated;
@@ -1837,6 +1837,8 @@ function withMinzenPrep(r, t) {
   return medOneSentence(r, t, MINZEN_PREP, isMed);
 }
 // 朝の服薬の文を書く訪問か：朝食の時間の訪問で、入浴の訪問でない（入浴の時に食事の文は書かない）。身体→家事と続く朝は、朝食を出す家事の訪問に書く
+// 記録の文に出さない言葉：薬の種類・病名・症状（11/19 ユーザー「精神安定剤って言葉入ってる」「他もあるはず」→「出さないようにする」）。眠前薬・睡眠（生活リズム）・ふらつきは使ってよい
+const SENSITIVE_RE = /安定剤|睡眠薬|睡眠導入|眠剤|眠薬|抗不安|抗うつ|向精神|抗精神|精神薬|精神科|心療内科|精神疾患|精神障害|統合失調|うつ病|うつ状態|鬱|双極|躁うつ|認知症|知的障害|発達障害|自閉|ADHD|てんかん|パニック|幻聴|幻覚|妄想|依存症|自傷|自殺|希死|頓服|下剤|副作用/;
 const isAmMed = x => x === MED_ASA || (MED_SENT.test(x) && !AM_KEEP.test(x));
 // 手順書に「服薬の声掛け（精神安定剤）」がある訪問の服薬確認の文（11/19 ユーザー「他の人と同じ感じにして 服薬確認にして」）は、朝・夜の服薬の文をまとめる時も残す（前は「精神安定剤」の言葉で残していた）
 const ANTEI_SAY = ['服薬の声掛けを行い、飲まれたことを確認した。', '薬を手渡し、服用されたことを確認した。', '服薬の時間を伝え、飲まれたことを確かめた。'];
@@ -2608,7 +2610,7 @@ function planCands(r, cur) {
   const said = x => { const tmp = { ...r, text: x, kp: [], kpOff: [] }; kpFromText(tmp); return new Set((tmp.kpText || []).filter(k => /^文章から/.test((tmp.kpSrc || {})[k] || ''))); };
   const was = said(cur || ''), rules = mnRules(r), ng = [...getNgList(), ...clientNg(name)], fine = k => kp.includes(k) || was.has(k) || k === '食事|水分補給' || kp.includes(TO_TOGETHER(k)) || (r.kind === '家事援助' && /^服薬・医療\|/.test(k));
   const woman = sexOf() === '女'; // 女性の方は髭の文を作らない（11/17）
-  const ok = s => !(woman && /髭|ひげ/.test(s)) && !/精神安定剤|安定剤/.test(s) && !ng.some(w => w && s.includes(w)) && !rules.some(([keys, re]) => re.test(s) && !keys.some(k => kp.includes(k))) && !strict.some(([k, re]) => !kp.includes(k) && re.test(s))
+  const ok = s => !(woman && /髭|ひげ/.test(s)) && !SENSITIVE_RE.test(s) && !ng.some(w => w && s.includes(w)) && !rules.some(([keys, re]) => re.test(s) && !keys.some(k => kp.includes(k))) && !strict.some(([k, re]) => !kp.includes(k) && re.test(s))
     && [...said(s)].every(fine);
   const out = [], grps = new Set();
   PLAN_PHRASES.forEach(p => {
@@ -4391,7 +4393,7 @@ function assessHints(row, who) {
   const inote = k => Object.entries(a.itemNotes || {}).find(([key]) => key.includes(k))?.[1] || '';
   const dress = kp.some(k => /更衣|就寝/.test(k)) || /更衣|着替|(起床|就寝)[^\n]*等/.test(row.e.detail || '');
   if (dress && /見守り|声掛け/.test(inote('着替'))) care.push(K ? '着替えは声掛けと見守りを行いながら進めた。' : '着替えは見守り・声掛けを行いながら、本人に行っていただいた。');
-  if (a.notes.includes('ふらつき') && body) care.push(pick(['ふらつきに注意し、移動時は近くで見守った。', '薬の副作用によるふらつきに注意しながら支援した。']));
+  if (a.notes.includes('ふらつき') && body) care.push(pick(['ふらつきに注意し、移動時は近くで見守った。', 'ふらつきに注意しながら支援した。'])); // 11/19 薬のことは書かない（前は「薬の副作用による」）
   if (/ゆっくり/.test(inote('特別な配慮')) && body) care.push('急がせず、ゆっくりと声掛けをしながらケアを行った。');
   const laundry = kp.some(k => k.startsWith('洗濯|') || k === '自立支援|洗濯'), cleaning = kp.some(k => k.startsWith('清掃|') || k === '自立支援|掃除');
   const cooking = kp.some(k => k.startsWith('調理|') || k === '自立支援|一般的な調理・配下膳');
@@ -5318,7 +5320,7 @@ const VARY = [
   ['服薬は決められた量であることを本人と一緒に確認した', '決められた量の薬であることを本人と確認した', '薬が決められた量であることを本人と一緒に確かめた'],
   ['飲み忘れがないよう、声掛けをしながら服薬を確認した', '飲み忘れのないよう、声を掛けながら服薬を確認した', '声掛けをしながら、飲み忘れがないよう服薬を確かめた'],
   ['めまいやふらつきがないか確認した', 'めまいやふらつきがないか確かめた', 'ふらつきやめまいがないか確認した'],
-  ['薬の副作用によるふらつきに注意しながら支援した', '薬の副作用によるふらつきに気を付けながら支援した', '薬の影響によるふらつきに注意して支援した'],
+  ['ふらつきに注意しながら支援した', 'ふらつきに気を付けながら支援した', 'ふらつきに注意して支援した'], // 11/19 薬の副作用・影響は書かない
   // 引き継ぎ・つなぎ
   ['続けて', '引き続き'], ['の支援に続けて、', 'の支援を終え、続けて', 'の支援の後、'], ['そのまま家事援助に入った', '続けて家事援助に入った', 'そのまま家事援助へ移った'],
   ['この後、', 'このあと、', 'この後は'],
@@ -5745,7 +5747,7 @@ function uniqueText(row, others) {
     for (const c of [...bank.締め].sort(() => Math.random() - .5)) { if (c && !used.has(normText(t + c))) { t += c; break; } }
   }
   t = nextLink(row, dedupeText(orderFix(consistText(row, addMore(row, fitTime(row, mnText(row, withVin(row, withKd(row, withPlan(row, t)))))))))); const keep = row.text; row.text = t; kpFromText(row); row.text = keep;
-  t = t.split(/(?<=。)/).filter(x => !/安定剤/.test(x)).join(''); // 記録に薬の種類（精神安定剤）は書かない（11/19）
+  t = t.split(/(?<=。)/).filter(x => !SENSITIVE_RE.test(x)).join(''); // 記録に薬の種類・病名・症状は書かない（11/19）
   return t;
 }
 function dupGroups() {
@@ -5921,6 +5923,7 @@ window.qaCheckRows = function (name) {
       if (ci >= 0 && ss0.slice(ci + 1).some(x => /代行|購入|掃除|清掃|洗濯|調理|配膳|入浴|洗髪|更衣|着替え|服薬/.test(x) && !LINK_RE.test(x) && !/「/.test(x))) add(r, '順番', '締めの文の後に支援の文'); }
     if (typeof orderFlow === 'function' && !r.sick) { const c = { ...r, e: r.e, text: t }; try { orderFlow(c); } catch (e) {} if (c.text !== t) add(r, '順番', '支援の流れの順になっていない'); }
     // 8.5 計画書（業務手順書）の手順の言い回し：その訪問に当たる手順の文が文章にあるか（チェックの無い支援・本人がやることは数えない）
+    { const m = String(t || '').match(SENSITIVE_RE); if (m) add(r, '言葉', `薬の種類・病名・症状の言葉「${m[0]}」が文に入っている（記録には書かない・11/19）`); }
     if (typeof planCands === 'function' && !r.sick) { const c = planCands(r, t), n = c.length; if (n > 0 && c.filter(x => x.present).length < n) add(r, '計画書', `計画書の手順の文が足りない（例：${c.find(x => !x.present).says[0].slice(0, 24)}）`); }
     if (typeof planDedupe === 'function' && planDedupe(r, t) !== t) add(r, '計画書', '手順書の文と同じ意味の決まった文が残っている');
     if (typeof withMedNext === 'function' && !(typeof rowClosed === 'function' && rowClosed(r)) && withMedNext(r, t) !== t) add(r, '眠前薬', '朝の服薬・眠前薬の文が決まった言い回しになっていない');
