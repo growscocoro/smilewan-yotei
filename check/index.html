@@ -190,6 +190,7 @@ const PREP_RE = /寝る30分ほど前に服用/, NEXT_RE = /前日の眠前薬/;
 const RULES = [
   ['シフト：記録が無い', 'bad', 'シフトにある訪問（利用者・日・開始時刻）の記録が無い'],
   ['シフト：担当者が違う', 'bad', 'シフトの担当者（2人で入った訪問は2人とも）が記録の担当者に無い'],
+  ['言葉：薬・病名・症状', 'bad', '記録の文に薬の種類・病名・症状の言葉（睡眠薬・安定剤・うつ・認知症・パニック・幻聴・精神科・副作用など）が入っている。11/19「精神安定剤って言葉入ってる」'],
   ['シフト：身体と家事が違う', 'bad', 'シフト（実際に入ったサービス）は家事なのに記録は身体（またはその逆）。11/19「身体と家事の認識ができてない」'],
   ['担当者が空（シフトに担当がいる）', 'bad', 'シフトに担当者がいるのに、記録の担当者の欄が空'],
   ['担当者が空（シフトにも無い）', 'warn', 'シフトにその人の予定が無い訪問で、担当者の欄が空（人×月で1行）'],
@@ -290,6 +291,7 @@ function check(D) {
     const tmplOf = r => { const dow = new Date(r.date + 'T00:00:00').getDay(), st = hm(r.start); if (st == null) return null; const c = tmpls.filter(x => (x.days || []).includes(dow) && Math.abs(hm(x.start) - st) <= 10); return c.find(x => /家事/.test(x.type || '') === (r.kind === '家事援助')) || c[0] || null; };
     rows.forEach(r => {
       const kp = shown(r), v = vals(r), t = String(r.text || ''), off = r.kpOff || [], on = r.kpOn || [];
+      { const m = t.match(/安定剤|睡眠薬|睡眠導入|眠剤|眠薬|抗不安|抗うつ|向精神|抗精神|精神薬|精神科|心療内科|精神疾患|精神障害|統合失調|うつ病|うつ状態|鬱|双極|躁うつ|認知症|知的障害|発達障害|自閉|ADHD|てんかん|パニック|幻聴|幻覚|妄想|依存症|自傷|自殺|希死|頓服|下剤|副作用/); if (m && r.on !== false) A('言葉：薬・病名・症状', r, `「${m[0]}」が文に入っている`); }
       { const tm = tmplOf(r), dow = new Date(r.date + 'T00:00:00').getDay(); if (tm) (tm.checked || []).forEach(k => { if (k === '食事|完食' || off.includes(k) || ((tm.dayOnly || {})[k] && !tm.dayOnly[k].includes(dow)) || (tm.either || []).some(g => g.includes(k)) || (r.sick && /入浴介助|清拭|身体整容\|整容/.test(k))) return; if (!kp.includes(k)) A('見本と違う', r, `見本（用紙p${tm.page || '?'}）にある「${k.split('|')[1]}」が付いていない`); }); }
       if (/通院/.test(r.type || '')) A('通院介助の記録', r, '通院介助の記録がある（いらない）');
       if (!String(r.start || '').trim()) A('開始時刻が空', r, `開始時刻が空（${String(r.text || '').slice(0, 20)}…）`);
