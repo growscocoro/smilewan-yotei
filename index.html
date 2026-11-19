@@ -831,7 +831,7 @@ async function setSetting(key, localKey, list, opt = {}) {
 const SUPA = { url: '', key: '' }; // 旧（使わない）
 const GAS = {"url": "https://script.google.com/macros/s/AKfycbxKEAUthQx9wiZKncHZR43jbSKjPfO2lYhlc2K5yXWJNXI_zA8wChdQTFlINEhLTDQO/exec"};           // 保存先（Googleドライブに保存するGAS）。build-site.sh が入れる
 // 版の確認：公開版が新しくなったら知らせ、古い版のままでは記録を保存しない（古い決まりで上書きしないため）
-const APP_VER = '20261117124501';
+const APP_VER = '20261119093549';
 let appOutdated = false;
 async function checkVer() {
   if (APP_VER === 'dev' || appOutdated) return appOutdated;
@@ -3966,9 +3966,9 @@ function tmplFor(r) {
   if (st == null) return null;
   const fam = t => /家事/.test(t.type || '') ? '家事援助' : '身体介護';
   const c = tmplList().filter(t => t.name === name && (t.days || []).includes(dow) && Math.abs(hm(t.start) - st) <= 10);
-  if (c.length) return c.find(t => fam(t) === r.kind) || c[0];
+  { const ck = c.find(t => fam(t) === r.kind); if (ck) return ck; } // その曜日の用紙が別の種類（身体と家事）のときは、下で同じ種類の用紙を探す（11/19 西村さん月曜13:00＝シフトは身体の入浴なのに家事の用紙を使っていた）
   // 曜日や時刻が用紙と違う訪問（予定表の変更など）：同じ人の、同じ種類（身体／家事／入浴／共に）で時刻が一番近い用紙（90分以内）を使う
-  if (/通院/.test(r.e.type || '')) return null;
+  if (/通院/.test(r.e.type || '')) return c[0] || null;
   const kind = tmplKind(r.e.type, r.e.detail, r.kind), tk = t => tmplKind(t.type, '', fam(t));
   const kinds = [kind, ...(/入浴|シャワー/.test(r.e.detail || '') && !/家事/.test(r.e.type || '') ? ['入浴'] : [])]; // 種別が「身体」でも内容に入浴とあれば入浴の用紙も
   const near = tmplList().filter(t => t.name === name && kinds.includes(tk(t)) && Math.abs(hm(t.start) - st) <= 90).sort((a, b) => Math.abs(hm(a.start) - st) - Math.abs(hm(b.start) - st));
@@ -3977,7 +3977,7 @@ function tmplFor(r) {
   // 曜日が用紙に無い訪問（シフトから足した訪問）で上で見つからないときは、中身で種類を見て、同じ人の時刻が一番近い用紙（90分以内）を使う（11/16 Wordの写真「直して」）
   const tkC = t => { const k = tk(t); if (k !== '身体') return k; const c = [...(t.checked || []), ...(t.circled || [])]; return c.some(x => /^入浴・清拭\|(入浴介助|シャワー浴)$/.test(x)) ? '入浴' : c.some(x => TOGETHER_RE.test(x)) ? '共に' : k; };
   const near2 = tmplList().filter(t => t.name === name && kinds.includes(tkC(t)) && Math.abs(hm(t.start) - st) <= 90).sort((a, b) => Math.abs(hm(a.start) - st) - Math.abs(hm(b.start) - st));
-  return near2[0] || null;
+  return near2[0] || c[0] || null; // 同じ種類の用紙が無いときだけ、その曜日の別の種類の用紙
 }
 // 見本で「ときどき」（丸囲み）の項目は、その訪問の予定の内容に書いてあるときだけ付ける（例：買物に丸→予定に「代行」とあれば付ける）
 const CIRC_RE = { '買物等|日常品等の買物': /買い物|買物|代行/, '買物等|薬の受取り': /薬の受取|薬の受け取|受け取り/, '自立支援|買い物・薬の受け取り': /買い物|買物|代行|薬/, '洗濯|洗濯': /洗濯/, '洗濯|乾燥（物干し）': /洗濯|干/, '入浴・清拭|シャワー浴': /シャワー/, '入浴・清拭|清拭': /清拭/, '身体整容|整容': /整容|髭|爪|髪/, '清掃|浴室': /浴室|風呂/, '衣類・寝具|衣類の整理': /衣類/, '衣類・寝具|シーツ・カバー交換': /シーツ/, '衣類・寝具|ベッドメイク': /ベッド/ };
@@ -4714,12 +4714,17 @@ async function buildRecords() {
       const used = new Set();
       for (const g of shiftRowsFor(shift[ym], name, d.getDate())) {
         const st = hm(g.s), tOf = e => hm(entryTime(e).s), fam = svcFam(g.v), near = (lim, same) => entries.filter(e => entryTime(e).s && !used.has(e) && Math.abs(tOf(e) - st) <= lim && (!same || !g.v || entFam(e) === fam)).sort((a, b) => Math.abs(tOf(a) - st) - Math.abs(tOf(b) - st));
-        const cand = near(45, true).length ? near(45, true) : near(30, false); // サービス内容（身体・家事・通院）が合う予定を優先
+        // 身体・家事はシフト（実際に入ったサービス）が正。その曜日に同じ種類の予定が無くても、ほかの曜日に同じ種類・近い時刻の予定があれば、種類の違う予定とは組にしない
+        // （11/19「身体と家事の認識ができてない」：藤原さん7:30＝シフトと見本は家事なのに予定表が身体の曜日・清野さんの日曜（入浴の日と入れ替え）が、予定表の種類のまま記録になっていた）
+        const famElse = g.v && fam !== '通院' && allEntries.some(x => entFam(x) === fam && Math.abs(hm(entryTime(x).s) - st) <= 60);
+        const cand = near(45, true).length ? near(45, true) : famElse ? [] : near(30, false); // サービス内容（身体・家事・通院）が合う予定を優先
         let e = cand[0], flag = '';
         if (e) used.add(e);
         else { // 予定表に無い訪問：ほかの曜日の、時間が近い予定を手本にする
+          const wrong = famElse ? near(15, false)[0] : null; if (wrong) used.add(wrong); // 同じ時刻にある種類違いの予定（予定表の種類の入れ違い・曜日の入れ替え）は、この訪問の物として使い切る
           const tpl = allEntries.filter(x => !g.v || entFam(x) === svcFam(g.v)).sort((a, b) => Math.abs(hm(entryTime(a).s) - st) - Math.abs(hm(entryTime(b).s) - st))[0];
-          e = tpl && Math.abs(hm(entryTime(tpl).s) - st) <= 60 ? tpl : { ...emptyEntry(), type: svcFam(g.v) === '家事' ? '家事' : svcFam(g.v) === '通院' ? '通院介助' : '身体', detail: '' }; flag = '予定表に無い訪問（シフトから）'; nAdd++;
+          e = tpl && Math.abs(hm(entryTime(tpl).s) - st) <= 60 ? tpl : { ...emptyEntry(), type: svcFam(g.v) === '家事' ? '家事' : svcFam(g.v) === '通院' ? '通院介助' : '身体', detail: '' };
+          flag = wrong ? `予定表と種類が違う訪問（シフトの${fam}で作った・予定表は${wrong.type || '種別なし'}）` : '予定表に無い訪問（シフトから）'; nAdd++;
         }
         plan.push({ e: { ...e, start: g.s, end: g.e || e.end }, staff: g.helpers.join('・'), fromShift: true, on: true, flag }); nShift++;
       }
@@ -6076,6 +6081,8 @@ function scheduleQa(name) {
   }));
   const add = recRows.filter(r => /予定表に無い訪問/.test(r.flag || '')), miss = recRows.filter(r => /シフトに無い予定/.test(r.flag || ''));
   if (add.length) out.push(`シフトにあって予定表に無い訪問が ${add.length} 件（${add.slice(0, 5).map(r => ymd(r.date).slice(5) + ' ' + (r.e.start || '')).join('・')}${add.length > 5 ? '…' : ''}）：近い予定を手本に作りました。予定表に足すと正確になります`);
+  const kindX = recRows.filter(r => /予定表と種類が違う訪問/.test(r.flag || '')); // 11/19 身体・家事はシフトが正
+  if (kindX.length) out.push(`予定表と身体・家事が違う訪問が ${kindX.length} 件（${kindX.slice(0, 5).map(r => ymd(r.date).slice(5) + ' ' + (r.e.start || '') + ' ' + (r.e.type || '')).join('・')}${kindX.length > 5 ? '…' : ''}）：シフトの種類で作りました。予定表の種類（身体・家事）を確かめてください`);
   const warn = recRows.filter(r => r.on !== false && (r.noShift || /シフトに無い予定（(シフトを確認|記録に入れない)/.test(r.flag || '')));
   if (warn.length) out.push(`⚠ シフトに無い訪問が ${warn.length} 件（${warn.slice(0, 5).map(r => ymd(r.date).slice(5) + ' ' + (r.e.start || entryTime(r.e).s || '')).join('・')}${warn.length > 5 ? '…' : ''}）：チェックはそのままです。行っていない訪問ならチェックを外してください`);
   // 11/14 シフトがある月は、予定表だけの訪問はチェックを外して出す（記録に入れない）→ どれが外れたかを参考に出す（点検サイトの「シフトと予定表」でも見られる）
