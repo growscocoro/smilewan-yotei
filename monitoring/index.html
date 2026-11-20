@@ -992,14 +992,21 @@ function reloadAll(){ // 保存先から読み直して画面を作り直す
   users=store.get('users',[]); renderSettings(); renderUsers(); loadMonth($('#m-month').value); renderMonthly();
 }
 $('#b-export').addEventListener('click',()=>{
-  const data={}; store.keys().forEach(k=>data[k]=store.get(k));
-  download(new Blob([JSON.stringify(data,null,1)],{type:'application/json'}), `モニタリング報告書_backup_${todayStr()}.json`);
+  const data={ __mode:MODE }; store.keys().forEach(k=>data[k]=store.get(k));   // どちらの制度の控えかを書いておく
+  download(new Blob([JSON.stringify(data,null,1)],{type:'application/json'}), `モニタリング報告書_${MODE_NAME[MODE]}_backup_${todayStr()}.json`);
 });
 $('#b-import').addEventListener('click',()=>$('#b-file').click());
 $('#b-file').addEventListener('change',async e=>{
   const f=e.target.files[0]; if(!f) return;
   try{
     const data=JSON.parse(await f.text());
+    // 制度違いの読み込みを止める(障害の控えを介護側に読み込むと、名簿が混ざる)
+    const fm=data.__mode; delete data.__mode;
+    if(fm && fm!==MODE){ await notify(`このファイルは「${MODE_NAME[fm]||fm}」側の控えです。今は「${MODE_NAME[MODE]}」側が開いています。\n上の切替ボタンを「${MODE_NAME[fm]||fm}」にしてから、もう一度読み込んでください。`); e.target.value=''; return; }
+    if(!fm && Array.isArray(data.users) && data.users.length){
+      const other=data.users.filter(u=>u&&u.seido&&u.seido!==MODE_DEFAULT_SEIDO).length;
+      if(other>data.users.length/2 && !(await ask(`このファイルの利用者は、今開いている「${MODE_NAME[MODE]}」側ではない制度の人が多いようです（${data.users.length}名中${other}名）。\n本当に「${MODE_NAME[MODE]}」側に読み込みますか？`))){ e.target.value=''; return; }
+    }
     if(shared.on && !(await ask('読み込むと、共通保存の内容がこのファイルの内容に置き換わります（全員の画面に反映されます）。よろしいですか？'))){ e.target.value=''; return; }
     Object.entries(data).forEach(([k,v])=>store.set(k,v)); reloadAll(); toast('読み込みました');
   }
@@ -1018,7 +1025,7 @@ function renderLocalLeftover(){
   $('#b-local-info').textContent=`共通保存にする前にこのブラウザで入力していた内容が残っています（利用者${s.users}名・入力済み${s.months}か月分）。共通保存には自動では入りません。`;
 }
 $('#b-local-export').addEventListener('click',()=>{
-  const data={}; LS.keys().forEach(k=>data[k]=LS.get(k));
+  const data={ __mode:MODE }; LS.keys().forEach(k=>data[k]=LS.get(k));
   download(new Blob([JSON.stringify(data,null,1)],{type:'application/json'}), `モニタリング報告書_このブラウザの控え_${todayStr()}.json`);
 });
 $('#b-local-up').addEventListener('click',async()=>{
