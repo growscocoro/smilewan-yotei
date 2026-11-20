@@ -1,0 +1,1145 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="robots" content="noindex,nofollow">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>モニタリング報告書 自動作成</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<style>
+  :root{--bg:#f4f6f9;--card:#ffffff;--line:#d6dce4;--text:#1e2833;--muted:#66717f;--accent:#1d6fd1;--accent2:#e8f0fc;--accent-text:#ffffff;--th:#eef1f5;--warn:#b45309;--warn-bg:#fff3e0;--ok:#15803d;--ok-bg:#e6f4ea;--note-bg:#fff8e6;--note-line:#f1d48a;--danger:#c62828;--toast-bg:#1e2833;--toast-text:#ffffff;--input-bg:#ffffff}
+  @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--bg:#151a21;--card:#1d242d;--line:#343d49;--text:#e6eaf0;--muted:#98a3b1;--accent:#5b9cf5;--accent2:#22304a;--accent-text:#0d1420;--th:#242c37;--warn:#f2b06a;--warn-bg:#3a2a14;--ok:#7fd39a;--ok-bg:#16301f;--note-bg:#33301c;--note-line:#6b5f2a;--danger:#ff8a80;--toast-bg:#e6eaf0;--toast-text:#151a21;--input-bg:#161c24}}
+  :root[data-theme="dark"]{--bg:#151a21;--card:#1d242d;--line:#343d49;--text:#e6eaf0;--muted:#98a3b1;--accent:#5b9cf5;--accent2:#22304a;--accent-text:#0d1420;--th:#242c37;--warn:#f2b06a;--warn-bg:#3a2a14;--ok:#7fd39a;--ok-bg:#16301f;--note-bg:#33301c;--note-line:#6b5f2a;--danger:#ff8a80;--toast-bg:#e6eaf0;--toast-text:#151a21;--input-bg:#161c24}
+  *{box-sizing:border-box}
+  [hidden]{display:none!important}
+  .dlg-bg{position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;z-index:100;padding:16px}
+  .dlg{background:var(--card);color:var(--text);border:1px solid var(--line);border-radius:10px;padding:18px;max-width:420px;width:100%;box-shadow:0 10px 30px rgba(0,0,0,.3)}
+  .dlg-msg{white-space:pre-wrap;line-height:1.6;margin-bottom:14px}
+  .dlg-btns{display:flex;gap:8px;justify-content:flex-end}
+  body{margin:0;font-family:-apple-system,"Hiragino Sans","Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif;background:var(--bg);color:var(--text);font-size:14px}
+  header{background:var(--card);border-bottom:1px solid var(--line);padding:12px 20px;display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+  header h1{font-size:17px;margin:0}
+  nav button{border:1px solid var(--line);background:var(--card);color:var(--text);padding:7px 14px;border-radius:6px;cursor:pointer;font-size:14px}
+  nav button.active{background:var(--accent);color:var(--accent-text);border-color:var(--accent)}
+  main{max-width:1200px;margin:0 auto;padding-block:16px;padding-inline:16px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:16px;margin-bottom:16px}
+  .card h2{font-size:15px;margin:0 0 12px}
+  label{display:block;font-size:12px;color:var(--muted);margin-bottom:2px}
+  input[type=text],input[type=date],input[type=month],select,textarea{width:100%;padding:6px 8px;border:1px solid var(--line);border-radius:5px;font-size:14px;font-family:inherit;background:var(--input-bg);color:var(--text)}
+  textarea{min-height:110px;line-height:1.5}
+  .row{display:flex;gap:12px;flex-wrap:wrap}
+  .row>div{flex:1;min-width:160px}
+  .btn{border:1px solid var(--accent);background:var(--accent);color:var(--accent-text);padding:8px 14px;border-radius:6px;cursor:pointer;font-size:14px}
+  .btn.sub{background:var(--card);color:var(--accent)}
+  .btn.small{padding:4px 10px;font-size:12px}
+  .btn.danger{border-color:var(--danger);color:var(--danger);background:var(--card)}
+  .btn:disabled{opacity:.5;cursor:default}
+  table{border-collapse:collapse;width:100%;font-size:13px}
+  th,td{border:1px solid var(--line);padding:4px 6px;vertical-align:middle}
+  th{background:var(--th);font-weight:600;white-space:nowrap}
+  td input,td select{padding:4px 6px;font-size:13px}
+  td select{min-width:96px}
+  td input[type=date]{min-width:140px}
+  .muted{color:var(--muted);font-size:12px}
+  .note{background:var(--note-bg);border:1px solid var(--note-line);padding:8px 12px;border-radius:6px;font-size:13px;margin-bottom:12px}
+  .user{border:1px solid var(--line);border-radius:8px;padding:12px;margin-bottom:12px;background:var(--card)}
+  .user.skip{opacity:.55}
+  .user h3{margin:0 0 8px;font-size:15px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .user h3 .stat{font-weight:normal;font-size:12px;color:var(--muted)}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:8px 12px}
+  .toast{position:fixed;bottom:calc(20px + env(safe-area-inset-bottom, 0px));left:50%;transform:translateX(-50%);background:var(--toast-bg);color:var(--toast-text);padding:10px 18px;border-radius:8px;opacity:0;transition:.3s;pointer-events:none}
+  .toast.show{opacity:1}
+  .drop{border:2px dashed var(--line);border-radius:8px;padding:14px;text-align:center;color:var(--muted);cursor:pointer}
+  .drop.on{border-color:var(--accent);background:var(--accent2)}
+  .pill{display:inline-block;padding:1px 8px;border-radius:10px;font-size:11px;background:var(--accent2);color:var(--accent)}
+  .pill.warn{background:var(--warn-bg);color:var(--warn)}
+  .pill.ok{background:var(--ok-bg);color:var(--ok)}
+  details.sit{margin-top:10px;border:1px solid var(--line);border-radius:8px;padding:8px 12px;background:var(--bg)}
+  details.sit summary{cursor:pointer;font-size:13px;color:var(--accent);font-weight:600}
+  .sitcat{margin-top:8px}
+  .sitcat-name{font-size:12px;color:var(--muted);margin-bottom:4px}
+  .chips{display:flex;flex-wrap:wrap;gap:6px}
+  .chip{display:inline-flex;align-items:center;gap:4px;border:1px solid var(--line);border-radius:14px;padding:3px 10px;font-size:12px;background:var(--card);cursor:pointer;color:var(--text);user-select:none}
+  .chip:has(input:checked){background:var(--accent);border-color:var(--accent);color:var(--accent-text)}
+  .chip input{margin:0;width:12px;height:12px;accent-color:var(--accent)}
+  .chip .x{border:none;background:transparent;color:var(--muted);cursor:pointer;font-size:13px;padding:0 0 0 2px;line-height:1}
+  .chip .x:hover{color:var(--danger)}
+  @media (max-width:700px){.grid{grid-template-columns:1fr 1fr}header{padding:10px 16px}}
+  button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+  @media (prefers-reduced-motion: reduce){.toast{transition:none}}
+  .modesw{display:inline-flex;border:1px solid var(--accent);border-radius:999px;overflow:hidden;margin-left:8px;vertical-align:middle}
+  .mbtn{border:none;background:transparent;color:var(--accent);padding:4px 12px;font-size:12px;cursor:pointer;white-space:nowrap}
+  .mbtn.on{background:var(--accent);color:#fff}
+  .sync{display:inline-flex;align-items:center;gap:8px;font-size:12px;padding:4px 10px;border-radius:12px;background:var(--th);color:var(--muted)}
+  .sync.ok{background:var(--ok-bg);color:var(--ok)}
+  .sync.warn{background:var(--warn-bg);color:var(--warn)}
+  .sync button{border:1px solid currentColor;background:transparent;color:inherit;border-radius:10px;padding:2px 8px;font-size:12px;cursor:pointer}
+</style>
+</head>
+<body>
+<header>
+  <h1>モニタリング報告書兼サービス実施状況報告書　自動作成
+    <span class="modesw" title="制度を切り替え(入力データは制度ごとに別々に保存されます)">
+      <button type="button" class="mbtn" data-mode="shogai">障害福祉（居宅介護）</button><button type="button" class="mbtn" data-mode="kaigo">介護保険（訪問介護）</button>
+    </span>
+  </h1>
+  <nav>
+    <button data-tab="monthly" class="active">月次作成</button>
+    <button data-tab="master">利用者マスタ・設定</button>
+    <button data-tab="backup">バックアップ</button>
+  </nav>
+  <span class="sync" id="sync" hidden></span>
+</header>
+<main hidden>
+
+<!-- ================= 月次作成 ================= -->
+<section id="tab-monthly">
+  <div class="card">
+    <h2>1. 対象月と日付</h2>
+    <div class="row">
+      <div><label>対象月（サービス提供月）</label><input type="month" id="m-month"></div>
+      <div><label>作成日（報告書の日付）</label><input type="date" id="m-date"></div>
+      <div><label>説明日</label><input type="date" id="m-explain"></div>
+      <div><label>説明者（既定）</label><select id="m-explainer"></select></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>2. かいポケ シフトCSV取込（任意）</h2>
+    <p class="muted">かいポケの「訪問介護シフト」CSV（ヘルパー名／日付／曜日／利用者／業務種別／サービス内容／開始時間／終了時間／提供時間（分））を読み込むと、利用者ごとの訪問回数・内訳を集計し、「状況の詳細」の下書きを自動生成します。</p>
+    <div class="drop" id="m-drop">ここにCSVをドロップ、またはクリックして選択<input type="file" id="m-file" accept=".csv" hidden></div>
+    <div id="m-csvinfo" class="muted" style="margin-top:8px"></div>
+    <div id="m-newusers" class="note" style="margin-top:8px" hidden></div>
+  </div>
+
+  <div class="card">
+    <h2>3. 利用者ごとの内容</h2>
+    <div class="row" style="margin-bottom:10px;align-items:flex-end">
+      <div style="flex:0 0 auto"><button class="btn sub" id="m-draftall">全員の「状況の詳細」を一括作成（選んだ状況から）</button></div>
+      <div style="flex:0 0 auto"><button class="btn sub" id="m-resetall">全員を既定値に戻す</button></div>
+      <div style="flex:1"></div>
+      <div style="flex:0 0 auto"><button class="btn" id="m-zip">全員分をまとめてダウンロード（ZIP）</button></div>
+    </div>
+    <div id="m-users"></div>
+  </div>
+</section>
+
+<!-- ================= マスタ ================= -->
+<section id="tab-master" hidden>
+  <div class="card">
+    <h2>事業所設定</h2>
+    <div class="row">
+      <div><label>報告事業所（自事業所名）</label><input type="text" id="s-office" placeholder="例：すまいるわん"></div>
+      <div><label>サービス提供責任者（既定）</label><select id="s-sakuseki"></select></div>
+      <div><label>説明者（既定）</label><select id="s-explainer"></select></div>
+    </div>
+  </div>
+  <div class="card">
+    <h2>担当者名簿（自事業所）</h2>
+    <p class="muted">ここに登録した名前が「サービス提供責任者」「説明者」の選択肢になります。</p>
+    <div class="row" style="align-items:flex-end;margin-bottom:8px">
+      <div style="flex:1;min-width:200px"><label>名前を追加</label><input type="text" id="st-name" placeholder="例：山田 太郎"></div>
+      <div style="flex:0 0 auto"><button class="btn sub" id="st-add">＋ 追加</button></div>
+      <div style="flex:0 0 auto"><button class="btn sub" id="st-import">CSVから取り込む（シフトCSV／スタッフ設定CSV）</button><input type="file" id="st-file" accept=".csv" hidden></div>
+    </div>
+    <div class="chips" id="st-list"></div>
+  </div>
+  <div class="card">
+    <h2>報告先担当者名簿（<span class="lContact"></span>）</h2>
+    <p class="muted">ここに登録した名前が利用者マスタの「報告先担当者」の選択肢になります。選ぶと訪問先事業所も自動で入ります。</p>
+    <div class="row" style="align-items:flex-end;margin-bottom:8px">
+      <div style="flex:1;min-width:160px"><label>担当者名</label><input type="text" id="ct-name" placeholder="例：山田 花子"></div>
+      <div style="flex:1;min-width:200px"><label>事業所名（<span class="lOffice"></span>）</label><input type="text" id="ct-office" placeholder="例：相談支援センターさくら"></div>
+      <div style="flex:0 0 auto"><button class="btn sub" id="ct-add">＋ 追加</button></div>
+    </div>
+    <div style="overflow:auto"><table id="ct-table"><thead><tr><th>担当者名</th><th>事業所名</th><th></th></tr></thead><tbody></tbody></table></div>
+  </div>
+  <div class="card">
+    <h2>利用者マスタ</h2>
+    <div class="note">かいポケの「利用者情報」CSVを取り込むと利用中の利用者名を追加できます。区分・有効期間・報告先（<span class="lContact"></span>）などはかいポケCSVに含まれないため、ここで一度入力すると次回以降も使われます。</div>
+    <div class="row" style="margin-bottom:10px">
+      <div style="flex:0 0 auto"><button class="btn sub" id="u-import">利用者情報CSVを取り込む</button><input type="file" id="u-file" accept=".csv" hidden></div>
+      <div style="flex:0 0 auto"><button class="btn sub" id="u-add">＋ 利用者を追加</button></div>
+      <div style="flex:1"></div>
+      <div style="flex:0 0 auto"><button class="btn danger" id="u-clear">利用者を全員削除</button></div>
+    </div>
+    <div style="overflow:auto">
+    <table id="u-table">
+      <thead><tr>
+        <th>作成</th><th>利用者名</th><th>制度</th><th>区分・介護度</th><th>有効期間 開始</th><th>有効期間 終了</th><th>報告先担当者</th><th>訪問先事業所</th><th>サービス提供責任者</th><th>家族</th><th></th>
+      </tr></thead>
+      <tbody></tbody>
+    </table>
+    </div>
+    <p class="muted" style="margin-top:8px">「作成」のチェックを外した利用者は月次作成の対象外になります。有効期間・区分が未入力の場合は原本どおり空欄（未マーク）で出力します。</p>
+  </div>
+</section>
+
+<!-- ================= バックアップ ================= -->
+<section id="tab-backup" hidden>
+  <div class="card">
+    <h2>データのバックアップ・復元</h2>
+    <p class="muted" id="b-desc">入力内容（設定・利用者マスタ・各月の入力）はこのブラウザ内（localStorage）に保存されます。別のPCで使う場合や念のための控えとして、JSONで書き出し／読み込みができます。</p>
+    <div class="row">
+      <div style="flex:0 0 auto"><button class="btn sub" id="b-export">JSONで書き出す</button></div>
+      <div style="flex:0 0 auto"><button class="btn sub" id="b-import">JSONを読み込む</button><input type="file" id="b-file" accept=".json" hidden></div>
+      <div style="flex:0 0 auto"><button class="btn danger" id="b-clear">すべて削除</button></div>
+    </div>
+  </div>
+  <div class="card" id="b-local" hidden>
+    <h2>このブラウザに残っている内容（共通保存にする前のもの）</h2>
+    <p class="muted" id="b-local-info"></p>
+    <div class="row">
+      <div style="flex:0 0 auto"><button class="btn sub" id="b-local-export">このブラウザの内容をJSONで書き出す</button></div>
+      <div style="flex:0 0 auto"><button class="btn danger" id="b-local-up">このブラウザの内容を共通保存に入れる（上書き）</button></div>
+    </div>
+  </div>
+  <div class="card">
+    <h2>原本テンプレート</h2>
+    <p class="muted">この画面に埋め込まれている原本（Excel）をそのまま取り出せます。</p>
+    <button class="btn sub" id="b-template">原本をダウンロード</button>
+  </div>
+</section>
+
+</main>
+<div class="toast" id="toast"></div>
+<datalist id="contact-list"></datalist>
+<div class="dlg-bg" id="dlg" hidden><div class="dlg"><div class="dlg-msg" id="dlg-msg"></div><input type="text" id="dlg-in" hidden autocomplete="off" style="margin-bottom:14px"><div class="dlg-btns"><button class="btn sub" id="dlg-no">キャンセル</button><button class="btn" id="dlg-ok">OK</button></div></div></div>
+
+<script>
+// ====== 埋め込みテンプレート（原本xlsx） ======
+const TEMPLATE_B64 = "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";
+
+// ====== 選択肢定義（原本のチェック項目と一致させる） ======
+const OPT = {
+  jisshi:   ['計画通り実施','計画通り実施されていない'],
+  kouka:    ['達成','効果あり','特に変化なし','効果あるも不十分','効果なし'],
+  henka:    ['変化なし','変化あり'],
+  iyoku:    ['もっとやりたい','このままでよい','あまりやりたくない'],
+  minaoshi: ['必要なし','必要あり'],
+  manzoku:  ['満足','ふつう','不満'],
+};
+const DEFAULTS = { jisshi:'計画通り実施', kouka:'効果あり', henka:'変化なし', honninIyoku:'このままでよい', kazokuIyoku:'このままでよい', minaoshi:'必要なし', honninManzoku:'満足', kazokuManzoku:'満足', riyu:'', henkaNaiyo:'', shosai:'', explainer:'', tags:[], seed:0, memo:'' };
+// 制度モード: 画面上部のボタンで切り替え(選択はブラウザに記憶。未選択時は 'kaigo' が既定)
+const MODE = (function(){ try{ return localStorage.getItem('monModeSel') || 'kaigo'; }catch(e){ return 'kaigo'; } })();
+const L = MODE==='kaigo'
+  ? { contact:'ケアマネジャー', office:'居宅介護支援事業所' }
+  : { contact:'相談支援専門員', office:'相談支援事業所' };
+const MODE_DEFAULT_SEIDO = MODE==='kaigo' ? '介護保険' : '障害';
+const HOUSE_LABEL = MODE==='kaigo' ? '生活援助' : '家事援助';
+const SEIDO = ['障害','介護保険'];
+const KUBUN = { '障害':['','区分1','区分2','区分3','区分4','区分5','区分6'], '介護保険':['','要支援1','要支援2','要介護1','要介護2','要介護3','要介護4','要介護5'] };
+
+// ====== 保存 ======
+const MODE_PREFIX = MODE==='kaigo' ? 'monk:' : 'mon:';
+// 2026-11-20 共通保存に対応(それまでは localStorage のみ)
+// LS = このブラウザの中だけの保存(従来どおり)。共通保存につながらないとき、ローカルで開いたときに使う
+const LS = {
+  get(k, d){ try{ const v=localStorage.getItem(MODE_PREFIX+k); return v?JSON.parse(v):d; }catch(e){ return d; } },
+  set(k, v){ try{ localStorage.setItem(MODE_PREFIX+k, JSON.stringify(v)); }catch(e){ try{ toast('保存に失敗しました（ブラウザの容量）'); }catch(_){} } },
+  del(k){ try{ localStorage.removeItem(MODE_PREFIX+k);}catch(e){} },
+  keys(){ try{ return Object.keys(localStorage).filter(k=>k.startsWith(MODE_PREFIX)).map(k=>k.slice(MODE_PREFIX.length)); }catch(e){ return []; } }
+};
+// 共通保存(claude.ai の db 機能)。1つの項目(settings / users / month:YYYY-MM)を 1ドキュメント {v:値} として mon/<制度>.<項目> に置く
+// cache = 今この画面が持っている値、base = 共通保存側で最後に確認できた値。両者の差だけを書き込む
+const shared = { on:false, col:null, cache:{}, base:{}, timers:{}, busy:{}, again:{}, removed:{}, ready:false, writeFail:false };
+const clone = v => v===undefined ? undefined : JSON.parse(JSON.stringify(v));
+function stable(v){ // キーの並び順に左右されない比較用の文字列
+  if(v===undefined) return 'undefined';
+  if(v===null || typeof v!=='object') return JSON.stringify(v);
+  if(Array.isArray(v)) return '['+v.map(stable).join(',')+']';
+  return '{'+Object.keys(v).sort().filter(k=>v[k]!==undefined).map(k=>JSON.stringify(k)+':'+stable(v[k])).join(',')+'}';
+}
+const same = (a,b) => stable(a)===stable(b);
+const isMonthKey = k => k.startsWith('month:');
+const isObj = v => v && typeof v==='object' && !Array.isArray(v);
+const docId = k => MODE+'.'+k;
+// 月のデータは「利用者ごと」に見て、自分が変えた所は自分の値、変えていない所は相手(共通保存)の値を採る
+function merge3Month(b, l, r){
+  b=isObj(b)?b:{}; const out={};
+  new Set([...Object.keys(l),...Object.keys(r)]).forEach(x=>{
+    if(x==='users') return;
+    const v = same(l[x],b[x]) ? r[x] : l[x];
+    if(v!==undefined) out[x]=v;
+  });
+  const lu=isObj(l.users)?l.users:{}, ru=isObj(r.users)?r.users:{}, bu=isObj(b.users)?b.users:{};
+  out.users={};
+  new Set([...Object.keys(lu),...Object.keys(ru)]).forEach(id=>{
+    const v = same(lu[id],bu[id]) ? ru[id] : lu[id];
+    if(v!==undefined) out.users[id]=v;
+  });
+  return out;
+}
+// 月のデータの「変わった所だけ」を取り出す。項目が減っている(消した)ときは null を返し、丸ごと書き直す
+function monthPatch(b, l){
+  if(!isObj(b) || !isObj(l)) return null;
+  const patch={}; let n=0;
+  for(const x of Object.keys(b)){ if(!(x in l) || l[x]===undefined) return null; }
+  const lu=isObj(l.users)?l.users:{}, bu=isObj(b.users)?b.users:{};
+  for(const id of Object.keys(bu)){ if(!(id in lu)) return null; if(isObj(bu[id]) && isObj(lu[id])){ for(const f of Object.keys(bu[id])){ if(!(f in lu[id])) return null; } } }
+  for(const x of Object.keys(l)){ if(x==='users') continue; if(!same(l[x],b[x])){ patch[x]=clone(l[x]); n++; } }
+  const pu={}; for(const id of Object.keys(lu)){ if(!same(lu[id],bu[id])){ pu[id]=clone(lu[id]); n++; } }
+  if(Object.keys(pu).length) patch.users=pu;
+  return n ? patch : {};
+}
+function queueWrite(k, now){
+  clearTimeout(shared.timers[k]);
+  if(now){ delete shared.timers[k]; flushKey(k); return; }
+  shared.timers[k]=setTimeout(()=>{ delete shared.timers[k]; flushKey(k); }, 700);
+  showSync();
+}
+async function flushKey(k){
+  if(shared.busy[k]){ shared.again[k]=true; return; }
+  shared.busy[k]=true; showSync();
+  try{
+    const ref=shared.col.doc(docId(k));
+    const attempt=async()=>{
+      if(!(k in shared.cache)){ await ref.delete(); return; }
+      const local=shared.cache[k], base=shared.base[k];
+      if(base!==undefined && same(base,local)) return;
+      const patch = (base!==undefined && isMonthKey(k)) ? monthPatch(base, local) : null;
+      if(patch && !Object.keys(patch).length) return;
+      if(patch){ try{ await ref.update({v:patch}); return; }catch(e){ if(!(e&&e.code==='invalid_argument')) throw e; } }
+      await ref.set({v:clone(local)});
+    };
+    try{ await attempt(); }
+    catch(e){ if(e&&e.code==='unavailable'){ await new Promise(r=>setTimeout(r,1200+Math.random()*800)); await attempt(); } else throw e; }
+    shared.lastError=null;
+  }catch(e){
+    console.error('共通保存エラー', e);
+    const code=e&&e.code;
+    if(code==='invalid_argument' || code==='bad_pass'){ shared.writeFail=true; }
+    shared.lastError = code==='quota_exceeded' ? '共通保存の容量がいっぱいで保存できません' : code==='revoked' ? '共通保存が使えなくなりました。ページを読み込み直してください' : '共通保存に失敗しました。少し待ってから入力し直してください';
+  }finally{
+    shared.busy[k]=false;
+    if(shared.again[k]){ shared.again[k]=false; flushKey(k); }
+    showSync();
+  }
+}
+function sharedIdle(){ // 書き込み待ちが無くなるまで待つ
+  return new Promise(res=>{ const t=()=>{ if(Object.keys(shared.timers).length || Object.values(shared.busy).some(Boolean)) setTimeout(t,150); else res(); }; t(); });
+}
+function flushAllNow(){ Object.keys(shared.timers).forEach(k=>queueWrite(k,true)); }
+// 共通保存から届いた内容を取り込む。返り値 = この画面の値が変わった項目
+function ingest(snap){
+  const remote={};
+  snap.docs.forEach(d=>{ if(!d.exists || !d.id.startsWith(MODE+'.')) return; const body=d.data(); if(body && body.v!==undefined) remote[d.id.slice(MODE.length+1)]=clone(body.v); });
+  const changed=[];
+  new Set([...Object.keys(remote),...Object.keys(shared.base)]).forEach(k=>{
+    const r=remote[k], b=shared.base[k];
+    if(same(r,b)) return;
+    const has = k in shared.cache, l=shared.cache[k];
+    if(r===undefined){ if(has && same(l,b)){ delete shared.cache[k]; changed.push(k); } delete shared.base[k]; return; }
+    if(isMonthKey(k) && isObj(b) && isObj(b.users)){ const ru=isObj(r.users)?r.users:{}; const gone=Object.keys(b.users).filter(id=>!(id in ru)); if(gone.length) shared.removed[k]=(shared.removed[k]||[]).concat(gone); }
+    if(!has){ if(b===undefined){ shared.cache[k]=clone(r); changed.push(k); } }
+    else{
+      const merged = (isMonthKey(k) && isObj(l) && isObj(r)) ? merge3Month(b,l,r) : (same(l,b) ? clone(r) : l);
+      if(!same(merged,l)){ shared.cache[k]=merged; changed.push(k); }
+    }
+    shared.base[k]=r;
+    // 手元にまだ送っていない変更が残っているときは、送り直す
+    if(shared.ready && (k in shared.cache) && !same(shared.cache[k],r) && !shared.timers[k] && !shared.busy[k]) queueWrite(k);
+  });
+  return changed;
+}
+// Claudeの外(GitHubのページ)に置いたときの共通保存先(合言葉つき・GAS)。build.sh が URL を入れる。空なら使わない
+const GAS_URL = 'https://script.google.com/macros/s/AKfycbykPKIer02Iitw_JEYLikD3Mev4PTfeHDE6x65Ua9fZx0IJpEsr_vb9PTc6wJjrQ75Heg/exec';
+const PASS_KEY = 'monPass';
+function gasCall(body, pass){
+  return fetch(GAS_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({...body,pass})}).then(r=>r.json()).then(j=>{
+    if(!j || !j.ok){ const e=new Error((j&&j.error)||'error'); e.code = (j&&j.error==='invalid passcode') ? 'bad_pass' : 'unavailable'; throw e; }
+    return j;
+  }, err=>{ const e=new Error(String(err&&err.message||err)); e.code='unavailable'; throw e; });
+}
+// db 機能と同じ形(collection().onSnapshot / doc().set・update・delete)で使えるようにしたもの。15秒ごとに版数だけ見て、変わっていたら読み直す
+function gasDB(pass){
+  let chain=Promise.resolve(), rev=-1, next=null, timer=null, stopped=false;
+  const call=body=>{ const p=chain.then(()=>gasCall(body,pass)); chain=p.catch(()=>{}); return p; };   // 通信は1本ずつ順番に
+  const pull=async()=>{ const j=await call({op:'all'}); rev=j.rev; if(next && !stopped) next({metadata:{fromCache:false,hasPendingWrites:false}, docs:Object.keys(j.docs||{}).map(id=>({id,exists:true,data:()=>({v:j.docs[id]})}))}); };
+  const tick=async()=>{ if(stopped) return; try{ const m=await call({op:'meta'}); if(m.rev!==rev) await pull(); shared.offline=false; }catch(e){ shared.offline=true; } showSync(); timer=setTimeout(tick, document.visibilityState==='hidden'?60000:15000); };
+  const write=async op=>{ await call({op:'write',ops:[op]}); pull().catch(()=>{}); };
+  return { collection:()=>({
+    onSnapshot(n,err){ next=n; pull().then(()=>{ timer=setTimeout(tick,15000); }).catch(e=>{ if(err) err(e); }); return ()=>{ stopped=true; clearTimeout(timer); }; },
+    doc:id=>({ set:b=>write({id,set:b.v}), update:b=>write({id,patch:b.v}), delete:()=>write({id,del:true}) })
+  }) };
+}
+const store = {
+  get(k, d){ if(!shared.on) return LS.get(k,d); return (k in shared.cache) ? clone(shared.cache[k]) : d; },
+  set(k, v){ if(!shared.on) return LS.set(k,v); shared.cache[k]=clone(v); queueWrite(k); },
+  del(k){ if(!shared.on) return LS.del(k); delete shared.cache[k]; queueWrite(k,true); },
+  keys(){ return shared.on ? Object.keys(shared.cache) : LS.keys(); }
+};
+// 初期データ（seed.json / seed-kaigo.json を build.sh が埋め込む）。保存データが無いときだけ使う
+const SEEDS = { shogai: {"settings":{"office":"すまいるわん","sakuseki":"","explainer":"","staff":[],"contacts":[]},"users":[]}, kaigo: {"settings":{"office":"すまいるわん","sakuseki":"","explainer":"","staff":[],"contacts":[]},"users":[]} };
+const SEED = SEEDS[MODE] || {};
+// モード切替ボタン(選択を保存して再読み込み。データ領域はモードごとに独立)
+document.querySelectorAll('.mbtn').forEach(b => {
+  b.classList.toggle('on', b.dataset.mode === MODE);
+  b.addEventListener('click', () => {
+    if(b.dataset.mode === MODE) return;
+    try{ localStorage.setItem('monModeSel', b.dataset.mode); }catch(e){}
+    location.reload();
+  });
+});
+document.querySelectorAll('.lContact').forEach(el => el.textContent = L.contact);
+document.querySelectorAll('.lOffice').forEach(el => el.textContent = L.office);
+let settings = null;
+let users = null;   // {id,name,seido,kubun,validFrom,validTo,contact,contactOffice,sakuseki,family,active}
+function initData(){
+settings = store.get('settings', null);
+users = store.get('users', null);
+if(!settings){ settings={ office:'', sakuseki:'', explainer:'', ...(SEED.settings||{}) }; }
+settings.staff = Array.isArray(settings.staff) ? settings.staff : (SEED.settings&&SEED.settings.staff)||[];      // 自事業所の担当者名
+settings.contacts = Array.isArray(settings.contacts) ? settings.contacts : (SEED.settings&&SEED.settings.contacts)||[]; // 報告先担当者 {name, office}
+// 初期名簿に後から増えた名前は、保存済みの名簿にも足す(削除した名前まで復活しないよう、一度取り込んだ初期名簿は記憶する)
+{ const seedStaff=(SEED.settings&&SEED.settings.staff)||[]; const seen=new Set(settings.seedStaffSeen||[]); let changed=false;
+  seedStaff.forEach(n=>{ if(!seen.has(n)){ seen.add(n); changed=true; if(!settings.staff.includes(n)) settings.staff.push(n); } });
+  if(changed){ settings.seedStaffSeen=[...seen]; store.set('settings',settings); } }
+if(!users || !users.length){ users=(SEED.users||[]).map(u=>({...u, id:Math.random().toString(36).slice(2,10)})); store.set('users',users); }
+
+}
+let shiftStats = {};                  // 利用者名 -> {count,body,house,hospital,minutes,month}
+let monthData = null;                 // 当月入力 {month, date, explain, explainer, users:{[id]:{...DEFAULTS}}}
+
+// ====== ユーティリティ ======
+const $ = s => document.querySelector(s);
+// 確認・通知ダイアログ(ページ内)。claude.ai上の埋め込み表示では window.confirm / alert が表示されないため自前で出す
+function dialog(msg, withCancel){
+  return new Promise(res=>{
+    const bg=$('#dlg'); $('#dlg-msg').textContent=msg; $('#dlg-no').hidden=!withCancel; bg.hidden=false;
+    const done=v=>{ bg.hidden=true; $('#dlg-ok').onclick=null; $('#dlg-no').onclick=null; bg.onclick=null; document.onkeydown=null; res(v); };
+    $('#dlg-ok').onclick=()=>done(true); $('#dlg-no').onclick=()=>done(false); bg.onclick=e=>{ if(e.target===bg) done(false); };
+    document.onkeydown=e=>{ if(e.key==='Escape') done(false); if(e.key==='Enter') done(true); };
+    $('#dlg-ok').focus();
+  });
+}
+const ask = msg => dialog(msg, true);
+// 文字を入れてもらうダイアログ(合言葉用)。キャンセルは null
+function askText(msg){
+  const inp=$('#dlg-in'); inp.value=''; inp.hidden=false;
+  const p=dialog(msg, true).then(ok=>{ inp.hidden=true; return ok ? inp.value.trim() : null; });
+  inp.focus(); return p;
+}
+const notify = msg => dialog(msg, false);
+const uid = () => Math.random().toString(36).slice(2,10);
+function toast(msg){ const t=$('#toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(t._t); t._t=setTimeout(()=>t.classList.remove('show'),2500); }
+function esc(s){ return String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+function pad(n){ return String(n).padStart(2,'0'); }
+function todayStr(){ const d=new Date(); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; }
+function prevMonthStr(){ const d=new Date(); d.setDate(1); d.setMonth(d.getMonth()-1); return `${d.getFullYear()}-${pad(d.getMonth()+1)}`; }
+function warekiYear(y){ return y-2018; } // 令和
+function wareki(dateStr){ // 'YYYY-MM-DD' -> 令和X年Y月Z日
+  if(!dateStr) return '';
+  const [y,m,d]=dateStr.split('-').map(Number);
+  if(!y) return '';
+  const r=warekiYear(y);
+  return `令和${r===1?'元':r}年${m}月${d}日`;
+}
+function warekiMonth(monthStr){ const [y,m]=monthStr.split('-').map(Number); const r=warekiYear(y); return `令和${r===1?'元':r}年${m}月`; }
+function toZen(n){ return String(n).replace(/[0-9]/g,c=>String.fromCharCode(c.charCodeAt(0)+0xFEE0)); }
+function circled(n){ return '①②③④⑤⑥⑦⑧⑨'[n-1]||String(n); }
+async function readTextFile(file){
+  const buf = await file.arrayBuffer();
+  try { return new TextDecoder('utf-8',{fatal:true}).decode(buf); }
+  catch(e){ return new TextDecoder('shift_jis').decode(buf); }
+}
+function parseCSV(text){
+  const rows=[]; let row=[], field='', q=false;
+  for(let i=0;i<text.length;i++){
+    const c=text[i];
+    if(q){ if(c==='"'){ if(text[i+1]==='"'){field+='"';i++;} else q=false; } else field+=c; }
+    else if(c==='"') q=true;
+    else if(c===','){ row.push(field); field=''; }
+    else if(c==='\n'||c==='\r'){ if(c==='\r'&&text[i+1]==='\n') i++; row.push(field); rows.push(row); row=[]; field=''; }
+    else field+=c;
+  }
+  if(field!==''||row.length){ row.push(field); rows.push(row); }
+  const head=(rows.shift()||[]).map(h=>h.replace(/^﻿/,'').trim());
+  return rows.filter(r=>r.some(v=>v!=='')).map(r=>Object.fromEntries(head.map((h,i)=>[h,(r[i]??'').trim()])));
+}
+// 保存: claude.ai上(Artifact)では downloads 機能で保存確認を出す。ローカルで開いた場合は通常のダウンロード
+async function download(blob, name){
+  let dl=null;
+  try{ if(window.claude && typeof window.claude.use==='function') dl=await window.claude.use('downloads'); }catch(e){ dl=null; }
+  if(dl){
+    try{ await dl.save({filename:name, data:blob}); return true; }
+    catch(e){ if(e&&e.code==='declined') { toast('保存をキャンセルしました'); return false; } if(e&&e.code==='rate_limited'){ toast('前の保存確認が開いています。閉じてからもう一度押してください'); return false; }
+      // この見え方では保存機能が使えない(組織の外のアカウント等)。ふつうのダウンロードを試す
+      console.warn('downloads.save failed', e&&e.code, e&&e.message); window.__dlErr=(e&&e.code)||'unknown'; }
+  }
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=name; document.body.appendChild(a); a.click(); setTimeout(()=>{URL.revokeObjectURL(a.href); a.remove();},1000); return true;
+}
+function b64ToBuf(b64){ const s=atob(b64); const u=new Uint8Array(s.length); for(let i=0;i<s.length;i++) u[i]=s.charCodeAt(i); return u.buffer; }
+
+// ====== タブ ======
+document.querySelectorAll('nav button').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('nav button').forEach(x=>x.classList.toggle('active',x===b));
+  ['monthly','master','backup'].forEach(t=>$('#tab-'+t).hidden = (t!==b.dataset.tab));
+  if(b.dataset.tab==='monthly') renderMonthly();
+}));
+
+// ====== 設定・マスタ ======
+// 名前の選択肢(名簿に無い既存値も選べるように残す)
+function staffOptions(current, emptyLabel){
+  const names=[...settings.staff]; if(current && !names.includes(current)) names.push(current);
+  return `<option value="">${emptyLabel}</option>`+names.map(n=>`<option value="${esc(n)}" ${n===current?'selected':''}>${esc(n)}</option>`).join('');
+}
+// 報告先担当者は打ち込み式(入力候補として 報告先担当者名簿 + スタッフ名簿 を出す)
+function refreshContactList(){
+  const names=[...settings.contacts.map(c=>c.name), ...settings.staff.filter(n=>!settings.contacts.some(c=>c.name===n))];
+  $('#contact-list').innerHTML=names.map(n=>`<option value="${esc(n)}"></option>`).join('');
+}
+// 報告先担当者の選択肢 = 報告先担当者名簿 + スタッフ名簿(自事業所の担当者がケアマネ/相談支援専門員を兼ねる場合)
+function contactOptions(current){
+  const opt=n=>`<option value="${esc(n)}" ${n===current?'selected':''}>${esc(n)}</option>`;
+  const cnames=settings.contacts.map(c=>c.name);
+  const snames=settings.staff.filter(n=>!cnames.includes(n));
+  let html=`<option value="">（未設定）</option>`;
+  if(cnames.length) html+=`<optgroup label="報告先担当者名簿">${cnames.map(opt).join('')}</optgroup>`;
+  if(snames.length) html+=`<optgroup label="スタッフ">${snames.map(opt).join('')}</optgroup>`;
+  if(current && !cnames.includes(current) && !snames.includes(current)) html+=opt(current);
+  return html;
+}
+function renderSettings(){
+  refreshContactList();
+  $('#s-office').value=settings.office||'';
+  $('#s-sakuseki').innerHTML=staffOptions(settings.sakuseki||'','（未設定）');
+  $('#s-explainer').innerHTML=staffOptions(settings.explainer||'','（未設定）');
+  // 担当者名簿
+  $('#st-list').innerHTML = settings.staff.length ? settings.staff.map((n,i)=>`<span class="chip">${esc(n)} <button type="button" class="x" data-i="${i}" title="削除">×</button></span>`).join('') : '<span class="muted">まだ登録がありません</span>';
+  $('#st-list').querySelectorAll('.x').forEach(b=>b.addEventListener('click',async()=>{ const n=settings.staff[+b.dataset.i]; if(await ask(`「${n}」を名簿から削除しますか？`)){ settings.staff.splice(+b.dataset.i,1); store.set('settings',settings); renderSettings(); renderUsers(); } }));
+  // 報告先名簿
+  const tb=$('#ct-table tbody'); tb.innerHTML='';
+  settings.contacts.forEach((c,i)=>{
+    const tr=document.createElement('tr');
+    tr.innerHTML=`<td><input type="text" data-k="name" value="${esc(c.name)}" style="min-width:130px"></td><td><input type="text" data-k="office" value="${esc(c.office||'')}" style="min-width:180px"></td><td><button class="btn small danger" data-del>削除</button></td>`;
+    tr.querySelectorAll('[data-k]').forEach(el=>el.addEventListener('change',()=>{ c[el.dataset.k]=el.value.trim(); store.set('settings',settings); renderUsers(); }));
+    tr.querySelector('[data-del]').addEventListener('click',async()=>{ if(await ask(`「${c.name}」を名簿から削除しますか？`)){ settings.contacts.splice(i,1); store.set('settings',settings); renderSettings(); renderUsers(); } });
+    tb.appendChild(tr);
+  });
+  if(!settings.contacts.length) tb.innerHTML='<tr><td colspan="3" class="muted">まだ登録がありません</td></tr>';
+}
+['office','sakuseki','explainer'].forEach(k=>$('#s-'+k).addEventListener('input',e=>{ settings[k]=e.target.value; store.set('settings',settings); }));
+function addStaff(name){ name=(name||'').replace(/\s+/g,' ').trim(); if(!name) return false; if(settings.staff.includes(name)) return false; settings.staff.push(name); return true; }
+$('#st-add').addEventListener('click',()=>{ if(addStaff($('#st-name').value)){ store.set('settings',settings); $('#st-name').value=''; renderSettings(); renderUsers(); renderMonthly(); } else toast('未入力か、すでに登録されています'); });
+$('#st-name').addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); $('#st-add').click(); } });
+$('#st-import').addEventListener('click',()=>$('#st-file').click());
+$('#st-file').addEventListener('change',async e=>{
+  const f=e.target.files[0]; if(!f) return;
+  const rows=parseCSV(await readTextFile(f));
+  // かいポケのシフトCSV(ヘルパー名列)と、業務日誌ツールの「スタッフ設定」シートをCSV保存したもの(名前列)の両方に対応
+  const col = rows.length && ('ヘルパー名' in rows[0] ? 'ヘルパー名' : ('名前' in rows[0] ? '名前' : null));
+  if(!col){ toast('「ヘルパー名」または「名前」の列が見つかりません（シフトCSVかスタッフ設定CSVを選んでください）'); e.target.value=''; return; }
+  let added=0; rows.forEach(r=>{ if(addStaff(r[col])) added++; });
+  settings.staff.sort((a,b)=>a.localeCompare(b,'ja')); store.set('settings',settings); renderSettings(); renderUsers(); renderMonthly(); toast(`${added}名を名簿に追加しました`); e.target.value='';
+});
+$('#ct-add').addEventListener('click',()=>{
+  const name=$('#ct-name').value.replace(/\s+/g,' ').trim(), office=$('#ct-office').value.trim();
+  if(!name){ toast('担当者名を入力してください'); return; }
+  if(settings.contacts.some(c=>c.name===name)){ toast('すでに登録されています'); return; }
+  settings.contacts.push({name, office}); store.set('settings',settings); $('#ct-name').value=''; $('#ct-office').value=''; renderSettings(); renderUsers();
+});
+
+function renderUsers(){
+  const tb=$('#u-table tbody'); tb.innerHTML='';
+  users.forEach(u=>{
+    const tr=document.createElement('tr');
+    tr.innerHTML=`
+      <td style="text-align:center"><input type="checkbox" data-k="active" ${u.active!==false?'checked':''}></td>
+      <td><input type="text" data-k="name" value="${esc(u.name)}" style="min-width:110px"></td>
+      <td><select data-k="seido">${SEIDO.map(s=>`<option ${u.seido===s?'selected':''}>${s}</option>`).join('')}</select></td>
+      <td><select data-k="kubun">${(KUBUN[u.seido]||KUBUN['障害']).map(s=>`<option value="${s}" ${u.kubun===s?'selected':''}>${s||'（未設定）'}</option>`).join('')}</select></td>
+      <td><input type="date" data-k="validFrom" value="${esc(u.validFrom||'')}"></td>
+      <td><input type="date" data-k="validTo" value="${esc(u.validTo||'')}"></td>
+      <td><input type="text" data-k="contact" list="contact-list" value="${esc(u.contact||'')}" placeholder="${L.contact}" style="min-width:140px" autocomplete="off"></td>
+      <td><input type="text" data-k="contactOffice" value="${esc(u.contactOffice||'')}" placeholder="${L.office}" style="min-width:150px"></td>
+      <td><select data-k="sakuseki" style="min-width:120px">${staffOptions(u.sakuseki||'','（既定）')}</select></td>
+      <td><select data-k="family"><option value="あり" ${u.family!=='なし'?'selected':''}>あり</option><option value="なし" ${u.family==='なし'?'selected':''}>なし</option></select></td>
+      <td><button class="btn small danger" data-del>削除</button></td>`;
+    tr.querySelectorAll('[data-k]').forEach(el=>el.addEventListener('change',e=>{
+      const k=el.dataset.k; u[k]= el.type==='checkbox'?el.checked:el.value;
+      if(k==='seido'){ u.kubun=''; renderUsers(); }
+      if(k==='contact'){ const c=settings.contacts.find(x=>x.name===u.contact); if(c && c.office){ u.contactOffice=c.office; tr.querySelector('[data-k=contactOffice]').value=c.office; } }
+      store.set('users',users);
+    }));
+    tr.querySelector('[data-del]').addEventListener('click',async()=>{ if(await ask(`「${u.name}」を削除しますか？`)){ users=users.filter(x=>x!==u); store.set('users',users); renderUsers(); } });
+    tb.appendChild(tr);
+  });
+}
+$('#u-add').addEventListener('click',()=>{ users.push({id:uid(),name:'',seido:MODE_DEFAULT_SEIDO,kubun:'',validFrom:'',validTo:'',contact:'',contactOffice:'',sakuseki:'',family:'あり',active:true}); store.set('users',users); renderUsers(); });
+$('#u-import').addEventListener('click',()=>$('#u-file').click());
+$('#u-file').addEventListener('change',async e=>{
+  const f=e.target.files[0]; if(!f) return;
+  const rows=parseCSV(await readTextFile(f));
+  if(!rows.length){ toast('CSVにデータ行がありません'); e.target.value=''; return; }
+  // 列名はかいポケの版によって違うことがあるので、それらしい列を探す
+  const heads=Object.keys(rows[0]);
+  const nameCol = heads.find(h=>h==='利用者名') || heads.find(h=>/利用者.*(氏名|名)/.test(h)) || heads.find(h=>/氏名/.test(h)) || heads.find(h=>/^名前$/.test(h)) || heads.find(h=>/^利用者$/.test(h));
+  if(!nameCol){ notify('利用者名の列が見つかりませんでした。\nこのCSVの列: '+heads.join(' / ')+'\n\nかいポケの「利用者情報」CSVを選んでください。'); e.target.value=''; return; }
+  const statusCol = heads.find(h=>/状態|ステータス/.test(h));
+  let added=0, dup=0, inactive=0; const addedNames=[];
+  rows.forEach(r=>{
+    const name=(r[nameCol]||'').replace(/\s+/g,' ').trim();
+    if(!name) return;
+    if(statusCol && /停止|終了|中止|解約|退所|死亡|休止/.test(r[statusCol]||'')){ inactive++; return; }
+    if(users.some(u=>nameKey(u.name)===nameKey(name))){ dup++; return; }
+    users.push({id:uid(),name,seido:MODE_DEFAULT_SEIDO,kubun:'',validFrom:'',validTo:'',contact:'',contactOffice:'',sakuseki:'',family:'あり',active:true}); added++; addedNames.push(name);
+  });
+  users.sort((a,b)=>a.name.localeCompare(b.name,'ja'));
+  store.set('users',users); renderUsers(); renderNewUsers(); renderMonthly(); e.target.value='';
+  notify(`利用者CSVの取込結果\n追加: ${added}名${addedNames.length?'（'+addedNames.join('、')+'）':''}\nすでに登録済み: ${dup}名\n利用停止などで除外: ${inactive}名\n\n現在の利用者数: ${users.length}名`);
+});
+$('#u-clear').addEventListener('click',async()=>{
+  if(!users.length) return;
+  if(await ask(`利用者マスタの${users.length}名をすべて削除します。各月の入力内容も使えなくなります。よろしいですか？`)){ users=[]; store.set('users',users); renderUsers(); renderMonthly(); toast('利用者を全員削除しました'); }
+});
+
+// ====== 月次 ======
+function monthKey(m){ return 'month:'+m; }
+// 翌月に引き継がない「一時的な出来事」タグ(入院・転倒・キャンセル等)。それ以外の状況は人ごとに自動で持ち越す
+const ONE_OFF_TAGS = ['nyuin','tento','cancel_honnin','cancel_jigyosho','jikan_henko','helper_henko','tsuika'];
+function loadMonth(m){
+  monthData = store.get(monthKey(m), null);
+  if(!monthData){
+    monthData = { month:m, date:todayStr(), explain:todayStr(), explainer:settings.explainer||'', users:{} };
+    // 前月の各利用者の状況を自動引き継ぎ(初めて開いた月のみ。一時的な出来事タグ・理由・文章は引き継がない)
+    const [y,mm]=m.split('-').map(Number);
+    const d=new Date(y,mm-2,1);
+    const pm=`${d.getFullYear()}-${pad(d.getMonth()+1)}`;
+    const prev=store.get(monthKey(pm),null);
+    if(prev && prev.users){
+      Object.entries(prev.users).forEach(([id,pi])=>{
+        monthData.users[id] = { ...DEFAULTS,
+          kouka: pi.kouka ?? DEFAULTS.kouka,
+          honninIyoku: pi.honninIyoku ?? DEFAULTS.honninIyoku,
+          kazokuIyoku: pi.kazokuIyoku ?? DEFAULTS.kazokuIyoku,
+          minaoshi: pi.minaoshi ?? DEFAULTS.minaoshi,
+          honninManzoku: pi.honninManzoku ?? DEFAULTS.honninManzoku,
+          kazokuManzoku: pi.kazokuManzoku ?? DEFAULTS.kazokuManzoku,
+          explainer: pi.explainer || '',
+          memo: pi.memo || '',
+          tags: (pi.tags||[]).filter(t=>!ONE_OFF_TAGS.includes(t)),
+        };
+      });
+      monthData.inherited = pm;
+    }
+  }
+  monthData.month=m;
+}
+function saveMonth(){ if(monthData) store.set(monthKey(monthData.month), monthData); }
+function userInput(u){ if(!monthData.users[u.id]) monthData.users[u.id]={...DEFAULTS}; return monthData.users[u.id]; }
+
+function initMonthly(){
+  $('#m-month').value = prevMonthStr();
+  loadMonth($('#m-month').value);
+  $('#m-month').addEventListener('change',()=>{ loadMonth($('#m-month').value); renderMonthly(); });
+  ['date','explain','explainer'].forEach(k=>$('#m-'+k).addEventListener('input',e=>{ monthData[k]=e.target.value; saveMonth(); }));
+  const drop=$('#m-drop');
+  drop.addEventListener('click',()=>$('#m-file').click());
+  drop.addEventListener('dragover',e=>{e.preventDefault();drop.classList.add('on');});
+  drop.addEventListener('dragleave',()=>drop.classList.remove('on'));
+  drop.addEventListener('drop',e=>{e.preventDefault();drop.classList.remove('on'); if(e.dataTransfer.files[0]) importShift(e.dataTransfer.files[0]);});
+  $('#m-file').addEventListener('change',e=>{ if(e.target.files[0]) importShift(e.target.files[0]); e.target.value=''; });
+  $('#m-draftall').addEventListener('click',()=>{ activeUsers().forEach(u=>{ userInput(u).shosai = draftText(u); }); saveMonth(); renderMonthly(); toast('全員の文章を作成しました'); });
+  $('#m-resetall').addEventListener('click',async()=>{ if(await ask('この月の全員の入力を既定値に戻します。よろしいですか？')){ monthData.users={}; saveMonth(); renderMonthly(); } });
+  $('#m-zip').addEventListener('click',generateAll);
+}
+function activeUsers(){ return users.filter(u=>u.active!==false && u.name); }
+
+async function importShift(file){
+  const rows=parseCSV(await readTextFile(file));
+  if(!rows.length||!('利用者' in rows[0])){ toast('「利用者」列が見つかりません（かいポケの訪問介護シフトCSVを選んでください）'); return; }
+  shiftStats={};
+  // 業務種別で絞り込む（障害版は「障害」、介護版は「障害」以外）。列が無いCSVは全行対象
+  const hasType='業務種別' in rows[0];
+  let skipped=0;
+  rows.forEach(r=>{
+    if(hasType){ const isShogai=(r['業務種別']||'').includes('障害'); if((MODE==='kaigo')===isShogai){ skipped++; return; } }
+    const name=(r['利用者']||'').replace(/\s+/g,' ').trim(); if(!name) return;
+    const s=shiftStats[name]||(shiftStats[name]={count:0,body:0,house:0,hospital:0,other:0,minutes:0,days:new Set()});
+    s.count++;
+    const sv=r['サービス内容']||'';
+    if(sv.includes('身体')) s.body++; else if(sv.includes('家事')||sv.includes('生活')) s.house++; else if(sv.includes('通院')) s.hospital++; else s.other++;
+    s.minutes+=parseInt((r['提供時間（分）']||r['提供時間(分)']||'0').replace(/[^0-9]/g,''))||0;
+    if(r['日付']) s.days.add(r['日付']);
+  });
+  const n=Object.keys(shiftStats).length;
+  $('#m-csvinfo').innerHTML=`<span class="pill ok">取込済</span> ${esc(file.name)}：${rows.length}行、利用者${n}名分の実績を集計しました。${skipped?`（業務種別が対象外の${skipped}行は除外）`:''}`;
+  renderNewUsers();
+  renderMonthly();
+}
+// シフトCSVに出てくるのに利用者マスタにいない人（新しい利用者）を抽出して、選んで追加できるようにする
+function statsFor(u){ const k=nameKey(u.name); const n=Object.keys(shiftStats).find(x=>nameKey(x)===k); return n?shiftStats[n]:undefined; }
+function nameKey(n){ return String(n||'').replace(/\s+/g,''); }
+function newUsersFromShift(){
+  const known=new Set(users.map(u=>nameKey(u.name)));
+  return Object.keys(shiftStats).filter(n=>!known.has(nameKey(n))).sort((a,b)=>a.localeCompare(b,'ja'));
+}
+function renderNewUsers(){
+  const box=$('#m-newusers'); const list=newUsersFromShift();
+  if(!list.length){ box.hidden=true; box.innerHTML=''; return; }
+  box.hidden=false;
+  box.innerHTML=`<b>🆕 利用者マスタにいない人が${list.length}名います</b>（シフトCSVから抽出）<br>
+    <div style="margin:6px 0;display:flex;flex-wrap:wrap;gap:4px 14px">${list.map(n=>`<label style="display:inline-flex;align-items:center;gap:4px;font-weight:normal"><input type="checkbox" data-newu="${esc(n)}" checked>${esc(n)}（${shiftStats[n].count}回）</label>`).join('')}</div>
+    <button class="btn small" id="m-addnew">チェックした人を利用者マスタに追加</button>
+    <span class="muted" style="margin-left:8px">追加後、「利用者マスタ・設定」タブで区分・有効期間・報告先を入力してください。</span>`;
+  $('#m-addnew').addEventListener('click',()=>{
+    const names=[...box.querySelectorAll('[data-newu]:checked')].map(el=>el.dataset.newu);
+    if(!names.length){ toast('追加する人にチェックを入れてください'); return; }
+    names.forEach(name=>users.push({id:uid(),name,seido:MODE_DEFAULT_SEIDO,kubun:'',validFrom:'',validTo:'',contact:'',contactOffice:'',sakuseki:'',family:'あり',active:true}));
+    users.sort((a,b)=>a.name.localeCompare(b.name,'ja'));
+    store.set('users',users); renderUsers(); renderNewUsers(); renderMonthly();
+    notify(`${names.length}名を利用者マスタに追加しました\n${names.join('、')}\n\n「利用者マスタ・設定」タブで区分・有効期間・報告先を入力してください。`);
+  });
+}
+// ====== 状況タグ → 文章ライブラリ ======
+// 各タグに複数の言い回しを用意し、利用者×対象月×回数から決まる乱数で選ぶ（同じ人でも月ごとに文章が変わる）
+const SIT = [
+ {cat:'心身の状況', items:[
+  {id:'kentyo_ok', label:'体調安定', p:['体調は安定しており、訪問時も落ち着いて過ごされています。','訪問時の体調に大きな崩れはなく、安定した状態が続いています。','全体を通して体調は良好で、穏やかに過ごされていました。']},
+  {id:'kentyo_ng', label:'体調不良あり', p:['月の中で体調のすぐれない日があり、様子を見ながら無理のない範囲で支援しました。','体調不良を訴えられる日があったため、状態に応じて内容を調整しながら対応しました。','一時的に体調を崩された時期があり、休息を優先しつつ必要な支援を行いました。']},
+  {id:'suimin_ok', label:'睡眠良好', p:['睡眠はよく取れており、日中の活動にも支障はありません。','夜間はよく眠れているとのことで、生活リズムは整っています。']},
+  {id:'suimin_ng', label:'睡眠不良', p:['寝つきが悪い、夜中に目が覚めるといった訴えがあり、生活リズムに注意しています。','睡眠が浅い日が続いているとのことで、日中の様子も含めて経過を見ています。']},
+  {id:'shoku_ok', label:'食欲良好', p:['食事はしっかり摂れており、食欲は良好です。','食事量は安定しており、栄養面での心配は見られません。']},
+  {id:'shoku_ng', label:'食欲低下', p:['食事量が減っている日があり、水分・栄養の摂取状況を確認しながら支援しています。','食欲の低下が見られたため、食べやすい内容を意識して調理・声かけを行いました。']},
+  {id:'tsukare', label:'疲れやすい', p:['疲れやすさがあり、休憩を挟みながら無理のないペースで支援しています。','活動後に疲労が見られるため、体調を確認しながら進めています。']},
+  {id:'kibun_ng', label:'気分の落ち込み', p:['気分の落ち込みが見られる日があり、傾聴を心がけながら関わっています。','元気のない様子が見られることがあり、声かけを多めにして安心して過ごせるよう配慮しました。']},
+  {id:'iyoku_up', label:'意欲向上', p:['活動への意欲が高まっており、自分からできることに取り組む場面が増えています。','前向きな発言が多く、意欲的に生活に取り組まれています。']},
+  {id:'fukuyaku_ok', label:'服薬管理良好', p:['服薬は自己管理できており、飲み忘れはありません。','服薬状況を確認していますが、きちんと継続できています。']},
+  {id:'fukuyaku_ng', label:'服薬忘れあり', p:['服薬の飲み忘れが見られたため、訪問時に確認と声かけを行っています。','薬の管理が難しい場面があり、訪問時に残薬を確認しながら支援しています。']},
+  {id:'tsuin', label:'通院あり', p:['期間中に通院があり、医師からの指示内容を確認しながら支援しています。','定期通院を継続されており、体調管理は医療機関と連携しながら行っています。']},
+  {id:'nyuin', label:'入院あり', p:['期間中に入院された期間があり、その間はサービスを中止しました。退院後は状態を確認しながら再開しています。','入院により一時的にサービスを休止しました。退院後の体調に配慮しながら支援を再開しています。']},
+  {id:'tento', label:'転倒・ケガ', p:['転倒（ケガ）があったため、室内の環境や動作時の安全に注意して見守りを強化しています。','期間中に転倒があり、移動時の見守りと環境整備を徹底しています。']},
+ ]},
+ {cat:'生活・ADL', items:[
+  {id:'nyuyoku', label:'入浴介助', p:['入浴介助では安全に配慮し、清潔保持ができています。','入浴は見守り・一部介助で安全に行えており、清潔が保たれています。']},
+  {id:'haisetsu', label:'排泄介助', p:['排泄面では声かけと一部介助により、失敗なく過ごせています。','排泄については状況に応じて介助を行い、清潔を保っています。']},
+  {id:'ido', label:'移動介助', p:['移動時はふらつきに注意し、見守り・介助を行っています。','歩行時の安全に配慮しながら移動の支援を行いました。']},
+  {id:'shokuji', label:'食事介助', p:['食事は準備・声かけを中心に支援し、安全に摂取できています。','食事の際は誤嚥に注意しながら見守り・介助を行いました。']},
+  {id:'souji', label:'掃除', p:['居室の掃除を行い、清潔で安全な住環境を保っています。','掃除・整理整頓により、生活しやすい環境を維持できています。']},
+  {id:'sentaku', label:'洗濯', p:['洗濯を行い、衣類の清潔を保っています。','洗濯・衣類の整理を継続して支援しています。']},
+  {id:'chori', label:'調理', p:['調理支援では本人の希望を聞きながら、栄養バランスに配慮した食事を準備しています。','調理を行い、食事が規則的に摂れるよう支援しています。']},
+  {id:'kaimono', label:'買い物', p:['買い物の支援を行い、必要な食材・日用品が不足なく揃うようにしています。','買い物同行（代行）を通じて、生活に必要な物品の確保を支援しました。']},
+  {id:'jiritsu_up', label:'自立度向上', p:['できることが増えており、ヘルパーの介助量は少しずつ減っています。','自分で行える動作が増え、自立に向けた良い変化が見られます。']},
+  {id:'jiritsu_down', label:'自立度低下', p:['以前より介助を要する場面が増えており、状態の変化に注意しています。','動作に時間がかかるようになっており、必要に応じて介助量を増やして対応しています。']},
+  {id:'gaishutsu', label:'外出機会増加', p:['外出の機会が増え、生活の幅が広がっています。','外出を楽しまれる様子が見られ、活動性が高まっています。']},
+  {id:'tojikomori', label:'閉じこもり傾向', p:['外出の機会が少なく、閉じこもりがちな傾向があるため、声かけを行っています。','自宅で過ごす時間が多くなっているため、活動の機会づくりを意識して関わっています。']},
+ ]},
+ {cat:'サービスの実施', items:[
+  {id:'keikaku_ok', label:'計画通り実施', p:['訪問介護計画書に沿ってサービスを提供し、特に問題なく実施できています。','計画どおりにサービスを実施できており、大きな支障はありませんでした。','予定していた支援内容はおおむね計画どおりに提供できています。']},
+  {id:'cancel_honnin', label:'本人都合のキャンセルあり', p:['本人の都合によりキャンセルとなった日がありました。','体調や予定の都合でお休みになった日があり、翌回以降で必要な支援を補いました。']},
+  {id:'cancel_jigyosho', label:'事業所都合の変更あり', p:['事業所の都合で訪問日時を変更した日があり、事前に本人へ説明し了承を得ています。','一部、事業所側の都合で日程を調整しましたが、支援内容に不足はありません。']},
+  {id:'jikan_henko', label:'時間変更あり', p:['本人の希望により訪問時間を一部変更しています。','通院などの予定に合わせて訪問時間を調整しました。']},
+  {id:'helper_henko', label:'ヘルパー変更あり', p:['担当ヘルパーの変更がありましたが、引き継ぎを行い支援内容は継続しています。','ヘルパーの交代がありましたが、大きな混乱なくサービスを継続できています。']},
+  {id:'tsuika', label:'追加訪問あり', p:['必要に応じて追加の訪問を行い、状況に対応しました。','状況に応じて臨時の訪問を実施しています。']},
+ ]},
+ {cat:'本人・家族', items:[
+  {id:'kansha', label:'本人から感謝の言葉', p:['本人からは「助かっている」と感謝の言葉が聞かれています。','サービスに対して本人から肯定的な言葉が聞かれ、良好な関係が保てています。']},
+  {id:'yobo_honnin', label:'本人から要望あり', p:['本人からサービス内容についての要望があり、内容を確認して対応を検討しています。','本人より希望が出されたため、計画への反映を検討しています。']},
+  {id:'yobo_kazoku', label:'家族から要望あり', p:['ご家族からの要望があり、内容を共有して対応を検討しています。','ご家族より意見をいただき、支援内容に反映できるよう調整しています。']},
+  {id:'kazoku_futan_up', label:'家族の負担増', p:['ご家族の介護負担が増しているとのことで、負担軽減に向けた支援を意識しています。','ご家族の負担が大きくなっているため、サービス内容の見直しも含めて検討しています。']},
+  {id:'kazoku_futan_down', label:'家族の負担軽減', p:['サービス利用によりご家族の負担が軽減されていると伺っています。','ご家族からは「余裕ができた」との声があり、負担軽減につながっています。']},
+  {id:'dokkyo', label:'独居', p:['独居のため、訪問時に安否と生活状況の確認を行っています。','一人暮らしのため、体調や生活の変化を訪問のたびに確認しています。']},
+  {id:'comm_ok', label:'コミュニケーション良好', p:['ヘルパーとのコミュニケーションは良好で、会話も楽しまれています。','会話を通じて信頼関係が築けており、安心してサービスを受けられています。']},
+ ]},
+ {cat:'今後の方針', items:[
+  {id:'genjo', label:'現状維持', p:['今後も現行の計画に基づき、サービスを継続していきます。','引き続き現在の内容でサービスを継続し、状態の変化に注意していきます。','当面は現状の支援内容を維持しながら、経過を見守っていきます。']},
+  {id:'minaoshi', label:'計画見直しを検討', p:['状態の変化を踏まえ、計画内容の見直しを検討したいと考えています。','今後の支援内容について、担当者と相談のうえ見直しを検討します。']},
+  {id:'renkei_kikan', label:'関係機関と連携', p:['関係機関と情報を共有しながら、必要な支援を検討していきます。','担当者・関係機関と連携し、状況の変化に応じて対応していきます。']},
+  {id:'renkei_iryo', label:'医療機関と連携', p:['医療機関と連携し、体調面の変化に注意しながら支援を継続します。','主治医の指示を確認しながら、安全にサービスを提供していきます。']},
+  {id:'kaisu_up', label:'回数増加を検討', p:['支援の必要性が高まっているため、訪問回数の増加について相談したいと考えています。','状態を踏まえ、サービス量の見直し（増回）を検討しています。']},
+  {id:'kaisu_down', label:'回数減少を検討', p:['自立度の向上に伴い、訪問回数の見直し（減回）を検討しています。','できることが増えてきているため、支援量の調整を相談したいと考えています。']},
+ ]},
+];
+const SIT_BY_ID = Object.fromEntries(SIT.flatMap(c=>c.items.map(i=>[i.id,i])));
+const OPENERS = ['【{wm}の実施状況】','【{wm}のサービス実施状況】','＜{wm}の実施状況＞'];
+const CONNECT = ['また、','','なお、','加えて、'];
+
+// 文字列→乱数（利用者名＋月＋言い回し番号で決まる。同じ条件なら同じ文、月や回数が変われば変わる）
+function seededRand(str){ let h=1779033703^str.length; for(let i=0;i<str.length;i++){ h=Math.imul(h^str.charCodeAt(i),3432918353); h=h<<13|h>>>19; } return function(){ h=Math.imul(h^(h>>>16),2246822507); h=Math.imul(h^(h>>>13),3266489909); h^=h>>>16; return (h>>>0)/4294967296; }; }
+function pick(rand, arr){ return arr[Math.floor(rand()*arr.length)]; }
+
+function draftText(u){
+  const s=statsFor(u);
+  const wm=warekiMonth(monthData.month);
+  const inp=userInput(u);
+  const rand=seededRand(`${u.name}|${monthData.month}|${inp.seed||0}`);
+  let t='';
+  // 実績（シフトCSVから）
+  t+=pick(rand,OPENERS).replace('{wm}',wm)+'\n';
+  if(s){
+    const parts=[]; if(s.body) parts.push(`身体介護${s.body}回`); if(s.house) parts.push(`${HOUSE_LABEL}${s.house}回`); if(s.hospital) parts.push(`通院介助${s.hospital}回`); if(s.other) parts.push(`その他${s.other}回`);
+    const h=Math.floor(s.minutes/60), mnt=s.minutes%60;
+    t+=`訪問回数：${s.count}回（${s.days.size}日）　内訳：${parts.join('、')}\n提供時間合計：${h}時間${mnt?mnt+'分':''}\n\n`;
+  } else {
+    t+=`訪問回数：　回　内訳：身体介護　回、${HOUSE_LABEL}　回\n\n`;
+  }
+  // 選んだ状況をカテゴリ順に文章化
+  const tags=(inp.tags||[]).filter(id=>SIT_BY_ID[id]);
+  const autoTags=[];
+  if(!tags.includes('keikaku_ok') && inp.jisshi==='計画通り実施' && !tags.some(id=>id.startsWith('cancel_'))) autoTags.push('keikaku_ok');
+  const ordered=SIT.flatMap(c=>c.items.map(i=>i.id)).filter(id=>tags.includes(id)||autoTags.includes(id));
+  const paras={}; // cat -> sentences
+  ordered.forEach(id=>{ const cat=SIT.find(c=>c.items.some(i=>i.id===id)).cat; (paras[cat]=paras[cat]||[]).push(pick(rand,SIT_BY_ID[id].p)); });
+  // 実施状況で「計画通り実施されていない」なら理由を入れる
+  if(inp.jisshi!=='計画通り実施'){ (paras['サービスの実施']=paras['サービスの実施']||[]).unshift(`計画通りに実施できなかった日があります（理由：${inp.riyu||'　'}）。`); }
+  if(inp.henka==='変化あり' && inp.henkaNaiyo){ (paras['心身の状況']=paras['心身の状況']||[]).push(`心身・家族状況の変化：${inp.henkaNaiyo}`); }
+  const catOrder=['サービスの実施','心身の状況','生活・ADL','本人・家族'];
+  const body=[];
+  catOrder.forEach(cat=>{ const ss=paras[cat]; if(!ss||!ss.length) return; body.push(ss.map((x,i)=> i===0?x: pick(rand,CONNECT)+x).join('')); });
+  if(!body.length && !paras['今後の方針']) body.push(pick(rand,SIT_BY_ID.keikaku_ok.p)+pick(rand,['心身状況・家族状況に大きな変化はありません。','心身の状態、ご家族の状況ともに大きな変化は見られません。']));
+  if(inp.memo) body.push(inp.memo.trim());
+  t+=body.join('\n');
+  // 今後の方針（未選択なら現状維持）
+  const plan=paras['今後の方針']||[pick(rand,SIT_BY_ID.genjo.p)];
+  t+='\n'+plan.join('');
+  return t;
+}
+
+function renderMonthly(){
+  if(!monthData) loadMonth($('#m-month').value);
+  $('#m-date').value=monthData.date||''; $('#m-explain').value=monthData.explain||''; $('#m-explainer').innerHTML=staffOptions(monthData.explainer||settings.explainer||'','（未設定）');
+  const box=$('#m-users'); box.innerHTML='';
+  const list=activeUsers();
+  if(!list.length){ box.innerHTML='<p class="muted">利用者マスタに利用者が登録されていません。「利用者マスタ・設定」タブで登録してください。</p>'; return; }
+  if(monthData.inherited){
+    const n=document.createElement('div'); n.className='note';
+    n.textContent=`✔ ${warekiMonth(monthData.inherited)}の各利用者の状況を引き継いでいます。変わった点だけ直せばOKです（入院・転倒・キャンセルなど一時的な項目は引き継ぎません）。`;
+    box.appendChild(n);
+  }
+  list.forEach(u=>{
+    const inp=userInput(u);
+    const s=statsFor(u);
+    const sel=(k,opts,val)=>`<div><label>${k}</label><select data-k="${val}">${opts.map(o=>`<option ${inp[val]===o?'selected':''}>${o}</option>`).join('')}</select></div>`;
+    const warn=[]; if(!u.contact) warn.push('報告先未設定'); if(!u.kubun) warn.push('区分未設定'); if(!u.validFrom||!u.validTo) warn.push('有効期間未設定');
+    const div=document.createElement('div'); div.className='user'; div.dataset.uid=u.id;
+    div.innerHTML=`
+      <h3>${esc(u.name)} <span class="pill">${esc(u.seido)} ${esc(u.kubun||'')}</span><span class="pill" data-tanto ${(u.sakuseki||settings.sakuseki)?'':'hidden'}>担当：${esc(u.sakuseki||settings.sakuseki||'')}</span>
+        ${s?`<span class="stat">訪問${s.count}回／身体${s.body}・${MODE==='kaigo'?'生活':'家事'}${s.house}・通院${s.hospital}／${Math.floor(s.minutes/60)}時間${s.minutes%60?s.minutes%60+'分':''}</span>`:`<span class="stat">（シフト実績なし）</span>`}
+        ${warn.map(w=>`<span class="pill warn" ${w==='報告先未設定'?'data-warn-contact':''}>${w}</span>`).join('')}
+        <span style="flex:1"></span>
+        <button class="btn small sub" data-draft>文章作成</button>
+        <button class="btn small" data-one>この人のExcelを出力</button>
+      </h3>
+      <div class="grid">
+        ${sel('計画の実施状況',OPT.jisshi,'jisshi')}
+        ${sel('期待された効果（目標達成度）',OPT.kouka,'kouka')}
+        ${sel('心身や家族状況の変化',OPT.henka,'henka')}
+        ${sel('本人の意欲・意向',OPT.iyoku,'honninIyoku')}
+        ${u.family==='なし'?'':sel('家族の意欲・意向',OPT.iyoku,'kazokuIyoku')}
+        ${sel('計画見直しの必要性',OPT.minaoshi,'minaoshi')}
+        ${sel('本人の満足度',OPT.manzoku,'honninManzoku')}
+        ${u.family==='なし'?'':sel('家族の満足度',OPT.manzoku,'kazokuManzoku')}
+      </div>
+      <div class="grid" style="margin-top:8px;padding-top:8px;border-top:1px dashed var(--line)">
+        <div><label>報告先担当者（${L.contact}）</label><input type="text" data-u="contact" list="contact-list" value="${esc(u.contact||'')}" placeholder="名前を入力（候補から選択も可）" autocomplete="off"></div>
+        <div><label>訪問先事業所（${L.office}）</label><input type="text" data-u="contactOffice" value="${esc(u.contactOffice||'')}" placeholder="報告先を選ぶと自動入力"></div>
+        <div><label>担当者（サービス提供責任者）</label><select data-u="sakuseki">${staffOptions(u.sakuseki||'','（既定：'+(settings.sakuseki||'未設定')+'）')}</select></div>
+        <div><label>説明者</label><select data-k="explainer">${staffOptions(inp.explainer||'','（既定）')}</select></div>
+      </div>
+      <div class="row" style="margin-top:8px">
+        <div ${inp.jisshi==='計画通り実施'?'hidden':''} data-riyu><label>計画通り実施されていない理由</label><input type="text" data-k="riyu" value="${esc(inp.riyu||'')}"></div>
+        <div ${inp.henka==='変化あり'?'':'hidden'} data-henka><label>変化の内容</label><input type="text" data-k="henkaNaiyo" value="${esc(inp.henkaNaiyo||'')}"></div>
+      </div>
+      <details class="sit" ${(inp.tags&&inp.tags.length)?'open':''}>
+        <summary>状況を選ぶ（${(inp.tags||[]).length}件選択中）　→ 選んだ内容から「状況の詳細」の文章を作ります</summary>
+        ${SIT.map(c=>`<div class="sitcat"><div class="sitcat-name">${c.cat}</div><div class="chips">${c.items.map(i=>`<label class="chip"><input type="checkbox" data-tag="${i.id}" ${(inp.tags||[]).includes(i.id)?'checked':''}>${i.label}</label>`).join('')}</div></div>`).join('')}
+        <div class="row" style="margin-top:8px;align-items:flex-end">
+          <div style="flex:2;min-width:220px"><label>補足（自由記入・文章に差し込まれます）</label><input type="text" data-k="memo" value="${esc(inp.memo||'')}" placeholder="例：来月から週1回の通院同行を追加予定"></div>
+          <div style="flex:0 0 auto"><button class="btn small sub" data-prev>前月の選択をコピー</button></div>
+          <div style="flex:0 0 auto"><button class="btn small sub" data-reword>別の言い回しにする</button></div>
+          <div style="flex:0 0 auto"><button class="btn small" data-compose>選んだ状況から文章作成</button></div>
+        </div>
+      </details>
+      <div style="margin-top:8px"><label>状況の詳細</label><textarea data-k="shosai" placeholder="上の「状況を選ぶ」でチェックして「選んだ状況から文章作成」を押すと自動作成されます">${esc(inp.shosai||'')}</textarea></div>`;
+    div.querySelectorAll('[data-k]').forEach(el=>el.addEventListener('input',()=>{
+      inp[el.dataset.k]=el.value; saveMonth();
+      if(el.dataset.k==='jisshi') div.querySelector('[data-riyu]').hidden = (el.value==='計画通り実施');
+      if(el.dataset.k==='henka') div.querySelector('[data-henka]').hidden = (el.value!=='変化あり');
+    }));
+    div.querySelectorAll('[data-u]').forEach(el=>el.addEventListener('change',()=>{ u[el.dataset.u]=el.value.trim();
+      if(el.dataset.u==='contact'){ const c=settings.contacts.find(x=>x.name===u.contact); if(c&&c.office){ u.contactOffice=c.office; div.querySelector('[data-u=contactOffice]').value=c.office; } }
+      store.set('users',users); renderUsers();
+      const t=div.querySelector('[data-tanto]'); const name=u.sakuseki||settings.sakuseki||''; t.textContent='担当：'+name; t.hidden=!name;
+      const w=div.querySelector('[data-warn-contact]'); if(w) w.hidden=!!u.contact; }));
+    const compose=()=>{ inp.shosai=draftText(u); saveMonth(); div.querySelector('[data-k=shosai]').value=inp.shosai; };
+    const refreshSummary=()=>{ div.querySelector('.sit summary').textContent=`状況を選ぶ（${(inp.tags||[]).length}件選択中）　→ 選んだ内容から「状況の詳細」の文章を作ります`; };
+    div.querySelectorAll('[data-tag]').forEach(cb=>cb.addEventListener('change',()=>{ const id=cb.dataset.tag; inp.tags=(inp.tags||[]).filter(x=>x!==id); if(cb.checked) inp.tags.push(id); saveMonth(); refreshSummary(); }));
+    div.querySelector('[data-draft]').addEventListener('click',compose);
+    div.querySelector('[data-compose]').addEventListener('click',compose);
+    div.querySelector('[data-reword]').addEventListener('click',()=>{ inp.seed=(inp.seed||0)+1; compose(); });
+    div.querySelector('[data-prev]').addEventListener('click',()=>{
+      const [y,m]=monthData.month.split('-').map(Number); const d=new Date(y,m-2,1); const pm=`${d.getFullYear()}-${pad(d.getMonth()+1)}`;
+      const prev=store.get(monthKey(pm),null); const pi=prev&&prev.users&&prev.users[u.id];
+      if(!pi||!(pi.tags||[]).length){ toast(`${warekiMonth(pm)}の選択がありません`); return; }
+      inp.tags=[...pi.tags]; inp.memo=pi.memo||''; saveMonth(); renderMonthly(); toast('前月の選択をコピーしました');
+    });
+    div.querySelector('[data-one]').addEventListener('click',async()=>{ try{ const blob=await buildXlsx(u); if(await download(blob,fileName(u))) toast('出力しました'); }catch(e){ console.error(e); toast('出力エラー: '+e.message); } });
+    box.appendChild(div);
+  });
+}
+
+// ====== Excel生成 ======
+function mark(text, chosen){ // "□ラベル" の該当行を "■ラベル" に
+  if(!chosen) return text;
+  return text.split('\n').map(l=> l.trim()==='□'+chosen ? l.replace('□','■') : l).join('\n');
+}
+function fileName(u){ return `モニタリング報告書_${u.name.replace(/\s+/g,'')}_${warekiMonth(monthData.month)}.xlsx`; }
+async function buildXlsx(u){
+  const inp=userInput(u);
+  const wb=new ExcelJS.Workbook();
+  await wb.xlsx.load(b64ToBuf(TEMPLATE_B64));
+  const ws=wb.getWorksheet('Sheet1');
+  const set=(addr,v)=>{ ws.getCell(addr).value=v; };
+  const dateW=wareki(monthData.date);
+  const sakuseki=u.sakuseki||settings.sakuseki||'';
+  const explainer=inp.explainer||monthData.explainer||settings.explainer||'';
+
+  set('G1', dateW || ws.getCell('G1').value);
+  set('C4', settings.office||'');
+  set('H4', (u.contact?u.contact+'　':'')+'様');
+  set('C6', u.contactOffice||'');
+  set('H6', sakuseki);
+  set('C8', u.name);
+  set('H8', dateW || ws.getCell('H8').value);
+  if(u.validFrom&&u.validTo) set('C10', `${wareki(u.validFrom)}　～　${wareki(u.validTo)}`);
+  // 介護度／区分
+  if(u.seido==='介護保険' && u.kubun){
+    const m=u.kubun.match(/^(要支援|要介護)(\d)$/);
+    if(m){
+      const n=+m[2];
+      let t=String(ws.getCell('C12').value);
+      const idx=t.indexOf('要介護度');
+      let a=t.slice(0,idx), b=t.slice(idx);
+      if(m[1]==='要支援') a=a.replace(toZen(n),circled(n)); else b=b.replace(toZen(n),circled(n));
+      set('C12', a+b);
+    }
+  } else if(u.seido==='障害'){
+    const n=+(u.kubun.match(/\d/)||[0])[0];
+    set('C12', '障害支援区分　　'+[1,2,3,4,5,6].map(i=> i===n?circled(i):toZen(i)).join('　・　'));
+  }
+  // チェック欄
+  let a17=mark(String(ws.getCell('A17').value), inp.jisshi);
+  if(inp.jisshi!=='計画通り実施' && inp.riyu) a17=a17.replace(/（理由）\n?/, `（理由）\n${inp.riyu}`);
+  set('A17', a17);
+  set('D17', mark(String(ws.getCell('D17').value), inp.kouka));
+  let g17=mark(String(ws.getCell('G17').value), inp.henka);
+  if(inp.henka==='変化あり' && inp.henkaNaiyo) g17+=`\n${inp.henkaNaiyo}`;
+  set('G17', g17);
+  set('A27', mark(String(ws.getCell('A27').value), inp.honninIyoku));
+  set('E27', u.family==='なし'? String(ws.getCell('E27').value) : mark(String(ws.getCell('E27').value), inp.kazokuIyoku));
+  set('H27', mark(String(ws.getCell('H27').value), inp.minaoshi));
+  set('A36', mark(String(ws.getCell('A36').value), inp.honninManzoku));
+  set('E36', u.family==='なし'? String(ws.getCell('E36').value) : mark(String(ws.getCell('E36').value), inp.kazokuManzoku));
+  // 状況の詳細
+  const c44=ws.getCell('A44'); c44.value=inp.shosai||''; c44.alignment={vertical:'top',horizontal:'left',wrapText:true};
+  // 結合セル(13行分)に収まるよう、文章が長いときはフォントを小さくする（1行≒全角44文字@11pt）
+  { const txt=inp.shosai||''; const lines=sz=>txt.split('\n').reduce((n,l)=>n+Math.max(1,Math.ceil((l.length||1)/(44*11/sz))),0);
+    let sz=11; while(sz>7 && lines(sz)*sz*1.25 > 13*13.2) sz--;
+    if(sz<11) c44.font={...(c44.font||{}), name:'ＭＳ Ｐゴシック', size:sz}; }
+  // 説明欄
+  let a57=String(ws.getCell('A57').value);
+  a57=a57.replace(/について[　 ]*様に/, `について　${u.contact||'　　　　　'}　様に`);
+  if(monthData.explain){ const [,mm,dd]=monthData.explain.split('-').map(Number); a57=a57.replace(/説明日：[　 ]*月[　 ]*日/, `説明日：${mm}月${dd}日`); }
+  a57=a57.replace(/説明者：[　 ]*$/, `説明者：${explainer}`);
+  set('A57', a57);
+
+  const buf=await wb.xlsx.writeBuffer();
+  return postFix(buf);
+}
+// ExcelJSが既定フォント(font 0)をCalibriに書き換えるため、原本どおりＭＳ Ｐゴシックへ戻す
+// （既定フォントが変わると列幅の実寸が変わり、印刷レイアウトがずれる）
+async function postFix(buf){
+  const zip=await JSZip.loadAsync(buf);
+  const stylesPath='xl/styles.xml';
+  let styles=await zip.file(stylesPath).async('string');
+  styles=styles.replace(/<fonts([^>]*)><font>.*?<\/font>/, '<fonts$1><font><sz val="11"/><color theme="1"/><name val="ＭＳ Ｐゴシック"/><family val="2"/><scheme val="minor"/></font>');
+  zip.file(stylesPath, styles);
+  const sheetPath='xl/worksheets/sheet1.xml';
+  let sheet=await zip.file(sheetPath).async('string');
+  sheet=sheet.replace(/<sheetFormatPr([^>]*?) customHeight="1"/, '<sheetFormatPr$1');
+  zip.file(sheetPath, sheet);
+  return zip.generateAsync({type:'blob', compression:'DEFLATE', mimeType:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+}
+async function generateAll(){
+  const list=activeUsers(); if(!list.length){ toast('対象の利用者がいません'); return; }
+  const btn=$('#m-zip'); btn.disabled=true; btn.textContent='作成中…';
+  try{
+    const zip=new JSZip();
+    for(const u of list){ zip.file(fileName(u), await buildXlsx(u)); }
+    const blob=await zip.generateAsync({type:'blob'});
+    if(await download(blob, `モニタリング報告書_${warekiMonth(monthData.month)}_${list.length}名.zip`)) toast(`${list.length}名分を出力しました`);
+  }catch(e){ console.error(e); toast('出力エラー: '+e.message); }
+  finally{ btn.disabled=false; btn.textContent='全員分をまとめてダウンロード（ZIP）'; }
+}
+
+// ====== バックアップ ======
+function reloadAll(){ // 保存先から読み直して画面を作り直す
+  settings=store.get('settings',settings); settings.staff=Array.isArray(settings.staff)?settings.staff:[]; settings.contacts=Array.isArray(settings.contacts)?settings.contacts:[];
+  users=store.get('users',[]); renderSettings(); renderUsers(); loadMonth($('#m-month').value); renderMonthly();
+}
+$('#b-export').addEventListener('click',()=>{
+  const data={}; store.keys().forEach(k=>data[k]=store.get(k));
+  download(new Blob([JSON.stringify(data,null,1)],{type:'application/json'}), `モニタリング報告書_backup_${todayStr()}.json`);
+});
+$('#b-import').addEventListener('click',()=>$('#b-file').click());
+$('#b-file').addEventListener('change',async e=>{
+  const f=e.target.files[0]; if(!f) return;
+  try{
+    const data=JSON.parse(await f.text());
+    if(shared.on && !(await ask('読み込むと、共通保存の内容がこのファイルの内容に置き換わります（全員の画面に反映されます）。よろしいですか？'))){ e.target.value=''; return; }
+    Object.entries(data).forEach(([k,v])=>store.set(k,v)); reloadAll(); toast('読み込みました');
+  }
+  catch(err){ toast('読み込みに失敗しました'); }
+  e.target.value='';
+});
+$('#b-clear').addEventListener('click',async()=>{
+  const msg = shared.on ? '共通保存されている設定・利用者・各月の入力を、全員分すべて削除します。元に戻せません。よろしいですか？' : '保存されている設定・利用者・各月の入力をすべて削除します。よろしいですか？';
+  if(await ask(msg)){ store.keys().forEach(k=>store.del(k)); if(shared.on) await sharedIdle(); location.reload(); }
+});
+// 共通保存にする前に、このブラウザに入れていた内容
+function localSummary(){ const ks=LS.keys(); const lu=LS.get('users',[])||[]; return { keys:ks, users:Array.isArray(lu)?lu.filter(u=>u&&u.name).length:0, months:ks.filter(isMonthKey).length }; }
+function renderLocalLeftover(){
+  const box=$('#b-local'); if(!shared.on){ box.hidden=true; return; }
+  const s=localSummary(); box.hidden = !(s.users || s.months);
+  $('#b-local-info').textContent=`共通保存にする前にこのブラウザで入力していた内容が残っています（利用者${s.users}名・入力済み${s.months}か月分）。共通保存には自動では入りません。`;
+}
+$('#b-local-export').addEventListener('click',()=>{
+  const data={}; LS.keys().forEach(k=>data[k]=LS.get(k));
+  download(new Blob([JSON.stringify(data,null,1)],{type:'application/json'}), `モニタリング報告書_このブラウザの控え_${todayStr()}.json`);
+});
+$('#b-local-up').addEventListener('click',async()=>{
+  const s=localSummary();
+  if(!(await ask(`このブラウザの内容（利用者${s.users}名・入力済み${s.months}か月分）を共通保存に入れます。\n共通保存の設定・利用者・同じ月の入力は、この内容に置き換わります（全員の画面に反映されます）。よろしいですか？`))) return;
+  s.keys.forEach(k=>store.set(k, LS.get(k))); reloadAll(); toast('共通保存に入れました');
+});
+$('#b-template').addEventListener('click',()=>download(new Blob([b64ToBuf(TEMPLATE_B64)],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}),'原本_モニタリング報告書.xlsx'));
+
+// ====== 共通保存の状態表示 ======
+let syncMode='file';   // file=ローカルで開いた / loading / slow / shared / local=claude.ai上だが共通保存が使えない / lost
+function showSync(){
+  const el=$('#sync'); if(!el) return;
+  el.className='sync'; el.hidden=false; el.title='';
+  const pending = Object.keys(shared.timers).length || Object.values(shared.busy).some(Boolean);
+  if(syncMode==='file'){ el.hidden=true; }
+  else if(syncMode==='loading'){ el.textContent='共通保存を読み込んでいます…'; }
+  else if(syncMode==='slow'){ el.classList.add('warn'); el.textContent='まだ共通保存につながりません。このまま待つか、'; const b=document.createElement('button'); b.type='button'; b.textContent='このブラウザだけで使う'; b.onclick=()=>{ if(shared.giveUp) shared.giveUp(); }; el.appendChild(b); }
+  else if(syncMode==='local'){ el.classList.add('warn'); el.textContent='このブラウザだけに保存（共通保存ではありません）'; el.title = GAS_URL ? '共通保存を使うには、ページを読み込み直して合言葉を入れてください' : '共通保存を使うには、Claudeにログインし、このページに書き込める権限で招待されている必要があります';
+    if(GAS_URL){ const b=document.createElement('button'); b.type='button'; b.textContent='合言葉を入れ直す'; b.onclick=()=>{ try{ localStorage.removeItem(PASS_KEY); }catch(e){} location.reload(); }; el.appendChild(b); } }
+  else if(syncMode==='lost'){ el.classList.add('warn'); el.textContent='共通保存との接続が切れました。ページを読み込み直してください'; }
+  else if(shared.writeFail){ el.classList.add('warn'); el.textContent='共通保存に書き込めません（権限がありません）。今の入力は保存されていません'; }
+  else if(shared.lastError){ el.classList.add('warn'); el.textContent=shared.lastError; }
+  else if(shared.offline){ el.classList.add('warn'); el.textContent='共通保存につながりません（電波・通信を確認してください）'; }
+  else if(pending){ el.textContent='保存中…'; }
+  else{ el.classList.add('ok'); el.textContent='✓ 共通保存（みんなで同じ内容）'; }
+}
+// ====== ほかの人の変更をこの画面に反映 ======
+const clearObj = o => Object.keys(o).forEach(k=>delete o[k]);
+let renderPending=false;
+function isTyping(){ const a=document.activeElement; return !!a && (a.tagName==='TEXTAREA' || (a.tagName==='INPUT' && !['checkbox','radio','button','file'].includes(a.type))); }
+function remoteRender(force){
+  if(!force && isTyping()){ renderPending=true; return; }   // 入力中の欄を消さないよう、入力が終わってから描き直す
+  renderPending=false;
+  const open=new Set([...document.querySelectorAll('#m-users .user')].filter(d=>{ const x=d.querySelector('details'); return x&&x.open; }).map(d=>d.dataset.uid));
+  renderSettings(); renderUsers(); renderMonthly();
+  document.querySelectorAll('#m-users .user').forEach(d=>{ if(open.has(d.dataset.uid)){ const x=d.querySelector('details'); if(x) x.open=true; } });
+  toast('ほかの人の変更を反映しました');
+}
+document.addEventListener('focusout',()=>{ if(renderPending) setTimeout(()=>{ if(renderPending && !isTyping()) remoteRender(); },300); });
+function applyRemote(keys){
+  let touched=false, force=false;
+  keys.forEach(k=>{
+    if(k==='settings'){
+      const v=store.get('settings',null); if(!v) return;
+      clearObj(settings); Object.assign(settings, v);
+      settings.staff=Array.isArray(settings.staff)?settings.staff:[]; settings.contacts=Array.isArray(settings.contacts)?settings.contacts:[];
+      touched=true;
+    }else if(k==='users'){
+      const nl=store.get('users',[])||[];
+      users = nl.map(n=>{ const ex=users.find(x=>x.id===n.id); if(ex){ clearObj(ex); Object.assign(ex,n); return ex; } return n; });
+      touched=true;
+    }else if(monthData && k===monthKey(monthData.month)){
+      const v=store.get(k,null);
+      if(!v){ loadMonth(monthData.month); touched=true; force=true; return; }
+      const cur=monthData.users||{}; const nu={};
+      const gone=new Set(shared.removed[k]||[]); delete shared.removed[k];   // 相手が「既定値に戻す」等で消した利用者
+      Object.entries(v.users||{}).forEach(([id,e])=>{ const ex=cur[id]; if(ex){ clearObj(ex); Object.assign(ex,e); nu[id]=ex; } else nu[id]=e; });
+      Object.keys(cur).forEach(id=>{ if(id in nu) return; if(gone.has(id)) force=true; else nu[id]=cur[id]; });   // まだ保存していない手元の既定値は残す
+      clearObj(monthData); Object.assign(monthData, v, {users:nu});
+      touched=true;
+    }
+  });
+  if(touched) remoteRender(force);
+}
+// ====== 起動 ======
+function boot(){
+  try{
+    initData(); renderSettings(); renderUsers(); initMonthly(); renderMonthly();
+    if(shared.on) $('#b-desc').textContent='入力内容（設定・利用者マスタ・各月の入力）は共通保存に入り、みんなで同じ内容を使います。念のための控えとして、JSONで書き出し／読み込みができます。';
+    renderLocalLeftover();
+  }finally{
+    document.querySelector('main').hidden=false;
+    shared.ready=true; showSync();
+  }
+}
+async function connectShared(){
+  let db=null;
+  if(GAS_URL){
+    syncMode='loading'; showSync();
+    let pass=''; try{ pass=localStorage.getItem(PASS_KEY)||''; }catch(e){}
+    let msg='合言葉を入れてください。';
+    for(;;){
+      if(!pass){ pass=await askText(msg); if(pass===null || pass===''){ syncMode='local'; return; } }
+      try{ await gasCall({op:'meta'}, pass); break; }
+      catch(e){
+        if(e.code==='bad_pass'){ pass=''; msg='合言葉が違います。もう一度入れてください。'; continue; }
+        await notify('共通保存につながりませんでした。通信を確かめて、ページを読み込み直してください。\nこのまま進むと、入力はこのブラウザだけに保存されます。'); syncMode='local'; return;
+      }
+    }
+    try{ localStorage.setItem(PASS_KEY, pass); }catch(e){}
+    db=gasDB(pass);
+  }else{
+    if(!(window.claude && typeof window.claude.use==='function')){ syncMode='file'; return; }
+    syncMode='loading'; showSync();
+    let user=null;
+    try{ [db,user]=await Promise.all([window.claude.use('db'), window.claude.use('user')]); }catch(e){ db=null; }
+    if(!db){ syncMode='local'; return; }
+    let can=null; try{ can = user ? await user.can('data.write') : null; }catch(e){ can=null; }
+    if(can===false){ syncMode='local'; return; }
+  }
+  shared.col=db.collection('mon');
+  await new Promise(resolve=>{
+    let done=false;
+    const finish=on=>{ if(done) return; done=true; clearTimeout(timer); shared.on=on; syncMode = on?'shared':'local'; resolve(); };
+    const timer=setTimeout(()=>{ if(!done){ syncMode='slow'; showSync(); } },10000);
+    shared.giveUp=()=>finish(false);
+    shared.col.onSnapshot(snap=>{
+      if(done && !shared.on) return;
+      if(snap.metadata && snap.metadata.fromCache) return;   // 共通保存側が確認した内容だけを使う
+      const changed=ingest(snap);
+      if(!done){ finish(true); return; }
+      if(shared.ready && changed.length) applyRemote(changed);
+    }, err=>{
+      console.error('共通保存の受信エラー', err);
+      if(!done){ finish(false); return; }
+      if(shared.on){ syncMode='lost'; showSync(); }
+    });
+  });
+  if(!shared.on) return;
+  // 共通保存がまだ空で、このブラウザに以前の入力が残っているときは、入れるかどうかを聞く
+  if(!Object.keys(shared.cache).length){
+    const s=localSummary();
+    if(s.users || s.months){
+      if(await ask(`共通保存はまだ空です。\nこのブラウザに入っている内容（利用者${s.users}名・入力済み${s.months}か月分）を共通保存に入れますか？\n\nOK＝入れる（このページに書き込める人みんなに見えるようになります）\nキャンセル＝入れずに始める（あとで「バックアップ」から入れられます）`)){
+        s.keys.forEach(k=>store.set(k, LS.get(k)));
+      }
+    }
+  }
+}
+window.addEventListener('pagehide', flushAllNow);
+document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='hidden') flushAllNow(); });
+connectShared().catch(e=>{ console.error(e); shared.on=false; syncMode='local'; }).then(boot);
+</script>
+</body>
+</html>
