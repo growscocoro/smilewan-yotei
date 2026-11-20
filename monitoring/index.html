@@ -91,6 +91,7 @@
   </nav>
   <span class="sync" id="sync" hidden></span>
 </header>
+<div class="note" id="moved" hidden style="max-width:1168px;margin:12px auto 0"></div>
 <main hidden>
 
 <!-- ================= 月次作成 ================= -->
@@ -194,6 +195,17 @@
       <div style="flex:0 0 auto"><button class="btn sub" id="b-local-export">このブラウザの内容をJSONで書き出す</button></div>
       <div style="flex:0 0 auto"><button class="btn danger" id="b-local-up">このブラウザの内容を共通保存に入れる（上書き）</button></div>
     </div>
+  </div>
+  <div class="card" id="b-move">
+    <h2>前の入力を移す（ファイルを使わない方法）</h2>
+    <div id="mv-out-box" hidden>
+      <p class="muted" id="mv-out-info"></p>
+      <div class="row"><div style="flex:0 0 auto"><button class="btn sub" id="mv-show">移す内容を表示する</button></div><div style="flex:0 0 auto"><button class="btn" id="mv-copy" hidden>全部コピーする</button></div></div>
+      <textarea id="mv-out" readonly hidden style="margin-top:8px;font-size:11px"></textarea>
+    </div>
+    <p class="muted" style="margin-top:8px">前のページで「全部コピーする」でコピーした内容を、下の枠に貼り付けて読み込めます。</p>
+    <textarea id="mv-in" placeholder="ここに貼り付け" style="min-height:70px;font-size:11px"></textarea>
+    <div class="row" style="margin-top:8px"><div style="flex:0 0 auto"><button class="btn sub" id="mv-load">貼り付けた内容を読み込む</button></div></div>
   </div>
   <div class="card">
     <h2>原本テンプレート</h2>
@@ -1014,6 +1026,43 @@ $('#b-local-up').addEventListener('click',async()=>{
   if(!(await ask(`このブラウザの内容（利用者${s.users}名・入力済み${s.months}か月分）を共通保存に入れます。\n共通保存の設定・利用者・同じ月の入力は、この内容に置き換わります（全員の画面に反映されます）。よろしいですか？`))) return;
   s.keys.forEach(k=>store.set(k, LS.get(k))); reloadAll(); toast('共通保存に入れました');
 });
+// ====== 前の入力を移す(このブラウザに残っている障害・介護の両方をまとめて文字にする／貼り付けて読み込む) ======
+const NEW_URL = '';   // Claudeのページ版にだけ入る「引っ越し先」
+function lsDump(prefix){ const o={}; try{ Object.keys(localStorage).filter(k=>k.startsWith(prefix)).forEach(k=>{ try{ o[k.slice(prefix.length)]=JSON.parse(localStorage.getItem(k)); }catch(e){} }); }catch(e){} return o; }
+function countInput(d){ const us=Array.isArray(d&&d.users)?d.users:[]; const F=['kubun','validFrom','validTo','contact','contactOffice','sakuseki'];
+  return { users:us.filter(u=>u&&u.name).length, filled:us.filter(u=>u&&F.some(f=>u[f])).length, months:Object.keys(d||{}).filter(isMonthKey).length }; }
+const hasReal = c => c.months>0 || c.filled>0;   // 名前だけの初期名簿は「入力」に数えない
+const MODE_NAME = { shogai:'障害福祉', kaigo:'介護保険' };
+function movePack(){ return { monMove:1, shogai:lsDump('mon:'), kaigo:lsDump('monk:') }; }
+function moveSummary(p){ return ['shogai','kaigo'].filter(m=>hasReal(countInput(p[m]))).map(m=>{ const c=countInput(p[m]); return `${MODE_NAME[m]}：利用者${c.users}名・入力済み${c.months}か月分`; }); }
+function renderMove(){
+  const sum=moveSummary(movePack()); $('#mv-out-box').hidden=!sum.length;
+  if(sum.length) $('#mv-out-info').textContent='このブラウザに前の入力が残っています（'+sum.join('／')+'）。「移す内容を表示する」→「全部コピーする」のあと、新しいページの同じ場所に貼り付けてください。';
+  return sum;
+}
+$('#mv-show').addEventListener('click',()=>{ const t=$('#mv-out'); t.value=JSON.stringify(movePack()); t.hidden=false; $('#mv-copy').hidden=false; t.focus(); t.select(); });
+$('#mv-copy').addEventListener('click',async()=>{ const t=$('#mv-out'); let ok=false;
+  try{ await navigator.clipboard.writeText(t.value); ok=true; }catch(e){ try{ t.focus(); t.select(); ok=document.execCommand('copy'); }catch(_){ ok=false; } }
+  if(ok) toast('コピーしました。新しいページに貼り付けてください'); else notify('自動でコピーできませんでした。枠の中を全部選んで（長押し→すべて選択）、コピーしてください。'); });
+$('#mv-load').addEventListener('click',async()=>{
+  let p=null; try{ p=JSON.parse($('#mv-in').value.trim()); }catch(e){ p=null; }
+  if(!p || p.monMove!==1){ await notify('貼り付けた内容を読めませんでした。前のページで「全部コピーする」を押して、そのまま貼り付けてください。'); return; }
+  const sum=moveSummary(p);
+  if(!sum.length){ await notify('貼り付けた内容には、移す入力（区分などの登録や月ごとの入力）がありませんでした。'); return; }
+  if(!(await ask('次の内容を読み込みます。\n'+sum.join('\n')+'\n\n同じ制度の設定・利用者・同じ月の入力は、この内容に置き換わります'+(shared.on?'（全員の画面に反映されます）':'')+'。よろしいですか？'))) return;
+  try{
+    for(const m of ['shogai','kaigo']){
+      const d=p[m]||{}; if(!hasReal(countInput(d))) continue;
+      for(const [k,v] of Object.entries(d)){
+        if(k!=='settings' && k!=='users' && !isMonthKey(k)) continue;
+        if(m===MODE) store.set(k,v);
+        else if(shared.on) await shared.col.doc(m+'.'+k).set({v:clone(v)});
+        else localStorage.setItem((m==='kaigo'?'monk:':'mon:')+k, JSON.stringify(v));
+      }
+    }
+    reloadAll(); $('#mv-in').value=''; toast('読み込みました');
+  }catch(e){ console.error(e); await notify('読み込みの途中で失敗しました。少し待ってから、もう一度お試しください。'); }
+});
 $('#b-template').addEventListener('click',()=>download(new Blob([b64ToBuf(TEMPLATE_B64)],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}),'原本_モニタリング報告書.xlsx'));
 
 // ====== 共通保存の状態表示 ======
@@ -1078,6 +1127,12 @@ function boot(){
     initData(); renderSettings(); renderUsers(); initMonthly(); renderMonthly();
     if(shared.on) $('#b-desc').textContent='入力内容（設定・利用者マスタ・各月の入力）は共通保存に入り、みんなで同じ内容を使います。念のための控えとして、JSONで書き出し／読み込みができます。';
     renderLocalLeftover();
+    const left=renderMove();
+    if(NEW_URL && !GAS_URL){   // Claudeのページ版：引っ越し先の案内
+      const box=$('#moved'); box.hidden=false; box.textContent='このページは新しい場所に引っ越しました。これからは新しいページを使ってください（合言葉は週間予定表と同じです）： ';
+      const a=document.createElement('a'); a.href=NEW_URL; a.target='_blank'; a.rel='noopener'; a.textContent=NEW_URL; box.appendChild(a);
+      if(left.length){ const d=document.createElement('div'); d.style.marginTop='6px'; d.textContent='このブラウザに前の入力が残っています（'+left.join('／')+'）。「バックアップ」タブの「前の入力を移す」から、新しいページへ移せます。'; box.appendChild(d); }
+    }
   }finally{
     document.querySelector('main').hidden=false;
     shared.ready=true; showSync();
