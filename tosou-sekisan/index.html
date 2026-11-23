@@ -910,7 +910,8 @@ $('gateOut').addEventListener('click', function (e) { e.preventDefault(); try { 
 var API_URL = "https://script.google.com/macros/s/AKfycbxmUCDufro7a-yv5X_Q4hiISVu7Zc1Va0AROjSskmRz3rr--_b7XpN-xorsQ5sB5Lqs_A/exec", PASSKEY = 'sekisan-pass-v1', apiPass = '';
 function apiCall(action, payload) {
   return fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ pass: apiPass, action: action, payload: payload }), redirect: 'follow' })
-    .then(function (r) { if (!r.ok) throw new Error('つながりませんでした（' + r.status + '）。'); return r.json(); })
+    .then(function (r) { if (!r.ok) throw new Error('つながりませんでした（' + r.status + '）。'); return r.text(); }, function () { throw new Error('つながりませんでした。電波を確かめて、もう一度ためしてください。\n（何度やってもだめなときは、保存先の準備がまだ済んでいません）'); })
+    .then(function (t) { try { return JSON.parse(t); } catch (e) { throw new Error('保存先の準備がまだ済んでいません。'); } })
     .then(function (j) { if (!j.ok) { var e = new Error(j.error || 'できませんでした。'); e.badPass = j.badPass === true; throw e; } return j.data; });
 }
 // 元のページの「google.script.run」を、受け口への呼び出しに置きかえる
