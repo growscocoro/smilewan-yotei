@@ -1,0 +1,946 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>積算</title>
+<meta charset="UTF-8">
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 14px 14px 170px; background: #f1f3f4; color: #202124; font-family: -apple-system, 'Hiragino Sans', 'Yu Gothic', Meiryo, sans-serif; font-size: 16px; }
+  .wrap { max-width: 640px; margin: 0 auto; }
+  h1 { font-size: 22px; color: #1a3a5f; margin: 4px 2px 6px; }
+  h2 { font-size: 16px; color: #1a3a5f; margin: 20px 2px 8px; padding-left: 9px; border-left: 5px solid #1a3a5f; }
+  .lead { font-size: 14px; color: #5f6368; margin: 0 2px 12px; line-height: 1.7; }
+  .card { background: #fff; border: 1px solid #dadce0; border-radius: 10px; padding: 12px; margin-bottom: 10px; }
+  label.f { display: block; font-size: 13px; color: #5f6368; margin: 9px 0 3px; }
+  label.f:first-child { margin-top: 0; }
+  input[type=text], select { width: 100%; font-size: 16px; padding: 10px; border: 1px solid #c0c4c9; border-radius: 8px; background: #fffde7; font-family: inherit; color: #202124; }
+  .row { display: flex; gap: 8px; }
+  .row > div { flex: 1; min-width: 0; }
+  .narrow { flex: 0 0 78px !important; }
+  .hint { font-size: 12px; color: #5f6368; margin-top: 3px; line-height: 1.6; }
+  details { margin-top: 10px; } summary { font-size: 14px; color: #1a73e8; font-weight: bold; padding: 4px 0; }
+  button { font-size: 16px; font-family: inherit; border-radius: 8px; padding: 11px 14px; border: 1px solid #1a3a5f; background: #fff; color: #1a3a5f; font-weight: bold; }
+  button.main { background: #1a3a5f; color: #fff; width: 100%; font-size: 18px; padding: 14px; }
+  button.del { border-color: #c0c4c9; color: #c5221f; padding: 7px 10px; font-size: 14px; }
+  button:disabled { opacity: .5; }
+  .line .top { display: flex; align-items: center; gap: 8px; margin-bottom: 2px; }
+  .line .no { font-weight: bold; color: #1a3a5f; }
+  .line .sp { margin-left: auto; }
+  .chk { display: flex; align-items: center; gap: 6px; font-size: 14px; margin-top: 10px; }
+  .chk input { width: 22px; height: 22px; margin: 0; }
+  .amt { text-align: right; font-weight: bold; margin-top: 8px; }
+  .amt small { color: #5f6368; font-weight: normal; }
+  .from { font-size: 12px; color: #188038; margin-top: 3px; } .from.chk2 { color: #b06000; }
+  table.res { width: 100%; border-collapse: collapse; font-size: 14px; }
+  table.res td { padding: 6px 4px; border-bottom: 1px solid #eceff1; vertical-align: top; }
+  table.res td.n { text-align: right; white-space: nowrap; font-weight: bold; }
+  table.res tr.big td { background: #e6f4ea; font-size: 16px; } table.res tr.red td { background: #fce8e6; font-size: 16px; }
+  table.res small { display: block; color: #5f6368; font-weight: normal; font-size: 12px; }
+  .warn { color: #b06000; font-size: 13px; margin-top: 8px; line-height: 1.6; white-space: pre-wrap; }
+  .bar { position: fixed; left: 0; right: 0; bottom: 0; background: #fff; border-top: 1px solid #dadce0; padding: 10px 14px calc(10px + env(safe-area-inset-bottom)); }
+  .bar .in { max-width: 640px; margin: 0 auto; }
+  .tot { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px; font-size: 13px; color: #5f6368; }
+  .tot b { font-size: 20px; color: #188038; } .tot b.r { color: #c5221f; font-size: 17px; }
+  #msg { white-space: pre-wrap; color: #c5221f; font-size: 14px; margin: 4px 2px; }
+  #done { display: none; } #done .big { font-size: 22px; font-weight: bold; margin: 8px 0; }
+  a.open { display: block; text-align: center; background: #1a3a5f; color: #fff; text-decoration: none; font-weight: bold; border-radius: 8px; padding: 14px; font-size: 18px; margin: 12px 0; }
+  button.bg { width: 100%; margin-top: 8px; font-size: 14px; padding: 9px; border-color: #1a73e8; color: #1a73e8; }
+  #ymPanel { display: none; position: fixed; inset: 0; z-index: 20; background: #f1f3f4; overflow-y: auto; padding: 14px 14px 30px; }
+  #ymPanel .in { max-width: 640px; margin: 0 auto; }
+  #ymPanel textarea { width: 100%; height: 110px; font-size: 14px; padding: 8px; border: 1px solid #c0c4c9; border-radius: 8px; background: #fffde7; font-family: inherit; }
+  #ymPanel input[type=file] { width: 100%; font-size: 15px; padding: 8px 0; }
+  .ymRow { display: flex; gap: 10px; align-items: flex-start; padding: 8px 0; border-bottom: 1px solid #eceff1; }
+  .ymRow input { width: 22px; height: 22px; margin: 2px 0 0; flex: none; }
+  .ymRow .t { flex: 1; min-width: 0; font-size: 14px; line-height: 1.5; word-break: break-all; } .ymRow .t small { display: block; color: #5f6368; }
+  .ymRow .q { flex: none; font-size: 14px; font-weight: bold; white-space: nowrap; }
+  .ymKubun { font-size: 13px; font-weight: bold; color: #1a3a5f; background: #e8f0fe; border-radius: 4px; padding: 3px 8px; margin-top: 10px; }
+  #ymMsg { white-space: pre-wrap; font-size: 14px; line-height: 1.7; margin: 8px 2px; } #ymMsg.err { color: #c5221f; }
+  #smPanel { display: none; position: fixed; inset: 0; z-index: 20; background: #f1f3f4; overflow-y: auto; padding: 14px 14px 30px; }
+  #smPanel .in { max-width: 640px; margin: 0 auto; }
+  .smRow { display: block; width: 100%; text-align: left; background: #fff; border: 1px solid #dadce0; border-radius: 10px; padding: 10px 12px; margin-bottom: 8px; font-weight: normal; color: #202124; }
+  .smRow .h { display: flex; gap: 8px; align-items: baseline; } .smRow .h b { flex: 1; min-width: 0; font-size: 15px; word-break: break-all; }
+  .smRow .p { flex: none; font-size: 17px; font-weight: bold; color: #188038; white-space: nowrap; }
+  .smRow small { display: block; font-size: 12px; color: #5f6368; line-height: 1.6; word-break: break-all; }
+  .smRow .tag { display: inline-block; font-size: 11px; font-weight: bold; border-radius: 4px; padding: 1px 6px; margin-right: 6px; color: #fff; background: #5f6368; }
+  .smRow .tag.hi { background: #188038; } .smRow .tag.mid { background: #b06000; } .smRow .tag.ng { background: #c5221f; }
+  .cand { margin-top: 8px; } .cand .t { font-size: 12px; color: #5f6368; margin-bottom: 4px; }
+  .cand button { display: flex; width: 100%; gap: 8px; align-items: baseline; text-align: left; font-size: 13px; font-weight: normal; color: #202124; padding: 7px 9px; margin-bottom: 4px; border: 1px solid #dadce0; border-left: 4px solid #b06000; border-radius: 6px; background: #fff; }
+  .cand button.hi { border-left-color: #188038; }
+  .cand button span.n { flex: 1; min-width: 0; word-break: break-all; line-height: 1.45; } .cand button span.n small { display: block; color: #5f6368; font-size: 11px; }
+  .cand button span.p { flex: none; font-weight: bold; color: #188038; white-space: nowrap; }
+  #bgPanel { display: none; position: fixed; inset: 0; z-index: 20; background: #f1f3f4; overflow-y: auto; padding: 14px 14px 30px; }
+  #bgPanel .in { max-width: 640px; margin: 0 auto; }
+  table.bgT { width: 100%; border-collapse: collapse; font-size: 13px; }
+  table.bgT td { padding: 5px 3px; border-bottom: 1px solid #eceff1; vertical-align: middle; } table.bgT td.n { text-align: right; white-space: nowrap; }
+  table.bgT input { padding: 7px; font-size: 15px; text-align: right; }
+  table.bgT tr.sum td { font-weight: bold; } table.bgT tr.big td { background: #e6f4ea; font-size: 16px; font-weight: bold; }
+  .links { font-size: 14px; margin: 18px 2px; line-height: 2; } .links a { color: #1a73e8; }
+</style>
+</head>
+<body>
+<div class="wrap" id="gate">
+  <h1>積算</h1>
+  <div class="card">
+    <label class="f">合言葉</label>
+    <input type="text" id="gatePass" autocomplete="off" autocapitalize="off" style="-webkit-text-security:disc;">
+    <button id="gateGo" class="main" type="button" style="margin-top:12px;">開く</button>
+    <div id="gateMsg" style="white-space:pre-wrap;color:#c5221f;font-size:14px;margin-top:10px;"></div>
+  </div>
+</div>
+<div class="wrap" id="form" style="display:none;">
+  <h1>積算</h1>
+  <p class="lead">数量書の項目と単価を入れると、工事価格と最低制限価格の目安が出ます。金額は目安です。</p>
+
+  <h2>工事</h2>
+  <div class="card">
+    <label class="f">入札の案件から選ぶ</label>
+    <select id="job"><option value="">（選ばない）</option></select>
+    <label class="f">工事名</label><input type="text" id="title">
+    <label class="f">案件番号</label><input type="text" id="no" inputmode="numeric">
+    <div class="row">
+      <div><label class="f">工事の種類</label><select id="kind"></select></div>
+      <div class="narrow"><label class="f">工期（か月）</label><input type="text" id="months" inputmode="decimal" placeholder="3"></div>
+    </div>
+    <div class="hint">工期（か月）＝（開札日から工期末までの日数 − 20日）÷ 30</div>
+    <details>
+      <summary>くわしい設定</summary>
+      <label class="chk"><input type="checkbox" id="office">監理事務所を設けない工事の補正をする（共通仮設費が下がる。書類にそう書いてあるときだけ）</label>
+      <label class="f">積み上げの共通仮設費（円）</label><input type="text" id="addKasetsu" inputmode="numeric" placeholder="足場など、率に含まれない分">
+      <label class="f">積み上げの現場管理費（円）</label><input type="text" id="addKanri" inputmode="numeric">
+      <label class="chk"><input type="checkbox" id="hosho">契約保証費を足す（金銭的保証が必要な契約）</label>
+      <label class="chk"><input type="checkbox" id="hoken">労災の法定外保険の補正をする（公告に記載があるとき）</label>
+      <label class="f">消費税率（％）</label><input type="text" id="tax" inputmode="numeric" value="10">
+    </details>
+  </div>
+
+  <h2>項目</h2>
+  <button id="ymOpen" type="button" style="width:100%;margin-bottom:10px;border-color:#1a73e8;color:#1a73e8;">数量書を読み込む（Excel・PDF・貼り付け）</button>
+  <div id="lines"></div>
+  <button id="add" type="button">＋ 行を足す</button>
+
+  <h2>計算の結果</h2>
+  <div class="card"><div id="res"></div></div>
+
+  <label class="chk" style="margin:14px 2px;"><input type="checkbox" id="learn" checked>入れた単価を覚える（次から自動で入る）</label>
+  <button id="reset" type="button" class="del">入力を全部消す</button>
+  <div class="links"><a id="gateOut" href="#">合言葉を入れ直す</a><span style="display:none;"><a id="osaka"></a><a id="mitsu"></a><a id="joken"></a></span></div>
+</div>
+
+<div class="wrap" id="done">
+  <div class="card">
+    <div class="big">内訳書をつくりました</div>
+    <div id="doneText" style="line-height:1.9;"></div>
+    <a class="open" id="pdf" href="#" target="_blank">PDFを開く</a>
+    <button id="back" type="button" style="width:100%;">続けて直す</button>
+  </div>
+</div>
+
+<div id="ymPanel"><div class="in">
+  <h1>数量書を読み込む</h1>
+  <p class="lead">数量書や内訳書のファイルから、名称・規格・数量・単位を拾って項目に入れます。ファイルはこの端末の中で読むだけで、どこにも送りません。</p>
+  <div class="card">
+    <label class="f">ファイルを選ぶ（Excel・CSV・PDF）</label>
+    <input type="file" id="ymFile" accept=".xlsx,.xlsm,.xls,.csv,.txt,.pdf">
+    <div class="hint">PDFは、文字が入っているもの（文字をなぞって選べるもの）だけ読めます。紙をスキャンしたPDFは読めません。</div>
+    <details>
+      <summary>Excelの表をコピーして貼り付ける</summary>
+      <textarea id="ymPaste" placeholder="Excelで表を選んでコピーし、ここに貼り付けます"></textarea>
+      <button id="ymPasteGo" type="button" style="width:100%;margin-top:6px;">貼り付けた文字を読み取る</button>
+    </details>
+    <div id="ymSheetBox" style="display:none;"><label class="f">シート</label><select id="ymSheet"></select></div>
+  </div>
+  <div id="ymMsg"></div>
+  <div class="card" id="ymListBox" style="display:none;">
+    <label class="chk" style="margin-top:0;"><input type="checkbox" id="ymAll" checked>全部えらぶ</label>
+    <div id="ymList"></div>
+  </div>
+  <button id="ymUse" class="main" type="button" disabled>項目に入れる</button>
+  <button id="ymCancel" type="button" style="width:100%;margin-top:8px;">やめる</button>
+</div></div>
+
+<div id="smPanel"><div class="in">
+  <h1>似た単価を探す</h1>
+  <p class="lead">覚えている単価の中から、この項目に似たものを並べます。中身が同じと言えるものだけ選んでください。</p>
+  <div class="card">
+    <div id="smTarget" style="font-size:15px;line-height:1.6;"></div>
+    <label class="f">言葉でしぼる（例：足場、ｼｰﾘﾝｸﾞ、塗膜防水）</label>
+    <input type="text" id="smWord" placeholder="空なら、名称に似ている順">
+  </div>
+  <div class="hint" style="margin:0 2px 10px;">※ 名称が似ていても、材料・工法・寸法・設置する月数が違うと単価は大きく変わります。規格の行を必ず見比べてください。単価は書いてある工事の発注時点のものです。</div>
+  <div id="smList"></div>
+  <button id="smCancel" type="button" style="width:100%;margin-top:8px;">やめる</button>
+</div></div>
+
+<div id="bgPanel"><div class="in">
+  <h1>手間の表から単価を作る</h1>
+  <p class="lead">国の「手間の表」と大阪府の労務単価から、1㎡あたりの単価を計算します。材料の値段はご自分で入れてください。</p>
+  <div class="card">
+    <label class="f">作業を選ぶ</label>
+    <select id="bgItem"></select>
+    <div class="hint" id="bgSrc"></div>
+    <label class="chk"><input type="checkbox" id="bgBusy">人がいる建物での工事（手間を15％増やす）</label>
+    <div class="hint">建物を使いながらの改修のときに入れます。空っぽの建物なら外します。除去・養生・清掃には掛かりません。</div>
+  </div>
+  <div class="card"><div id="bgOut"></div></div>
+  <div class="hint" style="margin:0 2px 12px;">※ 大阪府は塗装に「市場単価」（有料の季刊誌の値段）を使うので、ここで出る単価は近い数字です。下地調整と仕上げの塗りは別の行にします。</div>
+  <button id="bgUse" class="main" type="button">この単価を入れる</button>
+  <button id="bgCancel" type="button" style="width:100%;margin-top:8px;">やめる</button>
+</div></div>
+
+<div class="bar" id="bar" style="display:none;"><div class="in">
+  <div class="tot"><span>工事価格（税抜）の目安</span><b id="tPrice">—</b></div>
+  <div class="tot"><span>最低制限価格の目安</span><b class="r" id="tFloor">—</b></div>
+  <div id="msg"></div>
+  <button id="make" class="main" type="button">内訳書をつくる（PDF）</button>
+</div></div>
+
+<script>
+var SK={"KINDS":["建築工事（改修）","建築工事（新営）","塗装工事（単独発注）","防水工事（単独発注）"]};
+function skRound_(x, d) { var m = Math.pow(10, d); return Math.round(x * m + 1e-9) / m; }
+function sekisanCalc_(o) {
+  var errors = [], warns = [];
+  var direct = Math.floor(Number(o.direct) || 0), disposal = Math.floor(Number(o.disposal) || 0);
+  var T = skRound_(Number(o.months) || 0, 1), kind = String(o.kind || '');
+  var addK = Math.floor(Number(o.addKasetsu) || 0), addG = Math.floor(Number(o.addKanri) || 0);
+  var isNew = kind === SK.KINDS[1], isKai = kind === SK.KINDS[0], isPaint = kind === SK.KINDS[2], isWater = kind === SK.KINDS[3];
+  if (!(isNew || isKai || isPaint || isWater)) errors.push('工事の種類を選んでください。');
+  if (direct <= 0) errors.push('直接工事費が0円です。数量と単価を入れてください。');
+  if (disposal > direct) errors.push('処分費が直接工事費より大きくなっています。');
+  if ((isNew || isKai) && !(T > 0)) errors.push('工期（か月）を入れてください。');
+  if (errors.length) return { ok: false, errors: errors, warns: warns };
+
+  var base = direct - disposal, P = base / 1000, Kr = 0, Jo = 0, Gp = 0, hosei = 1;
+  // 共通仮設費
+  if (isNew || isKai) {
+    Kr = isNew ? Math.exp(3.346 - 0.282 * Math.log(P) + 0.625 * Math.log(T)) : Math.exp(3.962 - 0.315 * Math.log(P) + 0.531 * Math.log(T));
+    Kr = skRound_(Kr, 2);
+    var lo = isNew ? 10000 : 3000, hi = isNew ? 5000000 : 1000000;
+    if (P < lo || P > hi) warns.push('直接工事費が基準の式の範囲（' + (lo / 10).toLocaleString() + '万円〜' + (hi / 10).toLocaleString() + '万円）の外です。発注者は別の決め方をすることがあります。');
+    if (!o.office) {
+      hosei = P < 10000 ? 0.887 : (P > 5000000 ? 0.988 : skRound_(0.738 + 0.0162 * Math.log(P), 3));
+      Kr = skRound_(Kr * hosei, 2);
+    }
+  } else if (!addK) {
+    warns.push((isPaint ? '塗装工事' : '防水工事') + '（単独発注）の共通仮設費は積み上げです。足場などの費用を「積み上げの共通仮設費」に入れてください。');
+  }
+  var kasetsu = Math.floor(base * Kr / 100) + addK;
+  var junkoji = direct + kasetsu;
+  // 現場管理費
+  var Np = (junkoji - disposal) / 1000;
+  if (isNew || isKai) {
+    Jo = isNew ? Math.exp(5.899 - 0.447 * Math.log(Np) + 0.831 * Math.log(T)) : Math.exp(7.079 - 0.538 * Math.log(Np) + 0.773 * Math.log(T));
+    Jo = skRound_(Jo, 2);
+    if (o.hoken) Jo = skRound_(Jo * 1.01, 2);
+  } else {
+    Jo = isPaint ? 11.5 : 10;
+  }
+  var kanri = Math.floor((junkoji - disposal) * Jo / 100) + addG;
+  var genka = junkoji + kanri;
+  // 一般管理費等
+  var Cp = genka / 1000;
+  if (isPaint) Gp = 11.5;
+  else if (isWater) Gp = 10;
+  else Gp = Cp <= 5000 ? 17.24 : (Cp > 3000000 ? 8.43 : skRound_(28.978 - 3.173 * (Math.log(Cp) / Math.LN10), 2));
+  var ippan = Math.floor(genka * Gp / 100) + (o.hosho ? Math.floor(genka * 0.04 / 100) : 0);
+  var price = Math.floor((genka + ippan) / 1000) * 1000;   // 工事価格は千円単位（一般管理費等で調整）
+  ippan = price - genka;
+  var taxPct = Number(o.taxPct); if (isNaN(taxPct) || taxPct < 0) taxPct = 10;
+  var tax = Math.floor(price * taxPct / 100);
+  // 最低制限価格の目安
+  var floorRaw = Math.floor(direct * 0.97 + kasetsu * 0.90 + kanri * 0.90 + ippan * 0.68);
+  var floorLow = Math.floor(price * 0.75), floorHigh = Math.floor(price * 0.92);
+  var floor = Math.min(Math.max(floorRaw, floorLow), floorHigh);
+
+  var pct = function (x) { return x.toFixed(2) + '％'; };
+  return {
+    ok: true, errors: errors, warns: warns, T: T, Kr: Kr, Jo: Jo, Gp: Gp, hosei: hosei,
+    direct: direct, disposal: disposal, kasetsu: kasetsu, junkoji: junkoji, kanri: kanri, genka: genka, ippan: ippan,
+    price: price, tax: tax, total: price + tax, floor: floor, floorRaw: floorRaw, floorLow: floorLow, floorHigh: floorHigh,
+    steps: [
+      ['直接工事費', direct, disposal ? 'うち処分費 ' + disposal.toLocaleString() + '円（率の計算からは除く）' : ''],
+      ['共通仮設費', kasetsu, (Kr ? '率 ' + pct(Kr) + (hosei !== 1 ? '（監理事務所なしの補正 ×' + hosei + ' 込み）' : '') : '率なし（積み上げ）') + (addK ? ' ＋ 積み上げ ' + addK.toLocaleString() + '円' : '')],
+      ['純工事費', junkoji, '直接工事費＋共通仮設費'],
+      ['現場管理費', kanri, '率 ' + pct(Jo) + (addG ? ' ＋ 積み上げ ' + addG.toLocaleString() + '円' : '')],
+      ['工事原価', genka, '純工事費＋現場管理費'],
+      ['一般管理費等', ippan, '率 ' + pct(Gp) + (o.hosho ? ' ＋ 契約保証費 0.04％' : '') + '（工事価格が千円単位になるよう調整）'],
+      ['工事価格（税抜）', price, 'これが予定価格の目安'],
+      ['消費税', tax, taxPct + '％'],
+      ['合計（税込）', price + tax, ''],
+      ['最低制限価格の目安（税抜）', floor, '式の値 ' + floorRaw.toLocaleString() + '円 → 工事価格の75〜92％（' + floorLow.toLocaleString() + '〜' + floorHigh.toLocaleString() + '円）に収める']
+    ]
+  };
+}
+function skKey_(s) {
+  s = String(s === null || s === undefined ? '' : s);
+  if (s.normalize) s = s.normalize('NFKC');
+  return s.replace(/[\s　]+/g, '').toLowerCase();
+}
+function skFind_(master, name, spec, unit) {
+  var n = skKey_(name), s = skKey_(spec), u = skKey_(unit), same = null, loose = [];
+  if (!n) return null;
+  for (var i = 0; i < master.length; i++) {
+    var m = master[i], price = Number(m[3]);
+    if (skKey_(m[0]) !== n || m[3] === '' || isNaN(price)) continue;
+    if (skKey_(m[1]) === s && skKey_(m[2]) === u) same = price;                // 後ろの行（新しい方）を優先
+    else if (skKey_(m[2]) === u) loose.push(price);
+  }
+  if (same !== null) return { price: same, how: '単価表（名称・規格・単位が同じ）' };
+  if (loose.length === 1) return { price: loose[0], how: '単価表（名称・単位が同じ／規格ちがい・要確認）' };
+  return null;
+}
+function skNum_(v) { if (v === '' || v === null) return ''; var n = Number(String(v).replace(/[,，円\s]/g, '')); return isNaN(n) ? '' : n; }
+function skTotal_(rows) {
+  var direct = 0, disposal = 0, amounts = [], blank = 0, used = 0;
+  rows.forEach(function (r) {
+    var qty = skNum_(r[3]), price = skNum_(r[5]), name = String(r[1] || '').trim();
+    if (!name || qty === '') { amounts.push(['']); return; }      // 見出しの行・空の行
+    used++;
+    if (price === '') { blank++; amounts.push(['']); return; }
+    var a = Math.floor(qty * price + 1e-6);
+    amounts.push([a]); direct += a;
+    if (r[7] === true) disposal += a;
+  });
+  return { direct: direct, disposal: disposal, amounts: amounts, blank: blank, used: used };
+}
+function skSimilar_(master, name, spec, unit, word, limit) {
+  var norm = function (x) { return skKey_(x).replace(/[()（）\[\]［］「」・･、,。.:：;；\-‐－ー―~〜～\/／*＊×xｘ=＝@＠φΦ]/g, ''); };
+  var unitKey = function (u) { return skKey_(u).replace(/^m2$/, '㎡').replace(/^m3$/, '㎥').replace(/[ヶケカヵ箇個]所/, 'か所'); };
+  var grams = function (t) { var g = {}, n = 0, i; if (t.length === 1) { g[t] = 1; n = 1; } for (i = 0; i + 1 < t.length; i++) { var k = t.substr(i, 2); if (!g[k]) { g[k] = 1; n++; } } return { g: g, n: n }; };
+  var dice = function (a, b) { if (!a.n || !b.n) return 0; var c = 0, k; for (k in a.g) if (b.g[k]) c++; return 2 * c / (a.n + b.n); };
+  var n0 = norm(name), s0 = norm(spec), u0 = unitKey(unit), gn = grams(n0), gs = grams(s0), gall = grams(n0 + s0), w = norm(word || ''), out = [], seen = {};
+  if (!n0 && !w) return out;
+  for (var i = master.length - 1; i >= 0; i--) {                   // 後ろの行（新しい方）を先に
+    var m = master[i], price = Number(m[3]);
+    if (m[3] === '' || isNaN(price) || !String(m[0]).trim()) continue;
+    var n1 = norm(m[0]), s1 = norm(m[1]), key = n1 + '|' + s1 + '|' + unitKey(m[2]);
+    if (seen[key]) continue;
+    if (w && (n1 + s1).indexOf(w) === -1) continue;
+    var same = !u0 || unitKey(m[2]) === u0;
+    var sc = n0 ? 0.6 * Math.max(dice(gn, grams(n1)), 0.8 * dice(gall, grams(n1 + s1))) + 0.4 * (s0 || s1 ? dice(gs, grams(s1)) : 1) : 0.5;
+    if (!same) sc *= 0.5;
+    if (!w && sc < 0.2) continue;
+    seen[key] = true;
+    out.push({ name: String(m[0]), spec: String(m[1]), unit: String(m[2]), price: price, memo: String(m[4] || ''), score: Math.round(sc * 100), sameUnit: same });
+  }
+  out.sort(function (a, b) { return b.score - a.score; });
+  return out.slice(0, limit || 12);
+}
+function bgRound3_(x) {
+  x = Number(x) || 0;
+  if (x >= 1000) { var d = Math.pow(10, Math.floor(Math.log(x) / Math.LN10 + 1e-9) - 2); return Math.round(x / d + 1e-9) * d; }
+  if (x >= 100) return Math.round(x / 10 + 1e-9) * 10;
+  return Math.round(x + 1e-9);
+}
+function bugakariPrice_(item, prices, o) {
+  var r2 = function (x) { return Math.round(x * 100 + 1e-7) / 100; };
+  var num = function (v) { if (v === '' || v === null || v === undefined) return ''; var n = Number(String(v).replace(/[,，円\s]/g, '')); return isNaN(n) || n < 0 ? '' : n; };
+  var labor = 0, mat = 0, missing = [], parts = [], k, plus = o.busy && item.plus ? BG.PLUS : 1;
+  var rl = num(o.rateLabor), ro = num(o.rateOther);
+  if (rl === '' || ro === '') return { ok: false, error: '諸経費の率が入っていません。「' + BG.SHEET + '」のシートを見てください。' };
+  for (k in item.labor) {
+    var wage = num(prices[k]);
+    if (wage === '' || wage === 0) return { ok: false, error: k + ' の労務単価が入っていません。「' + BG.SHEET + '」のシートに入れてください。' };
+    var q = Math.round(item.labor[k] * plus * 100000 + 1e-6) / 100000, a = r2(q * wage);
+    labor += a; parts.push([k, q, '人', wage, a, '手間']);
+  }
+  for (k in item.mats) {
+    var p = num(prices[k]), unit = BG.UNITS[k] || 'kg';
+    if (p === '') { missing.push(k); parts.push([k, item.mats[k], unit, '', '', '材料']); continue; }
+    var b = r2(item.mats[k] * p);
+    mat += b; parts.push([k, item.mats[k], unit, p, b, '材料']);
+  }
+  labor = r2(labor); mat = r2(mat);
+  var keihi = r2(r2(labor * rl / 100) + r2(mat * ro / 100)), raw = r2(labor + mat + keihi);
+  return { ok: true, labor: labor, mat: mat, keihi: keihi, raw: raw, price: bgRound3_(raw), missing: missing, parts: parts, plus: plus };
+}
+function ymNorm_(s) {
+  s = String(s === null || s === undefined ? '' : s);
+  if (s.normalize) s = s.normalize('NFKC');
+  return s.replace(/[\s　]+/g, ' ').trim();
+}
+function ymNum_(s) {
+  s = ymNorm_(s).replace(/[,\s]/g, '');
+  return /^-?(\d+\.?\d*|\.\d+)$/.test(s) ? Number(s) : '';
+}
+function ymIsUnit_(s) {
+  s = ymNorm_(s).replace(/\s/g, '');
+  if (!s || s.length > 6) return false;
+  return /^(m|m2|m3|m²|m³|平米|立米|か所|ヶ所|ケ所|カ所|箇所|ヵ所|個所|式|一式|本|枚|台|個|組|基|kg|g|t|ton|トン|l|kl|缶|袋|箱|巻|面|段|脚|灯|室|戸|棟|階|日|人|人工|人日|回|月|か月|ヶ月|時間|h|km|cm|mm|セット|スパン|束|丁|株|口|対|双|掛m2|架m2|空m3|延m|延m2|床m2|建m2|m\/日|台日|台回|枚日)$/i.test(s);
+}
+function ymIsTotal_(s) {
+  s = ymNorm_(s).replace(/[\s()（）［］\[\]【】]/g, '');
+  return /^(小計|中計|合計|総計|総合計|計|累計|消費税.*|.*の計|.*合計|.*小計|工事価格|工事費計|直接工事費計?|純工事費|工事原価|共通仮設費|現場管理費|一般管理費等?|共通費|諸経費)$/.test(s);
+}
+function ymImport_(grid, guess) {
+  var raws = (grid || []).map(function (r) { return (r || []).map(function (c) { return String(c === null || c === undefined ? '' : c).replace(/[\s\u3000]+/g, ' ').trim(); }); });
+  var rows = raws.map(function (r) { return r.map(function (c) { return ymNorm_(c); }); });
+  // 画面に出す文字は元のまま（㎡ を m2 に変えない）。見分けるときだけ全角半角をそろえる
+  var rawOf = function (i, text) { var k = rows[i].indexOf(text); return k === -1 ? text : raws[i][k]; };
+  var flat = function (s) { return s.replace(/\s/g, ''); };
+  var col = null, head = -1, i, j;
+
+  // ① 見出しの行（名称・数量・単位がそろった行）を探す
+  for (i = 0; !guess && i < rows.length && i < 80 && head === -1; i++) {
+    var c = { name: -1, spec: -1, qty: -1, unit: -1, price: -1 };
+    for (j = 0; j < rows[i].length; j++) {
+      var t = flat(rows[i][j]);
+      if (!t) continue;
+      if (c.qty === -1 && /^(数量|設計数量|員数)$/.test(t)) c.qty = j;
+      else if (c.unit === -1 && /^(単位|呼称)$/.test(t)) c.unit = j;
+      else if (c.price === -1 && /^単価/.test(t)) c.price = j;
+      else if (c.name === -1 && /^(名称|名称・規格|名称規格|品名|細目|工種|種別|種目|科目|項目|費目|工事種目|工事細目|名称及び規格|品名・規格)/.test(t)) c.name = j;
+      else if (c.spec === -1 && /(規格|摘要|仕様|形状|寸法|内容)/.test(t)) c.spec = j;
+    }
+    if (c.name !== -1 && c.qty !== -1 && c.unit !== -1) { col = c; head = i; }
+  }
+
+  var items = [], kubun = '', used = false, heads = 0, skipped = 0;
+  var push = function (name, spec, qty, unit, price, memo) {
+    if (ymIsTotal_(name)) { skipped++; return; }
+    items.push({ kubun: used ? '' : kubun, name: name.slice(0, 200), spec: spec.slice(0, 200), qty: qty, unit: unit.slice(0, 20), price: price, memo: String(memo || '').slice(0, 200) });
+    used = true;
+  };
+  var heading = function (text) {
+    if (!text || ymIsTotal_(text) || ymNum_(text) !== '') { skipped++; return; }
+    kubun = text.replace(/^[\s\d０-９IVXⅠ-Ⅹ一二三四五六七八九十A-Za-z]{1,3}[\s.．、)）:：-]+\s*/, '').slice(0, 100) || text.slice(0, 100);
+    used = false; heads++;
+  };
+
+  // ③ 役所の積算システムの形：1つの項目が3行（1行目 名称・摘要／2行目 数量／3行目 単位）で、ページごとに見出しがくり返す
+  var stack = 0, isHead = function (k) { return col && k >= 0 && k < rows.length && flat(rows[k][col.name] || '') === flat(rows[head][col.name]) && flat(rows[k][col.qty] || '') === flat(rows[head][col.qty]); };
+  if (col) for (i = head + 1; i + 1 < rows.length && stack < 2; i++) {
+    if (ymNum_(rows[i][col.qty]) !== '' && !rows[i][col.unit] && rows[i + 1][col.unit] && ymNum_(rows[i + 1][col.qty]) === '') stack++;
+  }
+  if (col && stack >= 2) {
+    var memoCol = -1, sub = '', setKubun = function (h) {
+      var top = h > 0 ? raws[h - 1].filter(function (x) { return x !== ''; }) : [];
+      if (top.length > 1) top.shift();                      // 先頭は種目（改修工事 など）
+      var k = top.join(' ').slice(0, 100);
+      if (k && k !== kubun) { kubun = k; used = false; heads++; sub = ''; }
+    };
+    for (j = 0; j < rows[head].length; j++) if (/^(備考|摘要2)$/.test(flat(rows[head][j]))) memoCol = j;
+    setKubun(head);
+    i = head + 1;
+    while (i < rows.length) {
+      if (isHead(i)) { setKubun(i); i++; continue; }
+      if (isHead(i + 1) || isHead(i + 2) || isHead(i + 3) || isHead(i + 4)) { i++; continue; }   // 次のページの題名の行（見出しの上2行）と、その手前の半端な行
+      var b = [raws[i] || [], raws[i + 1] || [], raws[i + 2] || []];
+      var cat = function (c, sep) { return c === -1 ? '' : b.map(function (x) { return x[c] || ''; }).filter(function (x) { return x !== ''; }).join(sep); };
+      var bn = cat(col.name, ''), bs = col.spec !== -1 && col.spec !== col.name ? cat(col.spec, ' ') : '', bq = '', bu = '';
+      b.forEach(function (x) { if (bq === '' && ymNum_(x[col.qty]) !== '') bq = ymNum_(x[col.qty]); if (!bu && x[col.unit]) bu = x[col.unit]; });
+      if (bn && bq !== '' && bu) push(bn, bs, bq, bu, col.price !== -1 ? ymNum_(cat(col.price, '')) : '', [sub, cat(memoCol, ' ')].filter(function (x) { return x; }).join(' '));
+      else if (bn && bq === '' && !bu && !ymIsTotal_(bn)) sub = bn;      // （本体屋上）などの小見出しは、次からの行のメモに入れる
+      else if (bn || bq !== '' || bu) skipped++;
+      i += 3;
+    }
+    return { items: items, mode: '見出しから（3行で1項目の形）', head: head, heads: heads, skipped: skipped };
+  }
+
+  for (i = head + 1; i < rows.length; i++) {
+    var r = rows[i], filled = r.filter(function (x) { return x !== ''; });
+    if (!filled.length) continue;
+    if (col) {
+      // 見出しどおりの列から拾う
+      if (flat(r[col.name] || '') === flat(rows[head][col.name]) && flat(r[col.qty] || '') === flat(rows[head][col.qty])) continue;   // ページごとにくり返す見出し
+      var name = r[col.name] || '', spec = col.spec !== -1 ? (r[col.spec] || '') : '', unit = r[col.unit] || '', qty = ymNum_(r[col.qty]);
+      if (!name) {
+        // 名称が字下げで隣の列に入っている形：数量より左で、規格の列でない最初の文字
+        for (j = 0; j < Math.min(col.qty, r.length); j++) if (j !== col.spec && r[j] && ymNum_(r[j]) === '') { name = r[j]; break; }
+      }
+      if (!name && spec && qty !== '') { name = spec; spec = ''; }
+      if (qty === '' && /^一?式$/.test(flat(unit)) ) qty = 1;
+      if (name && qty !== '' && unit) push(rawOf(i, name), spec ? rawOf(i, spec) : '', qty, rawOf(i, unit), col.price !== -1 ? ymNum_(r[col.price]) : '');
+      else if (name && qty === '' && !unit) heading(rawOf(i, name));
+      else skipped++;
+      continue;
+    }
+    // ② 見出しが無いとき：「数字＋単位」のならびを探す
+    var q = -1, qv = '', uv = '', next = -1, m;
+    for (j = 0; j < filled.length && q === -1; j++) {
+      if (j + 1 < filled.length && ymNum_(filled[j]) !== '' && ymIsUnit_(filled[j + 1])) { q = j; qv = ymNum_(filled[j]); uv = filled[j + 1]; next = j + 2; }
+      else if (j > 0 && (m = /^([\d,]+(?:\.\d+)?)\s*([^\d.,].{0,5})$/.exec(filled[j])) && ymIsUnit_(m[2])) { q = j; qv = ymNum_(m[1]); uv = m[2]; next = j + 1; }
+      else if (j > 0 && j + 1 < filled.length && ymIsUnit_(filled[j]) && ymNum_(filled[j + 1]) !== '' && ymNum_(filled[j - 1]) === '') { q = j; uv = filled[j]; qv = ymNum_(filled[j + 1]); next = j + 2; }
+    }
+    if (q === -1) {
+      var texts = filled.filter(function (x) { return ymNum_(x) === ''; });
+      if (texts.length === 1 && filled.length <= 2) heading(rawOf(i, texts[0])); else skipped++;
+      continue;
+    }
+    var before = filled.slice(0, q);
+    if (before.length > 1 && /^[(（]?[\d０-９]{1,3}[)）.．]?$/.test(before[0])) before.shift();     // 行の番号
+    if (!before.length || ymNum_(before[0]) !== '') { skipped++; continue; }
+    push(rawOf(i, before[0]), before.slice(1).map(function (x) { return rawOf(i, x); }).join(' '), qv, rawOf(i, uv).replace(/^m2$/i, '㎡').replace(/^m3$/i, '㎥'), next < filled.length ? ymNum_(filled[next]) : '');
+  }
+  return { items: items, mode: col ? '見出しから' : '形から', head: head, heads: heads, skipped: skipped };
+}
+function ymPdfRows_(list) {
+  var its = (list || []).filter(function (t) { return t && String(t.s).replace(/[\s　]/g, '') !== ''; })
+    .sort(function (a, b) { return b.y - a.y || a.x - b.x; });
+  var lines = [], i;
+  for (i = 0; i < its.length; i++) {
+    var t = its[i], last = lines[lines.length - 1], h = t.h || 10;
+    if (last && Math.abs(last.y - t.y) <= Math.max(2, Math.min(h, last.h) * 0.45)) last.cells.push(t);
+    else lines.push({ y: t.y, h: h, cells: [t] });
+  }
+  return lines.map(function (ln) {
+    var cs = ln.cells.sort(function (a, b) { return a.x - b.x; }), out = [], cur = null, end = 0;
+    cs.forEach(function (t) {
+      var gap = cur === null ? 0 : t.x - end;
+      if (cur !== null && gap <= Math.max(4, (t.h || 10) * 0.7)) cur += (gap > (t.h || 10) * 0.25 ? ' ' : '') + t.s;
+      else { if (cur !== null) out.push(cur); cur = String(t.s); }
+      end = t.x + (t.w || 0);
+    });
+    if (cur !== null) out.push(cur);
+    return out;
+  });
+}
+function ymText_(text) {
+  text = String(text || '').replace(/\r\n?/g, '\n');
+  var tab = text.indexOf('\t') !== -1, comma = !tab && /,/.test(text) && text.split('\n').filter(function (l) { return l.split(',').length >= 3; }).length >= Math.max(1, text.split('\n').length / 3);
+  if (!comma) return text.split('\n').map(function (l) { return l.indexOf('\t') !== -1 ? l.split('\t') : l.trim().split(/[ \u3000]{2,}|\s*\|\s*/); });
+  var sep = ',', rows = [], row = [], cell = '', inq = false, i, ch;
+  for (i = 0; i < text.length; i++) {
+    ch = text[i];
+    if (inq) { if (ch === '"') { if (text[i + 1] === '"') { cell += '"'; i++; } else inq = false; } else cell += ch; }
+    else if (ch === '"' && cell === '') inq = true;
+    else if (ch === sep) { row.push(cell); cell = ''; }
+    else if (ch === '\n') { row.push(cell); rows.push(row); row = []; cell = ''; }
+    else cell += ch;
+  }
+  row.push(cell); rows.push(row);
+  return rows;
+}
+var BG={"PLUS":1.15,"UNITS":{"研磨紙":"枚"},"SHEET":"手間の表の単価"};
+</script>
+<script>
+function startApp(D) {
+var KEY = 'sekisan-draft-v1';
+var $ = function (id) { return document.getElementById(id); };
+var esc = function (s) { return String(s === null || s === undefined ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); };
+var yen = function (n) { return Math.round(n).toLocaleString('ja-JP') + '円'; };
+var blankLine = function () { return { kubun: '', name: '', spec: '', qty: '', unit: '', price: '', disposal: false, memo: '', from: '', bg: undefined }; };
+var lines = [blankLine()];
+var TOPS = ['title', 'no', 'months', 'addKasetsu', 'addKanri', 'tax'], CHECKS = ['office', 'hosho', 'hoken', 'learn'];
+
+$('kind').innerHTML = D.kinds.map(function (k) { return '<option>' + esc(k) + '</option>'; }).join('');
+$('job').innerHTML += D.jobs.map(function (j, i) { return '<option value="' + i + '">' + esc(j[1]) + '</option>'; }).join('');
+$('mitsu').href = D.mitsuUrl; $('osaka').href = D.osakaUrl; $('joken').href = D.jokenUrl;
+
+function sheetRows() { return lines.map(function (l) { return [l.kubun, l.name, l.spec, l.qty, l.unit, l.price, '', l.disposal, l.memo, '']; }); }
+function opts() {
+  return { kind: $('kind').value, months: $('months').value, addKasetsu: skNum_($('addKasetsu').value), addKanri: skNum_($('addKanri').value),
+    office: !$('office').checked, hosho: $('hosho').checked, hoken: $('hoken').checked, taxPct: $('tax').value === '' ? 10 : $('tax').value };
+}
+
+function lineAmount(l) { var q = skNum_(l.qty), p = skNum_(l.price); return (q === '' || p === '') ? '' : Math.floor(q * p + 1e-6); }
+
+// 単価が空の行に、似た単価の候補を3つまで並べる（同じ名称・規格・単位なら結果を覚えておく）
+var candCache = {};
+function candOf(l) {
+  if (!String(l.name).trim() || String(l.price).trim() !== '') return [];
+  var k = l.name + '\u0001' + l.spec + '\u0001' + l.unit;
+  if (!candCache[k]) candCache[k] = skSimilar_(D.master, l.name, l.spec, l.unit, '', 8).filter(function (c) { return c.sameUnit && c.score >= 45; }).slice(0, 3);
+  return candCache[k];
+}
+function candHtml(l) {
+  var list = candOf(l);
+  if (!list.length) return '';
+  return '<div class="t">似た単価の候補（規格を見比べて、同じものだけ押す）</div>' + list.map(function (c, j) {
+    return '<button type="button" data-k="cand" data-c="' + j + '" class="' + (c.score >= 70 ? 'hi' : '') + '"><span class="n">' + esc(c.name) + '<small>' + esc(c.spec || '（規格なし）') + '　｜　' + esc(smSource(c.memo)) + '</small></span><span class="p">' + Number(c.price).toLocaleString('ja-JP') + '円</span></button>';
+  }).join('');
+}
+function candApply(l, c) {
+  l.price = String(c.price);
+  l.from = '似た項目の単価：' + c.name + (c.spec ? '／' + c.spec : '') + '（' + smSource(c.memo) + '）要確認';
+}
+
+function drawLines() {
+  $('lines').innerHTML = lines.map(function (l, i) {
+    var a = lineAmount(l);
+    return '<div class="card line" data-i="' + i + '">' +
+      '<div class="top"><span class="no">' + (i + 1) + '</span><span class="sp"></span><button class="del" type="button" data-k="del">消す</button></div>' +
+      '<label class="f">区分（科目。空なら上の行と同じ）</label><input type="text" data-k="kubun" value="' + esc(l.kubun) + '" placeholder="例 外壁改修">' +
+      '<label class="f">名称</label><input type="text" data-k="name" value="' + esc(l.name) + '">' +
+      '<label class="f">規格・仕様</label><input type="text" data-k="spec" value="' + esc(l.spec) + '">' +
+      '<div class="row"><div><label class="f">数量</label><input type="text" inputmode="decimal" data-k="qty" value="' + esc(l.qty) + '"></div>' +
+      '<div class="narrow"><label class="f">単位</label><input type="text" data-k="unit" value="' + esc(l.unit) + '"></div>' +
+      '<div><label class="f">単価（円）</label><input type="text" inputmode="numeric" data-k="price" value="' + esc(l.price) + '"></div></div>' +
+      '<div class="from' + (l.from.indexOf('要確認') !== -1 ? ' chk2' : '') + '" data-from>' + esc(l.from) + '</div>' +
+      '<div class="cand" data-cand>' + candHtml(l) + '</div>' +
+      '<button class="bg" type="button" data-k="sm">似た単価をもっと探す</button>' +
+      '<button class="bg" type="button" data-k="bg">手間の表から単価を作る</button>' +
+      '<label class="chk"><input type="checkbox" data-k="disposal"' + (l.disposal ? ' checked' : '') + '>処分費（率の計算から除く）</label>' +
+      '<div class="amt" data-amt>' + (a === '' ? '<small>数量と単価を入れると金額が出ます</small>' : yen(a)) + '</div></div>';
+  }).join('');
+  $('add').disabled = lines.length >= D.lines;
+}
+
+function calc() {
+  var t = skTotal_(sheetRows()), o = opts(); o.direct = t.direct; o.disposal = t.disposal;
+  var r = sekisanCalc_(o);
+  if (!r.ok) {
+    $('res').innerHTML = '<div class="warn">' + esc(r.errors.join('\n')) + '</div>';
+    $('tPrice').textContent = '—'; $('tFloor').textContent = '—';
+    return null;
+  }
+  $('res').innerHTML = '<table class="res">' + r.steps.map(function (s, i) {
+    return '<tr class="' + (i === 6 ? 'big' : i === 9 ? 'red' : '') + '"><td>' + esc(s[0]) + '<small>' + esc(s[2]) + '</small></td><td class="n">' + yen(s[1]) + '</td></tr>';
+  }).join('') + '</table>' +
+    (t.blank ? '<div class="warn">⚠ 単価が空の行が ' + t.blank + ' 行あります。その分は入っていません。</div>' : '') +
+    (r.warns.length ? '<div class="warn">⚠ ' + esc(r.warns.join('\n⚠ ')) + '</div>' : '') +
+    '<div class="hint" style="margin-top:8px;">※ 目安です。発注者の単価・補正・ランダム係数までは再現できません。</div>';
+  $('tPrice').textContent = yen(r.price); $('tFloor').textContent = yen(r.floor);
+  return r;
+}
+
+function save() {
+  try {
+    var d = { v: 2, lines: lines, kind: $('kind').value };
+    TOPS.forEach(function (k) { d[k] = $(k).value; }); CHECKS.forEach(function (k) { d[k] = $(k).checked; });
+    localStorage.setItem(KEY, JSON.stringify(d));
+  } catch (e) { /* 保存できなくても動く */ }
+}
+function load() {
+  try {
+    var d = JSON.parse(localStorage.getItem(KEY) || 'null');
+    if (!d) return;
+    if (d.lines && d.lines.length) lines = d.lines.map(function (l) { var b = blankLine(); for (var k in b) if (l[k] !== undefined) b[k] = l[k]; return b; });
+    TOPS.forEach(function (k) { if (d[k] !== undefined) $(k).value = d[k]; }); CHECKS.forEach(function (k) { if (d[k] !== undefined && !(k === 'office' && d.v !== 2)) $(k).checked = d[k]; });   // 前の版の「監理事務所」は意味が逆なので引き継がない
+    if (D.kinds.indexOf(d.kind) !== -1) $('kind').value = d.kind;
+  } catch (e) { /* 読めなければ空から */ }
+}
+function changed() { calc(); save(); $('msg').textContent = ''; }
+
+$('lines').addEventListener('input', function (e) {
+  var k = e.target.getAttribute('data-k'), card = e.target.closest('.line');
+  if (!k || !card) return;
+  var l = lines[Number(card.getAttribute('data-i'))];
+  if (k === 'disposal') l.disposal = e.target.checked; else l[k] = e.target.value;
+  if (k === 'price') { l.from = ''; card.querySelector('[data-from]').textContent = ''; card.querySelector('[data-cand]').innerHTML = candHtml(l); }
+  var a = lineAmount(l);
+  card.querySelector('[data-amt]').innerHTML = a === '' ? '<small>数量と単価を入れると金額が出ます</small>' : yen(a);
+  changed();
+});
+// 名称・規格・単位を入れ終えたら、覚えている単価を入れる
+$('lines').addEventListener('change', function (e) {
+  var k = e.target.getAttribute('data-k'), card = e.target.closest('.line');
+  if (!card || ['name', 'spec', 'unit'].indexOf(k) === -1) return;
+  var l = lines[Number(card.getAttribute('data-i'))];
+  if (String(l.price).trim() !== '' && l.from.indexOf('単価表') !== 0) return;       // 手で入れた単価・手間の表から作った単価は変えない
+  var f = skFind_(D.master, l.name, l.spec, l.unit);
+  if (!f) { if (l.from) { l.price = ''; l.from = ''; drawLines(); changed(); } else card.querySelector('[data-cand]').innerHTML = candHtml(l); return; }
+  l.price = String(f.price); l.from = f.how; drawLines(); changed();
+});
+$('lines').addEventListener('click', function (e) {
+  var cb = e.target.closest('[data-k=cand]');
+  if (cb) { var ci = Number(cb.closest('.line').getAttribute('data-i')), cl = lines[ci], cc = candOf(cl)[Number(cb.getAttribute('data-c'))]; if (cc) { candApply(cl, cc); drawLines(); changed(); var cd = document.querySelectorAll('.line')[ci]; if (cd) cd.scrollIntoView({ block: 'nearest' }); } return; }
+  if (e.target.getAttribute('data-k') === 'sm') { smOpen(Number(e.target.closest('.line').getAttribute('data-i'))); return; }
+  if (e.target.getAttribute('data-k') === 'bg') { bgOpen(Number(e.target.closest('.line').getAttribute('data-i'))); return; }
+  if (e.target.getAttribute('data-k') !== 'del') return;
+  var i = Number(e.target.closest('.line').getAttribute('data-i'));
+  if (lines[i].name && !confirm((i + 1) + '行目（' + lines[i].name + '）を消しますか？')) return;
+  lines.splice(i, 1); if (!lines.length) lines.push(blankLine());
+  drawLines(); changed();
+});
+$('add').addEventListener('click', function () { lines.push(blankLine()); drawLines(); save(); var c = document.querySelectorAll('.line'); c[c.length - 1].scrollIntoView({ block: 'center' }); });
+$('job').addEventListener('change', function () {
+  var j = D.jobs[Number($('job').value)];
+  if ($('job').value !== '' && j) { $('title').value = j[1]; $('no').value = j[0]; changed(); }
+});
+TOPS.concat(['kind']).forEach(function (k) { $(k).addEventListener('input', changed); });
+CHECKS.forEach(function (k) { $(k).addEventListener('change', changed); });
+$('reset').addEventListener('click', function () {
+  if (!confirm('入力を全部消しますか？（覚えた単価は消えません）')) return;
+  lines = [blankLine()]; ['title', 'no', 'months', 'addKasetsu', 'addKanri'].forEach(function (k) { $(k).value = ''; }); $('job').value = '';
+  drawLines(); changed(); window.scrollTo(0, 0);
+});
+$('make').addEventListener('click', function () {
+  if (!$('title').value.trim()) { $('msg').textContent = '工事名を入れてください。'; return; }
+  if (!calc()) { $('msg').textContent = '上の「計算の結果」に出ている所を直してください。'; return; }
+  var p = opts();
+  p.title = $('title').value; p.no = $('no').value; p.tax = $('tax').value; p.learn = $('learn').checked;
+  p.rows = lines.map(function (l) { return [l.kubun, l.name, l.spec, l.qty, l.unit, l.price, l.disposal, l.memo]; });
+  $('make').disabled = true; $('msg').textContent = 'つくっています…（10秒ほど）';
+  google.script.run
+    .withSuccessHandler(function (res) {
+      $('make').disabled = false; $('msg').textContent = '';
+      $('pdf').href = res.url;
+      $('doneText').innerHTML = esc(res.name) + '<br>工事価格（税抜）の目安： <b>' + yen(res.price) + '</b><br>最低制限価格の目安： <b>' + yen(res.floor) + '</b>' +
+        (res.blank ? '<br><span style="color:#c5221f;">単価が空の行が ' + res.blank + ' 行あります。</span>' : '') + (res.learned ? '<br>単価を ' + res.learned + ' 件覚えました。' : '');
+      $('form').style.display = 'none'; $('bar').style.display = 'none'; $('done').style.display = 'block'; window.scrollTo(0, 0);
+    })
+    .withFailureHandler(function (err) { $('make').disabled = false; $('msg').textContent = String(err && err.message || err).replace(/^Error:\s*/, ''); })
+    .sekisanWebMake(p);
+});
+$('back').addEventListener('click', function () { $('done').style.display = 'none'; $('form').style.display = 'block'; $('bar').style.display = 'block'; });
+
+/* ───── 数量書を読み込む ───── */
+var ymSets = [], ymItems = [];
+var YM_LIB = { xlsx: 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js', pdf: 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js',
+  pdfWorker: 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js', cmap: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/cmaps/' };
+function ymScript(url) {
+  return new Promise(function (ok, ng) {
+    var el = document.createElement('script'); el.src = url;
+    el.onload = ok; el.onerror = function () { ng(new Error('読み込みの部品を取れませんでした。電波のよい所でもう一度ためしてください。')); };
+    document.head.appendChild(el);
+  });
+}
+function ymSay(text, err) { $('ymMsg').textContent = text || ''; $('ymMsg').className = err ? 'err' : ''; }
+function ymBuffer(file) { return new Promise(function (ok, ng) { var fr = new FileReader(); fr.onload = function () { ok(fr.result); }; fr.onerror = function () { ng(new Error('ファイルを開けませんでした。')); }; fr.readAsArrayBuffer(file); }); }
+function ymReadFile(file) {
+  var ext = (/\.([a-z0-9]+)$/i.exec(file.name) || ['', ''])[1].toLowerCase();
+  if (file.size > 30 * 1024 * 1024) return Promise.reject(new Error('ファイルが大きすぎます（30MBまで）。'));
+  return ymBuffer(file).then(function (buf) {
+    if (ext === 'csv' || ext === 'txt') {
+      var text;
+      try { text = new TextDecoder('utf-8', { fatal: true }).decode(buf); } catch (e) { text = new TextDecoder('shift_jis').decode(buf); }
+      return [{ label: file.name, grid: ymText_(text) }];
+    }
+    if (ext === 'pdf') {
+      return (window.pdfjsLib ? Promise.resolve() : ymScript(YM_LIB.pdf)).then(function () {
+        pdfjsLib.GlobalWorkerOptions.workerSrc = YM_LIB.pdfWorker;
+        return pdfjsLib.getDocument({ data: buf, cMapUrl: YM_LIB.cmap, cMapPacked: true }).promise;
+      }).then(function (doc) {
+        var grid = [], chars = 0, n = Math.min(doc.numPages, 80), chain = Promise.resolve();
+        for (var p = 1; p <= n; p++) (function (p) {
+          chain = chain.then(function () { return doc.getPage(p); }).then(function (page) {
+            var vp = page.getViewport({ scale: 1 });
+            return page.getTextContent().then(function (tc) {
+              var list = tc.items.map(function (t) {
+                var m = pdfjsLib.Util.transform(vp.transform, t.transform), h = Math.hypot(m[2], m[3]) || t.height || 10;
+                chars += String(t.str).replace(/\s/g, '').length;
+                return { x: m[4], y: -m[5], w: t.width, h: h, s: t.str };
+              });
+              grid = grid.concat(ymPdfRows_(list));
+            });
+          });
+        })(p);
+        return chain.then(function () {
+          if (chars < 20) throw new Error('このPDFには文字が入っていないようです（紙をスキャンしたPDF）。\nExcelのファイルか、文字の入ったPDFを使ってください。');
+          return [{ label: file.name + (doc.numPages > n ? '（先頭' + n + 'ページ）' : ''), grid: grid, guess: true }];
+        });
+      });
+    }
+    if (ext === 'xlsx' || ext === 'xlsm' || ext === 'xls') {
+      return (window.XLSX ? Promise.resolve() : ymScript(YM_LIB.xlsx)).then(function () {
+        var wb = XLSX.read(new Uint8Array(buf), { type: 'array' });
+        return wb.SheetNames.map(function (name) { return { label: name, grid: XLSX.utils.sheet_to_json(wb.Sheets[name], { header: 1, raw: false, defval: '' }) }; });
+      });
+    }
+    throw new Error('Excel（.xlsx／.xls）・CSV・PDF のファイルを選んでください。');
+  });
+}
+function ymShowSets(sets) {
+  ymSets = sets.map(function (s) { s.res = ymImport_(s.grid, s.guess === true); return s; });
+  var best = 0;
+  ymSets.forEach(function (s, i) { if (s.res.items.length > ymSets[best].res.items.length) best = i; });
+  $('ymSheet').innerHTML = ymSets.map(function (s, i) { return '<option value="' + i + '">' + esc(s.label) + '（' + s.res.items.length + '行）</option>'; }).join('');
+  $('ymSheet').value = String(best);
+  $('ymSheetBox').style.display = ymSets.length > 1 ? 'block' : 'none';
+  ymShowItems();
+}
+function ymShowItems() {
+  var s = ymSets[Number($('ymSheet').value)], kubun = '';
+  ymItems = s ? s.res.items.map(function (it) { if (it.kubun) kubun = it.kubun; return { kubun: kubun, name: it.name, spec: it.spec, qty: it.qty, unit: it.unit, price: it.price, memo: it.memo || '' }; }) : [];
+  if (!ymItems.length) {
+    $('ymListBox').style.display = 'none'; $('ymUse').disabled = true;
+    ymSay('項目を見つけられませんでした。\n「名称・数量・単位」の入った表かどうか見てください。シートが分かれているときは、上でシートを選び直せます。', true);
+    return;
+  }
+  var prev = null;
+  $('ymList').innerHTML = ymItems.map(function (it, i) {
+    var h = it.kubun !== prev && it.kubun ? '<div class="ymKubun">' + esc(it.kubun) + '</div>' : ''; prev = it.kubun;
+    return h + '<label class="ymRow"><input type="checkbox" data-ym="' + i + '" checked><span class="t">' + esc(it.name) + '<small>' + esc([it.spec, it.memo].filter(function (x) { return x; }).join('　')) + '</small></span><span class="q">' + esc(Number(it.qty).toLocaleString('ja-JP', { maximumFractionDigits: 3 })) + ' ' + esc(it.unit) + '</span></label>';
+  }).join('');
+  $('ymAll').checked = true; $('ymListBox').style.display = 'block';
+  ymSay(ymItems.length + ' 行 見つけました' + (s.res.skipped ? '（合計の行など ' + s.res.skipped + ' 行は飛ばしました）' : '') + '。\n入れたくない行はチェックを外してください。数量と名称が合っているか、元の書類と見比べてください。');
+  ymCount();
+}
+function ymChecked() { return [].slice.call(document.querySelectorAll('[data-ym]')).filter(function (c) { return c.checked; }).map(function (c) { return ymItems[Number(c.getAttribute('data-ym'))]; }); }
+function ymCount() { var n = ymChecked().length; $('ymUse').disabled = !n; $('ymUse').textContent = n ? n + ' 行を項目に入れる' : '項目に入れる'; }
+function ymFail(e) { $('ymListBox').style.display = 'none'; $('ymUse').disabled = true; ymSay(String(e && e.message || e), true); }
+$('ymOpen').addEventListener('click', function () {
+  ymSets = []; ymItems = []; $('ymFile').value = ''; $('ymPaste').value = ''; $('ymSheetBox').style.display = 'none'; $('ymListBox').style.display = 'none';
+  ymSay(''); ymCount(); $('ymPanel').style.display = 'block'; $('ymPanel').scrollTop = 0;
+});
+$('ymCancel').addEventListener('click', function () { $('ymPanel').style.display = 'none'; });
+$('ymFile').addEventListener('change', function () {
+  var f = $('ymFile').files[0];
+  if (!f) return;
+  $('ymListBox').style.display = 'none'; $('ymUse').disabled = true; ymSay('読み取っています…');
+  ymReadFile(f).then(ymShowSets).catch(ymFail);
+});
+$('ymPasteGo').addEventListener('click', function () {
+  if (!$('ymPaste').value.trim()) { ymSay('貼り付けてから押してください。', true); return; }
+  try { ymShowSets([{ label: '貼り付け', grid: ymText_($('ymPaste').value) }]); } catch (e) { ymFail(e); }
+});
+$('ymSheet').addEventListener('change', ymShowItems);
+$('ymAll').addEventListener('change', function () { [].forEach.call(document.querySelectorAll('[data-ym]'), function (c) { c.checked = $('ymAll').checked; }); ymCount(); });
+$('ymList').addEventListener('change', ymCount);
+$('ymUse').addEventListener('click', function () {
+  var picked = ymChecked(), room, first, prev = '';
+  if (!picked.length) return;
+  if (lines.length === 1 && !String(lines[0].name).trim() && String(lines[0].qty).trim() === '') lines = [];
+  room = D.lines - lines.length; first = lines.length;
+  if (lines.length) prev = null;       // 前からある行のあとに足すときは、最初の行に必ず区分を書く
+  picked.slice(0, room).forEach(function (it) {
+    var l = blankLine();
+    l.kubun = it.kubun !== prev ? it.kubun : ''; prev = it.kubun;
+    l.name = it.name; l.spec = it.spec; l.qty = String(it.qty); l.unit = it.unit; l.memo = it.memo;
+    if (it.price !== '' && it.price > 0) { l.price = String(it.price); l.from = '読み込んだファイルに書いてあった単価'; }
+    else { var f = skFind_(D.master, l.name, l.spec, l.unit); if (f) { l.price = String(f.price); l.from = f.how; } }
+    lines.push(l);
+  });
+  if (!lines.length) lines.push(blankLine());
+  $('ymPanel').style.display = 'none'; drawLines(); changed();
+  if (picked.length > room) $('msg').textContent = '行は ' + D.lines + ' 行までです。入りきらなかった ' + (picked.length - room) + ' 行は入れていません。';
+  var c = document.querySelectorAll('.line')[first]; if (c) c.scrollIntoView({ block: 'start' });
+});
+
+/* ───── 似た単価を探す ───── */
+var smLine = -1, smFound = [];
+function smSource(memo) { var m = /（(.+?)）/.exec(memo || ''); return m ? m[1] : (memo || '自分で入れた単価'); }
+function smDraw() {
+  var l = lines[smLine];
+  if (!l) return;
+  smFound = skSimilar_(D.master, l.name, l.spec, l.unit, $('smWord').value, 15);
+  $('smList').innerHTML = smFound.length ? smFound.map(function (c, i) {
+    var cls = !c.sameUnit ? 'ng' : c.score >= 70 ? 'hi' : c.score >= 45 ? 'mid' : '';
+    return '<button type="button" class="smRow" data-sm="' + i + '"><span class="h"><b>' + esc(c.name) + '</b><span class="p">' + Number(c.price).toLocaleString('ja-JP') + '円／' + esc(c.unit) + '</span></span>' +
+      '<small>' + esc(c.spec || '（規格なし）') + '</small>' +
+      '<small><span class="tag ' + cls + '">' + (c.sameUnit ? '似ている度 ' + c.score : '単位がちがう') + '</span>' + esc(smSource(c.memo)) + '</small></button>';
+  }).join('') : '<div class="hint" style="margin:10px 2px;">似た項目が見つかりませんでした。言葉を変えて探すか、単価を手で入れてください。</div>';
+}
+function smOpen(i) {
+  var l = lines[i];
+  if (!String(l.name).trim()) { $('msg').textContent = (i + 1) + '行目：先に名称を入れてください。'; return; }
+  smLine = i; $('smWord').value = '';
+  $('smTarget').innerHTML = '<b>' + esc(l.name) + '</b><br><span style="color:#5f6368;font-size:13px;">' + esc(l.spec || '（規格なし）') + '　／　単位 ' + esc(l.unit || '—') + '</span>';
+  smDraw(); $('smPanel').style.display = 'block'; $('smPanel').scrollTop = 0;
+}
+function smClose() { $('smPanel').style.display = 'none'; smLine = -1; }
+$('smWord').addEventListener('input', smDraw);
+$('smCancel').addEventListener('click', smClose);
+$('smList').addEventListener('click', function (e) {
+  var b = e.target.closest('[data-sm]'), l = lines[smLine];
+  if (!b || !l) return;
+  var c = smFound[Number(b.getAttribute('data-sm'))];
+  if (!c.sameUnit && !confirm('単位がちがいます（この行：' + (l.unit || '—') + '／候補：' + c.unit + '）。それでもこの単価を入れますか？')) return;
+  candApply(l, c);
+  var i = smLine; smClose(); drawLines(); changed();
+  var card = document.querySelectorAll('.line')[i]; if (card) card.scrollIntoView({ block: 'center' });
+});
+
+/* ───── 手間の表から単価を作る ───── */
+var bgLine = -1, bgTouched = {}, BGKEY = 'sekisan-bg-v1';
+(function () {
+  var groups = [], by = {};
+  D.bg.items.forEach(function (it) { if (!by[it.group]) { by[it.group] = []; groups.push(it.group); } by[it.group].push(it); });
+  $('bgItem').innerHTML = '<option value="">（選んでください）</option>' + groups.map(function (g) {
+    return '<optgroup label="' + esc(g) + '">' + by[g].map(function (it) { return '<option value="' + it.id + '">' + esc(it.name + '　' + it.spec) + '</option>'; }).join('') + '</optgroup>';
+  }).join('');
+  try { var m = JSON.parse(localStorage.getItem(BGKEY) || 'null'); if (m) { $('bgBusy').checked = m.busy === true; } } catch (e) { /* なくても動く */ }
+})();
+function bgItemNow() { var v = $('bgItem').value; return v === '' ? null : D.bg.items[Number(v)]; }
+function bgCalc() {
+  var it = bgItemNow();
+  if (!it) return null;
+  return bugakariPrice_(it, D.bg.prices, { busy: $('bgBusy').checked, rateLabor: D.bg.rateLabor, rateOther: D.bg.rateOther });
+}
+function bgNum(x) { return (Math.round(x * 100) / 100).toLocaleString('ja-JP', { maximumFractionDigits: 2 }); }
+function bgDraw(keepFocus) {
+  var it = bgItemNow(), r = bgCalc();
+  $('bgUse').disabled = !(r && r.ok);
+  if (!it) { $('bgSrc').textContent = ''; $('bgOut').innerHTML = '<div class="hint">作業を選ぶと、中身と単価が出ます。</div>'; return; }
+  $('bgSrc').textContent = '出どころ：国土交通省 ' + it.src + '（1' + it.unit + 'あたり）';
+  if (!r.ok) { $('bgOut').innerHTML = '<div class="warn">' + esc(r.error) + '</div>'; return; }
+  if (keepFocus) { bgSums(r); return; }
+  $('bgOut').innerHTML = '<table class="bgT"><tbody>' + r.parts.map(function (p) {
+    if (p[5] === '手間') return '<tr><td>' + esc(p[0]) + '<br><span class="hint">' + p[1] + ' 人 × ' + Number(p[3]).toLocaleString('ja-JP') + '円</span></td><td class="n" style="width:42%;">' + bgNum(p[4]) + '円</td></tr>';
+    return '<tr><td>' + esc(p[0]) + '<br><span class="hint">' + p[1] + ' ' + esc(p[2]) + ' × 値段（1' + esc(p[2]) + 'あたり）</span></td><td class="n" style="width:42%;"><input type="text" inputmode="decimal" data-mat="' + esc(p[0]) + '" value="' + esc(p[3]) + '" placeholder="値段（円）"></td></tr>';
+  }).join('') + '</tbody><tbody id="bgSum"></tbody></table><div id="bgWarn"></div>';
+  bgSums(r);
+}
+function bgSums(r) {
+  $('bgSum').innerHTML =
+    '<tr class="sum"><td>手間' + (r.plus !== 1 ? '（15％増し）' : '') + '</td><td class="n">' + bgNum(r.labor) + '円</td></tr>' +
+    '<tr class="sum"><td>材料</td><td class="n">' + bgNum(r.mat) + '円</td></tr>' +
+    '<tr class="sum"><td>諸経費<br><span class="hint">手間の' + D.bg.rateLabor + '％ ＋ 材料の' + D.bg.rateOther + '％</span></td><td class="n">' + bgNum(r.keihi) + '円</td></tr>' +
+    '<tr class="sum"><td>合わせて</td><td class="n">' + bgNum(r.raw) + '円</td></tr>' +
+    '<tr class="big"><td>単価（上から3けたに丸め）</td><td class="n">' + r.price.toLocaleString('ja-JP') + '円</td></tr>';
+  $('bgWarn').innerHTML = r.missing.length ? '<div class="warn">⚠ 値段が空の材料が ' + r.missing.length + ' つあります。その分は0円で計算しています。</div>' : '';
+}
+function bgOpen(i) {
+  bgLine = i; bgTouched = {};
+  $('bgItem').value = lines[i].bg !== undefined && D.bg.items[lines[i].bg] ? String(lines[i].bg) : '';
+  bgDraw(); $('bgPanel').style.display = 'block'; $('bgPanel').scrollTop = 0;
+}
+function bgClose() { $('bgPanel').style.display = 'none'; bgLine = -1; }
+$('bgItem').addEventListener('change', function () { bgDraw(); });
+$('bgBusy').addEventListener('change', function () { try { localStorage.setItem(BGKEY, JSON.stringify({ busy: $('bgBusy').checked })); } catch (e) { /* なくても動く */ } bgDraw(true); });
+$('bgOut').addEventListener('input', function (e) {
+  var name = e.target.getAttribute('data-mat');
+  if (!name) return;
+  var v = skNum_(e.target.value);
+  if (v === '' || v < 0) delete D.bg.prices[name]; else D.bg.prices[name] = v;
+  bgTouched[name] = v === '' || v < 0 ? '' : v;
+  bgDraw(true);
+});
+$('bgCancel').addEventListener('click', bgClose);
+$('bgUse').addEventListener('click', function () {
+  var it = bgItemNow(), r = bgCalc(), l = lines[bgLine];
+  if (!it || !r || !r.ok || !l) return;
+  if (!String(l.name).trim()) { l.name = it.name; l.spec = it.spec; }
+  if (!String(l.unit).trim()) l.unit = it.unit;
+  l.price = String(r.price); l.bg = it.id;
+  l.from = '手間の表から計算（' + it.src + (r.plus !== 1 ? '・手間15％増し' : '') + '）' + (r.missing.length ? '材料の値段が空＝要確認' : '近い数字');
+  // 入れた材料の値段は、次も使えるように覚える
+  var has = false; for (var k in bgTouched) has = true;
+  if (has && window.google && google.script && google.script.run) google.script.run.withFailureHandler(function () {}).bugakariSave(bgTouched);
+  var i = bgLine; bgClose(); drawLines(); changed();
+  var c = document.querySelectorAll('.line')[i]; if (c) c.scrollIntoView({ block: 'center' });
+});
+
+load();
+if (D.pick) { for (var pi = 0; pi < D.jobs.length; pi++) if (D.jobs[pi][0] === D.pick) { $('job').value = String(pi); $('title').value = D.jobs[pi][1]; $('no').value = D.pick; } }
+drawLines(); calc();
+$('gateOut').addEventListener('click', function (e) { e.preventDefault(); try { localStorage.removeItem(PASSKEY); } catch (err) {} location.reload(); });
+}   // startApp ここまで
+
+var API_URL = "https://script.google.com/macros/s/AKfycbxmUCDufro7a-yv5X_Q4hiISVu7Zc1Va0AROjSskmRz3rr--_b7XpN-xorsQ5sB5Lqs_A/exec", PASSKEY = 'sekisan-pass-v1', apiPass = '';
+function apiCall(action, payload) {
+  return fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ pass: apiPass, action: action, payload: payload }), redirect: 'follow' })
+    .then(function (r) { if (!r.ok) throw new Error('つながりませんでした（' + r.status + '）。'); return r.json(); })
+    .then(function (j) { if (!j.ok) { var e = new Error(j.error || 'できませんでした。'); e.badPass = j.badPass === true; throw e; } return j.data; });
+}
+// 元のページの「google.script.run」を、受け口への呼び出しに置きかえる
+var google = { script: {} };
+Object.defineProperty(google.script, 'run', { get: function () {
+  var ok = function () {}, ng = function () {};
+  var go = function (action) { return function (p) { apiCall(action, p).then(ok, ng); }; };
+  var r = { withSuccessHandler: function (f) { ok = f; return r; }, withFailureHandler: function (f) { ng = f; return r; }, sekisanWebMake: go('make'), bugakariSave: go('saveMat') };
+  return r;
+} });
+(function () {
+  var g = function (id) { return document.getElementById(id); }, started = false;
+  function open(pass, quiet) {
+    apiPass = pass; g('gateGo').disabled = true; g('gateMsg').style.color = '#5f6368'; g('gateMsg').textContent = '開いています…';
+    apiCall('load', null).then(function (data) {
+      if (started) return; started = true;
+      try { localStorage.setItem(PASSKEY, pass); } catch (e) {}
+      g('gate').style.display = 'none'; g('form').style.display = 'block'; g('bar').style.display = 'block';
+      startApp(data);
+    }).catch(function (e) {
+      g('gateGo').disabled = false; g('gateMsg').style.color = '#c5221f';
+      if (e.badPass) { try { localStorage.removeItem(PASSKEY); } catch (err) {} }
+      g('gateMsg').textContent = quiet && e.badPass ? '合言葉を入れてください。' : String(e.message || e);
+    });
+  }
+  g('gateGo').addEventListener('click', function () { var p = g('gatePass').value.trim(); if (!p) { g('gateMsg').textContent = '合言葉を入れてください。'; return; } open(p, false); });
+  g('gatePass').addEventListener('keydown', function (e) { if (e.key === 'Enter') g('gateGo').click(); });
+  var saved = ''; try { saved = localStorage.getItem(PASSKEY) || ''; } catch (e) {}
+  if (saved) open(saved, true);
+})();
+</script>
+</body>
+</html>
