@@ -1053,7 +1053,7 @@ function rpc(fn, args) {
       var j = null; try { j = x.text === '' ? null : JSON.parse(x.text); } catch (e) { j = null; }
       if (x.ok && j && j.qb_error) {
         var e1 = new Error(j.qb_error === 'badpass' ? '合言葉がちがいます。' : j.qb_error === 'locked' ? '合言葉を何度もまちがえたので、しばらく開けません。15分ほど待ってから、もう一度ためしてください。' : '合言葉がまだ決まっていません。');
-        e1.badPass = j.qb_error === 'badpass'; throw e1;
+        e1.badPass = j.qb_error === 'badpass'; e1.noPass = j.qb_error === 'nopass'; throw e1;
       }
       if (x.ok) return j;
       var e2 = new Error(j && j.message ? j.message : '保存先につながりませんでした（' + x.status + '）。');
@@ -1111,6 +1111,20 @@ Object.defineProperty(google.script, 'run', { get: function () {
       if (started || mine !== turn) return;
       g('gateGo').disabled = false; g('gateMsg').style.color = '#c5221f';
       if (e.badPass) { try { PASSBOX.removeItem(PASSKEY); } catch (err) {} }
+      // まだ合言葉が無いとき：受付中なら、いま入れた言葉を最初の合言葉にできる
+      if (e.noPass && !quiet) {
+        if (pass.length < 8) { g('gateMsg').textContent = 'まだ合言葉が決まっていません。最初の合言葉は、8文字以上で入れてください。'; return; }
+        if (!confirm('まだ合言葉が決まっていません。\nいま入れた言葉を、このページの合言葉にしますか？\n（決めたあとは、この言葉を知っている人だけが開けます）')) { g('gateMsg').textContent = '合言葉は決めていません。'; return; }
+        g('gateGo').disabled = true; g('gateMsg').style.color = '#5f6368'; g('gateMsg').textContent = '合言葉を決めています…';
+        fetch(SUPA_URL.replace(/\/+$/, '') + '/rest/v1/rpc/qb_first', { method: 'POST', headers: { 'Content-Type': 'application/json', apikey: SUPA_KEY, Authorization: 'Bearer ' + SUPA_KEY }, body: JSON.stringify({ p_pass: pass }) })
+          .then(function (r) { return r.json(); }).then(function (j) {
+            g('gateGo').disabled = false;
+            if (j && j.set) { open(pass, false); return; }
+            g('gateMsg').style.color = '#c5221f';
+            g('gateMsg').textContent = j && j.qb_error === 'closed' ? '合言葉を決める受付が閉じています。受付を開けてもらってから、もう一度ためしてください。' : j && j.qb_error === 'already' ? '合言葉はもう決まっています。その合言葉を入れてください。' : '合言葉を決められませんでした。';
+          }).catch(function () { g('gateGo').disabled = false; g('gateMsg').style.color = '#c5221f'; g('gateMsg').textContent = 'つながりませんでした。もう一度ためしてください。'; });
+        return;
+      }
       g('gateMsg').textContent = quiet && e.badPass ? '合言葉を入れてください。' : String(e.message || e);
     });
   }
