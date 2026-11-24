@@ -1143,7 +1143,7 @@ drawLines(); calc();
 $('gateOut').addEventListener('click', function (e) { e.preventDefault(); try { PASSBOX.removeItem(PASSKEY); } catch (err) {} location.reload(); });
 }   // startApp ここまで
 
-var SUPA_URL = "https://uniutujwbmwijizjdoyp.supabase.co", SUPA_KEY = "sb_publishable_T8oC_65bBzsHNoj1dBHP-Q_3wkv-zoi", PASSKEY = 'sekisan-pass-v1', PASSBOX = sessionStorage, apiPass = '', apiCompany = '';
+var SUPA_URL = "https://uniutujwbmwijizjdoyp.supabase.co", SUPA_KEY = "sb_publishable_T8oC_65bBzsHNoj1dBHP-Q_3wkv-zoi", PASSKEY = 'sekisan-pass-v1', PASSBOX = localStorage, apiPass = '', apiCompany = '';
 function rpc(fn, args) {
   var body = { p_pass: apiPass }; for (var k in (args || {})) body[k] = args[k];
   return fetch(SUPA_URL.replace(/\/+$/, '') + '/rest/v1/rpc/' + fn, { method: 'POST', headers: { 'Content-Type': 'application/json', apikey: SUPA_KEY, Authorization: 'Bearer ' + SUPA_KEY }, body: JSON.stringify(body) })
@@ -1213,7 +1213,7 @@ Object.defineProperty(google.script, 'run', { get: function () {
       // まだ合言葉が無いとき：受付中なら、いま入れた言葉を最初の合言葉にできる
       if (e.noPass && !quiet) {
         if (pass.length < 4) { g('gateMsg').textContent = 'まだ合言葉が決まっていません。最初の合言葉は、4文字以上で入れてください。'; return; }
-        if (!confirm('まだ合言葉が決まっていません。\nいま入れた言葉を、このページの合言葉にしますか？\n（決めたあとは、この言葉を知っている人だけが開けます）')) { g('gateMsg').textContent = '合言葉は決めていません。'; return; }
+        // 確認は出さない（最初に入れた言葉が、そのまま合言葉になる。まちがえたら受付を開け直せば決め直せる）
         g('gateGo').disabled = true; g('gateMsg').style.color = '#5f6368'; g('gateMsg').textContent = '合言葉を決めています…';
         fetch(SUPA_URL.replace(/\/+$/, '') + '/rest/v1/rpc/qb_first', { method: 'POST', headers: { 'Content-Type': 'application/json', apikey: SUPA_KEY, Authorization: 'Bearer ' + SUPA_KEY }, body: JSON.stringify({ p_pass: pass }) })
           .then(function (r) { return r.json(); }).then(function (j) {
