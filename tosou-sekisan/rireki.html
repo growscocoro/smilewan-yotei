@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>つくった書類</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 14px 14px 60px; background: #f1f3f4; color: #202124; font-family: -apple-system, 'Hiragino Sans', 'Yu Gothic', Meiryo, sans-serif; font-size: 16px; }
+  .wrap { max-width: 640px; margin: 0 auto; }
+  h1 { font-size: 22px; color: #1a3a5f; margin: 4px 2px 6px; }
+  .lead { font-size: 13px; color: #5f6368; margin: 0 2px 10px; line-height: 1.7; }
+  .card { background: #fff; border: 1px solid #dadce0; border-radius: 10px; padding: 12px; margin-bottom: 10px; }
+  label.f { display: block; font-size: 13px; color: #5f6368; margin: 10px 0 3px; } label.f:first-child { margin-top: 0; }
+  input[type=text], select { width: 100%; font-size: 16px; padding: 10px; border: 1px solid #c0c4c9; border-radius: 8px; background: #fffde7; font-family: inherit; color: #202124; }
+  button { font-size: 15px; font-family: inherit; font-weight: bold; border-radius: 8px; padding: 10px 12px; border: 1px solid #1a3a5f; background: #fff; color: #1a3a5f; }
+  button.main { background: #1a3a5f; color: #fff; width: 100%; font-size: 17px; padding: 13px; }
+  button:disabled { opacity: .5; }
+  .tabs { display: flex; gap: 8px; margin: 10px 0; } .tabs button { flex: 1; } .tabs button.on { background: #1a3a5f; color: #fff; }
+  .doc .top { display: flex; gap: 8px; align-items: baseline; font-size: 12px; color: #5f6368; } .doc .top .no { margin-left: auto; }
+  .doc .ttl { font-size: 16px; font-weight: bold; line-height: 1.5; margin: 4px 0 2px; word-break: break-all; }
+  .doc .sub { font-size: 13px; color: #5f6368; line-height: 1.6; word-break: break-all; }
+  .doc .amt { font-size: 17px; font-weight: bold; color: #188038; margin: 6px 0; } .doc .amt small { font-size: 12px; color: #5f6368; font-weight: normal; margin-left: 8px; }
+  .doc .btns { display: flex; gap: 8px; margin-top: 8px; } .doc .btns button { flex: 1; }
+  .doc .st { display: flex; gap: 8px; margin-top: 8px; align-items: center; } .doc .st select { flex: 0 0 120px; padding: 8px; } .doc .st input { flex: 1; padding: 8px; font-size: 14px; }
+  .tag { display: inline-block; font-size: 11px; font-weight: bold; color: #fff; border-radius: 4px; padding: 1px 7px; }
+  .msg { white-space: pre-wrap; font-size: 14px; line-height: 1.6; margin: 8px 2px; min-height: 1em; color: #c5221f; } .msg.ok { color: #188038; }
+  .empty { color: #5f6368; font-size: 14px; padding: 10px 2px; }
+  details.ans { margin-top: 10px; border-top: 1px solid #eceff1; padding-top: 8px; } details.ans summary { font-size: 14px; font-weight: bold; color: #1a73e8; }
+  .ans .row { display: flex; gap: 8px; } .ans .row > div { flex: 1; min-width: 0; } .ans input[type=text] { padding: 8px; text-align: right; } .ans input.memo { text-align: left; font-size: 14px; }
+  .ans .chk { display: flex; align-items: center; gap: 6px; font-size: 13px; color: #5f6368; margin: 8px 0; } .ans .chk input { width: 20px; height: 20px; margin: 0; }
+  .ans table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 8px; } .ans td { padding: 5px 3px; border-bottom: 1px solid #eceff1; } .ans td.n { text-align: right; white-space: nowrap; }
+  .ans .hi { color: #c5221f; font-weight: bold; } .ans .lo { color: #1a73e8; font-weight: bold; } .ans .ok { color: #188038; font-weight: bold; }
+  .sum { background: #e8f0fe; border-radius: 8px; padding: 10px 12px; font-size: 14px; line-height: 1.8; margin-bottom: 10px; } .sum b { color: #1a3a5f; }
+  .links { font-size: 14px; margin: 22px 2px; line-height: 2; } .links a { color: #1a73e8; }
+</style>
+</head>
+<body>
+<div class="wrap" id="gate">
+  <h1>つくった書類</h1>
+  <div class="card">
+    <label class="f">合言葉</label>
+    <input type="text" id="gatePass" autocomplete="off" autocapitalize="off" style="-webkit-text-security:disc;">
+    <button id="gateGo" class="main" type="button" style="margin-top:12px;">開く</button>
+    <div id="gateMsg" class="msg"></div>
+  </div>
+</div>
+
+<div class="wrap" id="form" style="display:none;">
+  <h1>つくった書類</h1>
+  <p class="lead">これまでにつくった見積書・請求書・内訳書です。開いて印刷し直したり、元にして新しくつくり直したりできます。請求書は、見積書から作ります。</p>
+  <div class="tabs"><button type="button" id="tabM" class="on">見積書</button><button type="button" id="tabB">請求書</button><button type="button" id="tabS">内訳書</button></div>
+  <input type="text" id="q" placeholder="宛名・件名・番号でさがす">
+  <div id="msg" class="msg"></div>
+  <div id="list"></div>
+  <div class="links"><a href="./">積算のページへ</a><br><a href="mitsumori.html">見積書をつくるページへ</a><br><a href="settei.html">設定</a><br><a id="gateOut" href="#">合言葉を入れ直す</a></div>
+</div>
+
+<script>
+function esc_(s) {
+  return String(s === null || s === undefined ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+function mitsuCalc_(rows, ratePct, discount) {
+  var lines = [], errors = [], sub = 0;
+  var blank = function (v) { return v === '' || v === null || v === undefined; };
+  rows.forEach(function (r, i) {
+    var name = String(blank(r[0]) ? '' : r[0]).trim(), spec = String(blank(r[1]) ? '' : r[1]).trim();
+    var qty = r[2], unit = String(blank(r[3]) ? '' : r[3]).trim(), price = r[4];
+    var hasQ = !blank(qty), hasP = !blank(price), at = '明細の' + (i + 1) + '行目';
+    if (!name && !spec && !hasQ && !hasP && !unit) return;
+    if (!name) { errors.push(at + '：項目が空です'); return; }
+    if (!hasQ && !hasP) { lines.push({ head: true, name: name, spec: spec }); return; }
+    if (!hasQ) { errors.push(at + '「' + name + '」：数量が空です'); return; }
+    if (!hasP) { errors.push(at + '「' + name + '」：単価が空です'); return; }
+    if (typeof qty !== 'number' || typeof price !== 'number' || isNaN(qty) || isNaN(price)) { errors.push(at + '「' + name + '」：数量と単価は数字で入れてください'); return; }
+    var amount = Math.round(qty * price);
+    sub += amount;
+    lines.push({ head: false, name: name, spec: spec, qty: qty, unit: unit, price: price, amount: amount });
+  });
+  var rate = blank(ratePct) ? 10 : Number(ratePct);
+  if (isNaN(rate) || rate < 0) { errors.push('消費税率は数字で入れてください'); rate = 0; }
+  var disc = blank(discount) ? 0 : Number(discount);
+  if (isNaN(disc) || disc < 0) { errors.push('値引きは0以上の数字で入れてください'); disc = 0; }
+  if (disc > sub) errors.push('値引きが小計より大きくなっています');
+  var tax = Math.floor((sub - disc) * rate / 100 + 1e-9);
+  return { lines: lines, errors: errors, sub: sub, discount: disc, tax: tax, total: sub - disc + tax, rate: rate };
+}
+function mitsuYen_(n) {
+  var s = String(Math.abs(Math.round(n))).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  return (n < 0 ? '-' : '') + '¥' + s;
+}
+function mitsuNum_(n) {
+  var p = String(n).split('.');
+  return p[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',') + (p[1] ? '.' + p[1] : '');
+}
+function mitsuHtml_(d) {
+  var c = d.calc, me = d.me || {}, h = [], bill = d.kind === 'seikyu';
+  var B = 'border:1px solid #777777;', P = 'padding:5px 7px;';
+  var th = function (t, w) { return '<td style="' + B + P + 'background:#e8eef5;color:#111111;font-weight:bold;text-align:center;' + (w ? 'width:' + w + ';' : '') + '">' + t + '</td>'; };
+  var td = function (t, align, extra) { return '<td style="' + B + P + 'text-align:' + (align || 'left') + ';' + (extra || '') + '">' + t + '</td>'; };
+
+  h.push('<html><head><meta charset="UTF-8"><style>@page{size:A4;margin:14mm 13mm;} body{font-family:sans-serif;font-size:10.5pt;color:#111111;-webkit-print-color-adjust:exact;print-color-adjust:exact;} table{border-collapse:collapse;}</style></head><body>');
+  h.push('<div style="text-align:center;font-size:22pt;font-weight:bold;letter-spacing:8pt;border-bottom:3px double #1a3a5f;padding-bottom:6px;margin-bottom:14px;">' + (bill ? '御 請 求 書' : '御 見 積 書') + '</div>');
+
+  // 上段：左＝宛名と合計、右＝番号・日付・自社
+  h.push('<table style="width:100%;"><tr><td style="width:56%;vertical-align:top;">');
+  h.push('<div style="font-size:15pt;font-weight:bold;border-bottom:1px solid #111111;padding-bottom:4px;">' + esc_(d.to) + '　' + esc_(d.keisho) + '</div>');
+  h.push('<div style="margin-top:10px;">' + (bill ? '下記のとおり、ご請求申し上げます。' : '下記のとおり、お見積り申し上げます。') + '</div>');
+  h.push('<table style="width:95%;margin-top:12px;"><tr>' +
+    '<td style="' + B + 'padding:9px 10px;background:#e8eef5;color:#111111;font-weight:bold;width:36%;text-align:center;">' + (bill ? '御請求金額' : '御見積金額') + '<br><span style="font-size:8.5pt;">（税込）</span></td>' +
+    '<td style="' + B + 'padding:9px 12px;font-size:18pt;font-weight:bold;text-align:right;">' + mitsuYen_(c.total) + ' －</td></tr></table>');
+  h.push('</td><td style="width:44%;vertical-align:top;font-size:10pt;">');
+  h.push('<div style="text-align:right;">' + (bill ? '請求番号' : '見積番号') + '　' + esc_(d.no) + '</div><div style="text-align:right;">' + (bill ? '請求日' : '見積日') + '　' + esc_(d.date) + '</div>');
+  h.push('<div style="margin-top:12px;font-size:13pt;font-weight:bold;">' + esc_(me['会社名'] || '') + '</div>');
+  var addr = [me['郵便番号'] ? '〒' + String(me['郵便番号']).replace(/^〒/, '') : '', me['住所'] || ''].filter(String).join('　');
+  if (addr) h.push('<div>' + esc_(addr) + '</div>');
+  var tel = [me['電話'] ? 'TEL ' + me['電話'] : '', me['FAX'] ? 'FAX ' + me['FAX'] : ''].filter(String).join('　');
+  if (tel) h.push('<div>' + esc_(tel) + '</div>');
+  if (me['メール']) h.push('<div>' + esc_(me['メール']) + '</div>');
+  if (me['担当者']) h.push('<div>担当　' + esc_(me['担当者']) + '</div>');
+  if (me['登録番号（インボイス）']) h.push('<div>登録番号　' + esc_(me['登録番号（インボイス）']) + '</div>');
+  if (me['建設業許可']) h.push('<div>建設業許可　' + esc_(me['建設業許可']) + '</div>');
+  h.push('</td></tr></table>');
+
+  // 件名など
+  var info = (bill ? [['件名', d.title], ['工事場所', d.place], ['お支払期限', d.due]]
+    : [['件名', d.title], ['工事場所', d.place], ['工期', d.kouki], ['有効期限', d.limit], ['お支払い条件', d.pay]]).filter(function (x) { return x[1]; });
+  if (info.length) {
+    h.push('<table style="width:100%;margin-top:14px;">');
+    info.forEach(function (x) {
+      h.push('<tr><td style="' + B + P + 'background:#e8eef5;font-weight:bold;width:18%;">' + x[0] + '</td>' + td(esc_(x[1])) + '</tr>');
+    });
+    h.push('</table>');
+  }
+
+  // 明細
+  h.push('<table style="width:100%;margin-top:14px;font-size:10pt;"><tr>' + th('No', '5%') + th('項目', '25%') + th('仕様・内容', '26%') + th('数量', '9%') + th('単位', '7%') + th('単価', '14%') + th('金額', '14%') + '</tr>');
+  var no = 0;
+  c.lines.forEach(function (l) {
+    if (l.head) {
+      h.push('<tr><td colspan="7" style="' + B + P + 'background:#f1f3f4;font-weight:bold;">' + esc_(l.name) + (l.spec ? '　' + esc_(l.spec) : '') + '</td></tr>');
+      return;
+    }
+    no++;
+    h.push('<tr>' + td(no, 'center') + td(esc_(l.name)) + td(esc_(l.spec)) + td(mitsuNum_(l.qty), 'right') + td(esc_(l.unit), 'center') +
+      td(mitsuNum_(l.price), 'right') + td(mitsuNum_(l.amount), 'right') + '</tr>');
+  });
+  var sum = function (label, val, bold) {
+    return '<tr><td colspan="5" style="border:none;"></td>' + td(label, 'center', 'background:#e8eef5;font-weight:bold;') +
+      td(val, 'right', bold ? 'font-weight:bold;font-size:11.5pt;' : '') + '</tr>';
+  };
+  h.push(sum('小計', mitsuNum_(c.sub)));
+  if (c.discount) h.push(sum('値引き', '-' + mitsuNum_(c.discount)));
+  h.push(sum('<span style="font-size:9pt;">消費税(' + c.rate + '%)</span>', mitsuNum_(c.tax)));
+  h.push(sum('合計（税込）', mitsuYen_(c.total), true));
+  h.push('</table>');
+
+  if (d.note || me['振込先']) {
+    h.push('<table style="width:100%;margin-top:14px;">');
+    if (d.note) h.push('<tr><td style="' + B + P + 'background:#e8eef5;font-weight:bold;width:18%;vertical-align:top;">備考</td>' + td(esc_(d.note).replace(/\n/g, '<br>')) + '</tr>');
+    if (me['振込先']) h.push('<tr><td style="' + B + P + 'background:#e8eef5;font-weight:bold;width:18%;vertical-align:top;">お振込先</td>' + td(esc_(me['振込先']).replace(/\n/g, '<br>')) + '</tr>');
+    h.push('</table>');
+  }
+  h.push('</body></html>');
+  return h.join('');
+}
+</script>
+<script>
+var SUPA_URL = "https://uniutujwbmwijizjdoyp.supabase.co", SUPA_KEY = "sb_publishable_T8oC_65bBzsHNoj1dBHP-Q_3wkv-zoi", PASSKEY = 'sekisan-pass-v1', PASSBOX = sessionStorage, apiPass = '';
+var $ = function (id) { return document.getElementById(id); };
+var esc = function (s) { return String(s === null || s === undefined ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); };
+var yen = function (n) { return n === null || n === undefined || n === '' ? '—' : Math.round(Number(n)).toLocaleString('ja-JP') + '円'; };
+function rpc(fn, args) {
+  var body = { p_pass: apiPass }; for (var k in (args || {})) body[k] = args[k];
+  return fetch(SUPA_URL.replace(/\/+$/, '') + '/rest/v1/rpc/' + fn, { method: 'POST', headers: { 'Content-Type': 'application/json', apikey: SUPA_KEY, Authorization: 'Bearer ' + SUPA_KEY }, body: JSON.stringify(body) })
+    .then(function (r) { return r.text().then(function (t) { return { ok: r.ok, status: r.status, text: t }; }); }, function () { throw new Error('つながりませんでした。電波を確かめて、もう一度ためしてください。'); })
+    .then(function (x) {
+      var j = null; try { j = x.text === '' ? null : JSON.parse(x.text); } catch (e) { j = null; }
+      if (x.ok && j && j.qb_error) {
+        var e1 = new Error(j.qb_error === 'badpass' ? '合言葉がちがいます。' : j.qb_error === 'locked' ? '合言葉を何度もまちがえたので、しばらく開けません。15分ほど待ってから、もう一度ためしてください。' : '合言葉がまだ決まっていません。');
+        e1.badPass = j.qb_error === 'badpass'; throw e1;
+      }
+      if (x.ok) return j;
+      throw new Error(j && j.message ? j.message : '保存先につながりませんでした（' + x.status + '）。');
+    });
+}
+
+var M = [], S = [], B = [], me = {}, tab = 'M', PAID = ['未入金', '入金済み'], STATUS = ['提出前', '提出した', '受注', '失注'], COLOR = { '提出前': '#5f6368', '提出した': '#1a73e8', '受注': '#188038', '失注': '#b06000' };
+function when(t) { var d = new Date(t); return isNaN(d) ? '' : d.getFullYear() + '/' + (d.getMonth() + 1) + '/' + d.getDate(); }
+function say(text, ok) { $('msg').textContent = text || ''; $('msg').className = 'msg' + (ok ? ' ok' : ''); }
+function hit(text) { var q = $('q').value.trim().toLowerCase(); return !q || String(text).toLowerCase().indexOf(q) !== -1; }
+// 答え合わせ：積算の数字が、公表された数字より何％高い（＋）か低い（−）か
+function gap(mine, real) { mine = Number(mine); real = Number(real); return real > 0 && mine > 0 ? (mine / real - 1) * 100 : null; }
+function gapText(g) { if (g === null) return '—'; var a = Math.abs(g).toFixed(1) + '％'; return Math.abs(g) < 0.05 ? '<span class="ok">ぴったり</span>' : g > 0 ? '<span class="hi">' + a + ' 高い</span>' : '<span class="lo">' + a + ' 低い</span>'; }
+function ansHtml(s) {
+  var has = s.actual_price || s.actual_floor || s.actual_bid, g1 = gap(s.price, s.actual_price), g2 = gap(s.floor, s.actual_floor), v = function (x) { return x === null || x === undefined ? '' : Math.round(Number(x)).toLocaleString('ja-JP'); };
+  var table = '';
+  if (has) {
+    table = '<table>' +
+      (s.actual_price ? '<tr><td>工事価格：積算 ' + yen(s.price) + ' ／ 公表 ' + yen(s.actual_price) + '</td><td class="n">' + gapText(g1) + '</td></tr>' : '') +
+      (s.actual_floor ? '<tr><td>最低制限価格：積算 ' + yen(s.floor) + ' ／ 公表 ' + yen(s.actual_floor) + '</td><td class="n">' + gapText(g2) + '</td></tr>' : '') +
+      (s.actual_price && s.actual_floor ? '<tr><td>公表の最低制限価格は、予定価格の</td><td class="n">' + (Number(s.actual_floor) / Number(s.actual_price) * 100).toFixed(1) + '％</td></tr>' : '') +
+      (s.actual_price && s.actual_bid ? '<tr><td>落札金額 ' + yen(s.actual_bid) + ' は、予定価格の</td><td class="n">' + (Number(s.actual_bid) / Number(s.actual_price) * 100).toFixed(1) + '％</td></tr>' : '') + '</table>';
+  }
+  return '<details class="ans"' + (has ? ' open' : '') + '><summary>答え合わせ' + (g1 !== null ? '（予定価格より ' + gapText(g1).replace(/<[^>]+>/g, '') + '）' : '（開札のあとに入れる）') + '</summary>' + table +
+    '<div class="row"><div><label class="f">予定価格</label><input type="text" inputmode="numeric" data-f="price" value="' + esc(v(s.actual_price)) + '"></div><div><label class="f">最低制限価格</label><input type="text" inputmode="numeric" data-f="floor" value="' + esc(v(s.actual_floor)) + '"></div></div>' +
+    '<div class="row"><div><label class="f">落札金額</label><input type="text" inputmode="numeric" data-f="bid" value="' + esc(v(s.actual_bid)) + '"></div><div><label class="f">メモ</label><input type="text" class="memo" data-f="memo" value="' + esc(s.actual_memo || '') + '"></div></div>' +
+    '<label class="chk"><input type="checkbox" data-f="zeikomi">入れた金額は税込（保存するときに税抜に直す）</label>' +
+    '<button type="button" data-a="ans" style="width:100%;">答え合わせを保存する</button></details>';
+}
+function sumHtml() {
+  var a = S.map(function (s) { return gap(s.price, s.actual_price); }).filter(function (g) { return g !== null; }), b = S.map(function (s) { return gap(s.floor, s.actual_floor); }).filter(function (g) { return g !== null; });
+  if (!a.length && !b.length) return '<div class="sum">開札のあと、公表された予定価格・最低制限価格を「答え合わせ」に入れると、積算がどのくらい合っていたかがここに出ます。金額は税抜で比べます。</div>';
+  var line = function (label, g) {
+    if (!g.length) return '';
+    var avg = g.reduce(function (x, y) { return x + y; }, 0) / g.length, abs = g.reduce(function (x, y) { return x + Math.abs(y); }, 0) / g.length;
+    return '<b>' + label + '</b>（' + g.length + '件）：ずれの大きさは平均 ' + abs.toFixed(1) + '％。' + (Math.abs(avg) < 0.05 ? 'かたよりはありません。' : '全体として ' + Math.abs(avg).toFixed(1) + '％ ' + (avg > 0 ? '高め' : '低め') + 'に出ています。') + '<br>';
+  };
+  return '<div class="sum">' + line('工事価格', a) + line('最低制限価格', b) + '</div>';
+}
+
+function draw() {
+  $('tabM').className = tab === 'M' ? 'on' : ''; $('tabS').className = tab === 'S' ? 'on' : ''; $('tabB').className = tab === 'B' ? 'on' : '';
+  $('tabM').textContent = '見積書（' + M.length + '）'; $('tabB').textContent = '請求書（' + B.length + '）'; $('tabS').textContent = '内訳書（' + S.length + '）';
+  var html = '';
+  if (tab === 'M') {
+    html = M.filter(function (m) { return hit(m.no + ' ' + m.to_name + ' ' + m.title + ' ' + m.place + ' ' + m.memo); }).map(function (m) {
+      return '<div class="card doc" data-no="' + esc(m.no) + '"><div class="top"><span>' + esc(when(m.created_at)) + '</span><span class="tag" style="background:' + (COLOR[m.status] || '#5f6368') + '">' + esc(m.status) + '</span><span class="no">' + esc(m.no) + '</span></div>' +
+        '<div class="ttl">' + esc(m.title) + '</div><div class="sub">' + esc(m.to_name + ' ' + m.keisho) + (m.place ? '　／　' + esc(m.place) : '') + '</div>' +
+        '<div class="amt">' + yen(m.total) + '<small>税込</small></div>' +
+        '<div class="st"><select data-a="st">' + STATUS.map(function (s) { return '<option' + (s === m.status ? ' selected' : '') + '>' + s + '</option>'; }).join('') + '</select><input type="text" data-a="memo" value="' + esc(m.memo) + '" placeholder="メモ"></div>' +
+        '<div class="btns"><button type="button" data-a="open">開く</button><button type="button" data-a="reuse">これを元につくる</button></div>' + billBox(m) + '</div>';
+    }).join('') || '<div class="empty">' + (M.length ? 'さがしている見積が見つかりません。' : 'まだ見積書がありません。') + '</div>';
+  } else if (tab === 'B') {
+    var unpaid = B.filter(function (b) { return b.paid !== '入金済み'; }), sumUnpaid = unpaid.reduce(function (x, b) { return x + (Number(b.total) || 0); }, 0);
+    html = (B.length ? '<div class="sum"><b>未入金</b>：' + unpaid.length + '件　合わせて ' + yen(sumUnpaid) + '（税込）</div>' : '') +
+      B.filter(function (b) { return hit(b.no + ' ' + b.mitsu_no + ' ' + b.to_name + ' ' + b.title + ' ' + b.memo); }).map(function (b) {
+      return '<div class="card doc" data-bno="' + esc(b.no) + '"><div class="top"><span>' + esc(when(b.created_at)) + '</span><span class="tag" style="background:' + (b.paid === '入金済み' ? '#188038' : '#c5221f') + '">' + esc(b.paid) + '</span><span class="no">' + esc(b.no) + '</span></div>' +
+        '<div class="ttl">' + esc(b.title) + '</div><div class="sub">' + esc(b.to_name + ' ' + b.keisho) + '　／　もとの見積 ' + esc(b.mitsu_no) + '</div>' +
+        '<div class="amt">' + yen(b.total) + '<small>税込</small></div><div class="sub">お支払期限：' + esc(b.due || '（書いていません）') + '</div>' +
+        '<div class="st"><select data-a="paid">' + PAID.map(function (x) { return '<option' + (x === b.paid ? ' selected' : '') + '>' + x + '</option>'; }).join('') + '</select><input type="text" data-a="bmemo" value="' + esc(b.memo) + '" placeholder="メモ（入金日など）"></div>' +
+        '<div class="btns"><button type="button" data-a="open">開く</button></div></div>';
+    }).join('') || '<div class="empty">' + (B.length ? 'さがしている請求書が見つかりません。' : 'まだ請求書がありません。「見積書」のタブで、見積から作れます。') + '</div>';
+  } else {
+    html = sumHtml() + S.filter(function (s) { return hit(s.title + ' ' + s.no + ' ' + s.kind + ' ' + (s.actual_memo || '')); }).map(function (s) {
+      return '<div class="card doc" data-id="' + esc(s.id) + '"><div class="top"><span>' + esc(when(s.created_at)) + '</span><span>' + esc(s.kind) + '</span><span class="no">' + (s.no ? '案件 ' + esc(s.no) : '') + '</span></div>' +
+        '<div class="ttl">' + esc(s.title) + '</div>' +
+        '<div class="amt">' + yen(s.price) + '<small>工事価格（税抜）の目安</small></div>' +
+        '<div class="sub">最低制限価格の目安 ' + yen(s.floor) + (Number(s.blank) ? '　／　単価が空の行 ' + esc(s.blank) + ' 行' : '') + '</div>' +
+        '<div class="btns"><button type="button" data-a="open">開く</button><button type="button" data-a="reuse">これを元に直す</button></div>' + ansHtml(s) + '</div>';
+    }).join('') || '<div class="empty">' + (S.length ? 'さがしている内訳書が見つかりません。' : 'まだ内訳書がありません。') + '</div>';
+  }
+  $('list').innerHTML = html;
+}
+// 見積のカードに付く「請求書をつくる」
+function billBox(m) {
+  var have = B.filter(function (b) { return b.mitsu_no === m.no; });
+  return '<details class="ans"><summary>請求書をつくる' + (have.length ? '（もう ' + have.length + ' 通あります：' + esc(have.map(function (b) { return b.no; }).join('、')) + '）' : '') + '</summary>' +
+    '<label class="f">お支払期限（例：2026年12月31日。空でも作れます）</label><input type="text" data-f="due" style="text-align:left;">' +
+    '<button type="button" data-a="bill" style="width:100%;margin-top:8px;">この見積で請求書をつくる</button></details>';
+}
+function billDoc(rec) {
+  var d = rec.data || {};
+  return { kind: 'seikyu', no: rec.no, date: d.date, due: d.due || rec.due || '', to: d.to || rec.to_name, keisho: d.keisho || rec.keisho, title: d.title || rec.title, place: d.place, limit: d.limit, kouki: d.kouki, pay: d.pay, note: d.note,
+    me: me, rows: d.rows || [], calc: mitsuCalc_(d.rows || [], d.rate, d.discount) };
+}
+function makeBill(btn) {
+  var c = btn.closest('.doc'), no = c.getAttribute('data-no'), due = c.querySelector('[data-f=due]').value.trim();
+  var have = B.filter(function (b) { return b.mitsu_no === no; });
+  if (have.length && !confirm('この見積の請求書は、もう ' + have.length + ' 通あります（' + have.map(function (b) { return b.no; }).join('、') + '）。\nもう1通つくりますか？')) return;
+  if (!me['振込先'] && !confirm('設定の「振込先」が空です。このまま作ると、請求書に振込先が出ません。\nこのまま作りますか？')) return;
+  var now = new Date(), date = now.getFullYear() + '年' + (now.getMonth() + 1) + '月' + now.getDate() + '日';
+  // 画面を止められないように、書類を出す画面を先に開いておく
+  var w = window.open('', '_blank');
+  btn.disabled = true; say('請求書をつくっています…', true);
+  rpc('qb_b_make', { p: { mitsu_no: no, due: due, date: date } }).then(function (r) {
+    var rec = { no: r.no, data: r.data, to_name: r.to_name, keisho: r.keisho, title: r.title, due: due };
+    B.unshift({ no: r.no, created_at: now.toISOString(), mitsu_no: no, to_name: r.to_name, keisho: r.keisho, title: r.title, total: mitsuCalc_(r.data.rows || [], r.data.rate, r.data.discount).total, due: due, paid: '未入金', memo: '' });
+    show(mitsuHtml_(billDoc(rec)), '請求書_' + r.no + '_' + r.to_name, w);
+    draw(); say('請求書 ' + r.no + ' をつくりました。「請求書」のタブから、いつでも開き直せます。', true);
+  }).catch(function (err) { if (w) { try { w.close(); } catch (e) {} } btn.disabled = false; say('請求書をつくれませんでした。\n' + String(err.message || err)); });
+}
+
+function show(html, name, w) {
+  // 画面で見るとき用に「印刷／PDFに保存」のボタンが付いていなければ足す
+  if (html.indexOf('class="noprint"') === -1) {
+    var extra = '<meta name="viewport" content="width=device-width, initial-scale=1"><title>' + esc(name) + '</title><style>@media screen{body{padding:14px;max-width:820px;margin:0 auto;}}@media print{.noprint{display:none;}}.noprint{position:sticky;top:0;background:#fff;padding:8px 0 12px;text-align:center;}.noprint button{font-size:17px;font-weight:bold;color:#fff;background:#1a3a5f;border:0;border-radius:8px;padding:12px 22px;}</style>';
+    html = html.indexOf('<head>') !== -1 ? html.replace('<head>', '<head>' + extra) : extra + html;
+    var btn = '<div class="noprint"><button onclick="window.print()">印刷する／PDFに保存する</button></div>';
+    html = html.indexOf('<body>') !== -1 ? html.replace('<body>', '<body>' + btn) : btn + html;
+  }
+  var url = URL.createObjectURL(new Blob([html], { type: 'text/html;charset=utf-8' }));
+  if (w) { try { w.location.href = url; return; } catch (e) { /* だめなら下で開き直す */ } }
+  w = window.open(url, '_blank');
+  if (!w) say('書類を開けませんでした。ブラウザが新しい画面を止めています。もう一度「開く」を押してください。');
+}
+function mitsuDoc(rec) {
+  var d = rec.data || {};
+  return { no: rec.no, date: d.date, to: d.to || rec.to_name, keisho: d.keisho || rec.keisho, title: d.title || rec.title, place: d.place, limit: d.limit, kouki: d.kouki, pay: d.pay, note: d.note,
+    me: me, rows: d.rows || [], calc: mitsuCalc_(d.rows || [], d.rate, d.discount) };
+}
+$('list').addEventListener('click', function (e) {
+  if (e.target.getAttribute('data-a') === 'ans') { saveAns(e.target); return; }
+  if (e.target.getAttribute('data-a') === 'bill') { makeBill(e.target); return; }
+  var a = e.target.getAttribute('data-a'), c = e.target.closest('.doc');
+  if (!c || (a !== 'open' && a !== 'reuse')) return;
+  var btn = e.target; btn.disabled = true; say('');
+  var done = function () { btn.disabled = false; }, fail = function (err) { btn.disabled = false; say(String(err.message || err)); };
+  if (tab === 'B') {
+    rpc('qb_b_get', { p_no: c.getAttribute('data-bno') }).then(function (rec) {
+      if (!rec) throw new Error('その請求書が見つかりません。');
+      show(mitsuHtml_(billDoc(rec)), '請求書_' + rec.no + '_' + rec.to_name); done();
+    }).catch(fail);
+  } else if (tab === 'M') {
+    rpc('qb_m_get', { p_no: c.getAttribute('data-no') }).then(function (rec) {
+      if (!rec) throw new Error('その見積が見つかりません。');
+      if (a === 'open') { show(mitsuHtml_(mitsuDoc(rec)), '見積書_' + rec.no + '_' + rec.to_name); done(); return; }
+      var d = rec.data || {};
+      sessionStorage.setItem('mitsu-recall', JSON.stringify({ no: rec.no, to: d.to || rec.to_name, keisho: d.keisho || rec.keisho, title: d.title || rec.title, place: d.place || '', limit: d.limit || '', kouki: d.kouki || '', pay: d.pay || '', note: d.note || '', discount: d.discount || '', rows: d.rows || [] }));
+      location.href = 'mitsumori.html';
+    }).catch(fail);
+  } else {
+    rpc('qb_get', { p_id: Number(c.getAttribute('data-id')) }).then(function (rec) {
+      if (!rec) throw new Error('その内訳書が見つかりません。');
+      var p = rec.payload || {};
+      if (a === 'open') { if (!p.html) throw new Error('この内訳書は、開き直すための中身が残っていません。'); show(p.html, p.name || rec.title); done(); return; }
+      var inp = p.input;
+      if (!inp || !inp.rows) throw new Error('この内訳書は、直すための中身が残っていません。');
+      var cur = null; try { cur = JSON.parse(localStorage.getItem('sekisan-draft-v1') || 'null'); } catch (err) { cur = null; }
+      var busy = cur && cur.lines && cur.lines.some(function (l) { return String(l.name || '').trim(); });
+      if (busy && !confirm('積算のページに入力中の内容があります。それを消して、この内訳書の中身に入れ替えますか？')) { done(); return; }
+      var s = function (x) { return x === null || x === undefined ? '' : String(x); };
+      var part = function (i, t) { return (i.parts || []).filter(function (x) { return x.type === t; })[0]; };
+      localStorage.setItem('sekisan-draft-v1', JSON.stringify({ v: 2, kind: inp.kind, title: s(inp.title), no: s(inp.no), months: s(inp.months), addKasetsu: s(inp.addKasetsu), addKanri: s(inp.addKanri), tax: s(inp.tax === '' || inp.tax === undefined ? 10 : inp.tax),
+        office: inp.office === false, hosho: inp.hosho === true, hoken: inp.hoken === true, learn: inp.learn !== false,
+        eDirect: s((part(inp, 'elec') || {}).direct), eDisposal: s((part(inp, 'elec') || {}).disposal), eMode: (part(inp, 'elec') || {}).mode === '含' ? '含' : '別',
+        mDirect: s((part(inp, 'mech') || {}).direct), mDisposal: s((part(inp, 'mech') || {}).disposal), mMode: (part(inp, 'mech') || {}).mode === '含' ? '含' : '別',
+        lines: inp.rows.map(function (r) { return { kubun: s(r[0]), name: s(r[1]), spec: s(r[2]), qty: s(r[3]), unit: s(r[4]), price: s(r[5]), disposal: r[6] === true, memo: s(r[7]), from: '' }; }) }));
+      location.href = './';
+    }).catch(fail);
+  }
+});
+function saveAns(btn) {
+  var c = btn.closest('.doc'), id = Number(c.getAttribute('data-id')), s = S.filter(function (x) { return Number(x.id) === id; })[0];
+  if (!s) return;
+  var f = function (k) { return c.querySelector('[data-f=' + k + ']'); }, tax = f('zeikomi').checked, out = {}, bad = '';
+  ['price', 'floor', 'bid'].forEach(function (k) {
+    var t = String(f(k).value); if (t.normalize) t = t.normalize('NFKC'); t = t.replace(/[,円\s]/g, '');
+    if (t === '') { out[k] = ''; return; }
+    if (!/^[0-9]{1,13}$/.test(t)) { bad = '金額は数字（円）で入れてください。'; return; }
+    out[k] = String(tax ? Math.round(Number(t) / 1.1) : Number(t));
+  });
+  if (bad) { say(bad); return; }
+  out.memo = f('memo').value;
+  btn.disabled = true; say('保存しています…', true);
+  rpc('qb_set_actual', { p_id: id, p: out }).then(function () {
+    s.actual_price = out.price === '' ? null : Number(out.price); s.actual_floor = out.floor === '' ? null : Number(out.floor); s.actual_bid = out.bid === '' ? null : Number(out.bid); s.actual_memo = out.memo;
+    draw(); say('「' + s.title + '」の答え合わせを保存しました。' + (tax ? '（税抜に直して入れました）' : ''), true);
+  }).catch(function (err) { btn.disabled = false; say('保存できませんでした。\n' + String(err.message || err)); });
+}
+$('list').addEventListener('change', function (e) {
+  var a = e.target.getAttribute('data-a'), c = e.target.closest('.doc');
+  if (c && tab === 'B' && (a === 'paid' || a === 'bmemo')) {
+    var bno = c.getAttribute('data-bno'), b = B.filter(function (x) { return x.no === bno; })[0];
+    if (!b) return;
+    var paid = c.querySelector('[data-a=paid]').value, bm = c.querySelector('[data-a=bmemo]').value;
+    say('保存しています…', true);
+    rpc('qb_b_set', { p_no: bno, p_paid: paid, p_memo: bm }).then(function () { b.paid = paid; b.memo = bm; draw(); say(bno + ' を保存しました。', true); })
+      .catch(function (err) { say('保存できませんでした。\n' + String(err.message || err)); draw(); });
+    return;
+  }
+  if (!c || tab !== 'M' || (a !== 'st' && a !== 'memo')) return;
+  var no = c.getAttribute('data-no'), m = M.filter(function (x) { return x.no === no; })[0];
+  if (!m) return;
+  var st = c.querySelector('[data-a=st]').value, memo = c.querySelector('[data-a=memo]').value;
+  say('保存しています…', true);
+  rpc('qb_m_set_status', { p_no: no, p_status: st, p_memo: memo }).then(function () { m.status = st; m.memo = memo; say(no + ' を保存しました。', true); var t = c.querySelector('.tag'); t.textContent = st; t.style.background = COLOR[st] || '#5f6368'; })
+    .catch(function (err) { say('保存できませんでした。\n' + String(err.message || err)); draw(); });
+});
+$('tabM').addEventListener('click', function () { tab = 'M'; say(''); draw(); });
+$('tabS').addEventListener('click', function () { tab = 'S'; say(''); draw(); });
+$('tabB').addEventListener('click', function () { tab = 'B'; say(''); draw(); });
+$('q').addEventListener('input', draw);
+$('gateOut').addEventListener('click', function (e) { e.preventDefault(); try { PASSBOX.removeItem(PASSKEY); } catch (err) {} location.reload(); });
+
+(function () {
+  var started = false, turn = 0;
+  function openGate(pass, quiet) {
+    var mine = ++turn;
+    apiPass = pass; $('gateGo').disabled = true; $('gateMsg').style.color = '#5f6368'; $('gateMsg').textContent = '開いています…';
+    rpc('qb_r_list').then(function (d) {
+      if (started) return; started = true;
+      try { PASSBOX.setItem(PASSKEY, pass); } catch (e) {}
+      M = d.mitsumori || []; S = d.sekisan || []; B = d.seikyu || []; me = d.me || {};
+      if (/[?&]tab=s/.test(location.search)) tab = 'S'; else if (/[?&]tab=b/.test(location.search)) tab = 'B';
+      $('gate').style.display = 'none'; $('form').style.display = 'block'; draw();
+    }).catch(function (e) {
+      if (started || mine !== turn) return;
+      $('gateGo').disabled = false; $('gateMsg').style.color = '#c5221f';
+      if (e.badPass) { try { PASSBOX.removeItem(PASSKEY); } catch (err) {} }
+      $('gateMsg').textContent = quiet && e.badPass ? '合言葉を入れてください。' : String(e.message || e);
+    });
+  }
+  $('gateGo').addEventListener('click', function () { var p = $('gatePass').value.trim(); if (!p) { $('gateMsg').textContent = '合言葉を入れてください。'; return; } openGate(p, false); });
+  $('gatePass').addEventListener('keydown', function (e) { if (e.key === 'Enter') $('gateGo').click(); });
+  var saved = ''; try { saved = PASSBOX.getItem(PASSKEY) || ''; } catch (e) {}
+  if (saved) openGate(saved, true);
+})();
+</script>
+</body>
+</html>
