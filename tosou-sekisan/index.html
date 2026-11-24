@@ -110,6 +110,17 @@
       <label class="chk"><input type="checkbox" id="hosho">契約保証費を足す（金銭的保証が必要な契約）</label>
       <label class="chk"><input type="checkbox" id="hoken">労災の法定外保険の補正をする（公告に記載があるとき）</label>
       <label class="f">消費税率（％）</label><input type="text" id="tax" inputmode="numeric" value="10">
+      <div style="margin-top:14px;padding-top:10px;border-top:1px solid #eceff1;">
+        <div style="font-size:14px;font-weight:bold;color:#1a3a5f;">電気設備・機械設備が入っている工事</div>
+        <div class="hint">建築と一緒に発注される設備の分を、直接工事費の合計で入れます（項目に入れた分は、ここには入れません）。空なら設備なしです。</div>
+        <label class="f">電気設備の直接工事費（円）</label><input type="text" id="eDirect" inputmode="numeric">
+        <div class="row"><div><label class="f">うち処分費（円）</label><input type="text" id="eDisposal" inputmode="numeric"></div>
+          <div><label class="f">計算のしかた</label><select id="eMode"><option value="別">設備の率で別に計算</option><option value="含">建築に含める</option></select></div></div>
+        <label class="f">機械設備の直接工事費（円）</label><input type="text" id="mDirect" inputmode="numeric">
+        <div class="row"><div><label class="f">うち処分費（円）</label><input type="text" id="mDisposal" inputmode="numeric"></div>
+          <div><label class="f">計算のしかた</label><select id="mMode"><option value="別">設備の率で別に計算</option><option value="含">建築に含める</option></select></div></div>
+        <div class="hint">ふつうは「設備の率で別に計算」です。発注者が軽微と判断した設備は、建築に含めて計算されることがあります（内訳書の共通費の表で、設備が別の行になっていなければ「含める」です）。</div>
+      </div>
     </details>
   </div>
 
@@ -121,16 +132,16 @@
   <h2>計算の結果</h2>
   <div class="card"><div id="res"></div></div>
 
-  <label class="chk" style="margin:14px 2px;"><input type="checkbox" id="learn" checked>入れた単価を覚える（次から自動で入る）</label>
+  <label class="chk" style="margin:14px 2px;"><input type="checkbox" id="learn" checked>入れた単価を覚える（次から自動で入る。「似た単価」「手間の表」から入れた分は覚えません）</label>
   <button id="reset" type="button" class="del">入力を全部消す</button>
-  <div class="links"><a id="gateOut" href="#">合言葉を入れ直す</a><span style="display:none;"><a id="osaka"></a><a id="mitsu"></a><a id="joken"></a></span></div>
+  <div class="links"><a href="mitsumori.html">見積書をつくるページへ</a><br><a href="rireki.html?tab=s">つくった内訳書・見積書を見る</a><br><a href="settei.html">設定（自社の情報・項目の単価・材料の値段）</a><br><a id="gateOut" href="#">合言葉を入れ直す</a><span style="display:none;"><a id="osaka"></a><a id="mitsu"></a><a id="joken"></a></span></div>
 </div>
 
 <div class="wrap" id="done">
   <div class="card">
     <div class="big">内訳書をつくりました</div>
     <div id="doneText" style="line-height:1.9;"></div>
-    <a class="open" id="pdf" href="#" target="_blank">PDFを開く</a>
+    <a class="open" id="pdf" href="#" target="_blank">内訳書を開く（印刷・PDFに保存）</a>
     <button id="back" type="button" style="width:100%;">続けて直す</button>
   </div>
 </div>
@@ -200,13 +211,31 @@ function skRound_(x, d) { var m = Math.pow(10, d); return Math.round(x * m + 1e-
 function sekisanCalc_(o) {
   var errors = [], warns = [];
   var direct = Math.floor(Number(o.direct) || 0), disposal = Math.floor(Number(o.disposal) || 0);
+  // 電気設備・機械設備が入っている工事：parts = [{type:'elec'|'mech', mode:'別'|'含', direct, disposal, addKasetsu, addKanri}]
+  // 「含」は建築に足して建築の率で計算（発注者が軽微と判断したときの扱い）。「別」は設備の率で別に計算して合計する。
+  var PART = { elec: '電気設備', mech: '機械設備' }, sep = [], merged = [], partErr = [], extras = [];
+  (o.parts || []).forEach(function (p) {
+    var d = Math.floor(Number(p.direct) || 0), ds = Math.floor(Number(p.disposal) || 0);
+    if (!PART[p.type] || (d === 0 && ds === 0)) return;
+    if (d <= 0 || ds < 0) { partErr.push(PART[p.type] + 'の直接工事費を、0より大きい数字で入れてください。'); return; }
+    if (ds > d) { partErr.push(PART[p.type] + 'の処分費が、直接工事費より大きくなっています。'); return; }
+    var ak = Math.floor(Number(p.addKasetsu) || 0), ag = Math.floor(Number(p.addKanri) || 0);
+    if (ak < 0 || ag < 0) { partErr.push(PART[p.type] + 'の積み上げ額に、マイナスの数は入れられません。'); return; }
+    if (p.mode === '含') { merged.push(PART[p.type]); direct += d; disposal += ds; extras.push({ name: PART[p.type] + '工事', direct: d, disposal: ds, how: '建築に含めて計算' }); }
+    else { sep.push({ type: p.type, name: PART[p.type], direct: d, disposal: ds, addK: ak, addG: ag }); extras.push({ name: PART[p.type] + '工事', direct: d, disposal: ds, how: '設備の率で別に計算' }); }
+  });
   var T = skRound_(Number(o.months) || 0, 1), kind = String(o.kind || '');
   var addK = Math.floor(Number(o.addKasetsu) || 0), addG = Math.floor(Number(o.addKanri) || 0);
   var isNew = kind === SK.KINDS[1], isKai = kind === SK.KINDS[0], isPaint = kind === SK.KINDS[2], isWater = kind === SK.KINDS[3];
   if (!(isNew || isKai || isPaint || isWater)) errors.push('工事の種類を選んでください。');
   if (direct <= 0) errors.push('直接工事費が0円です。数量と単価を入れてください。');
   if (disposal > direct) errors.push('処分費が直接工事費より大きくなっています。');
+  else if (direct > 0 && direct - disposal <= 0 && (isNew || isKai)) errors.push('全部が処分費になっています。処分費でない項目が1つも無いと、共通費の率が計算できません。');
+  if (addK < 0 || addG < 0) errors.push('積み上げの共通仮設費・現場管理費に、マイナスの数は入れられません。');
   if ((isNew || isKai) && !(T > 0)) errors.push('工期（か月）を入れてください。');
+  partErr.forEach(function (e) { errors.push(e); });
+  if ((sep.length || merged.length) && !(isNew || isKai)) errors.push('電気設備・機械設備の欄は、工事の種類が「建築工事」のときだけ使えます。');
+  sep.forEach(function (p) { if (p.direct - p.disposal <= 0) errors.push(p.name + 'は全部が処分費になっています。'); });
   if (errors.length) return { ok: false, errors: errors, warns: warns };
 
   var base = direct - disposal, P = base / 1000, Kr = 0, Jo = 0, Gp = 0, hosei = 1;
@@ -236,6 +265,27 @@ function sekisanCalc_(o) {
   }
   var kanri = Math.floor((junkoji - disposal) * Jo / 100) + addG;
   var genka = junkoji + kanri;
+  // 電気設備・機械設備を別に計算する分（大阪府の基準 別表3〜6・16〜19。工期は同じ）
+  var RATE = {
+    elec: { kNew: [3.086, 0.283, 0.673], kKai: [1.751, 0.119, 0.393], jNew: [5.961, 0.387, 0.629], jKai: [6.038, 0.431, 0.736], loNew: 10000, loKai: 3000 },
+    mech: { kNew: [2.173, 0.178, 0.481], kKai: [2.478, 0.173, 0.383], jNew: [4.723, 0.252, 0.428], jKai: [6.221, 0.461, 0.800], loNew: 10000, loKai: 3000 }
+  };
+  var main = { name: '建築', direct: direct, disposal: disposal, Kr: Kr, Jo: Jo, kasetsu: kasetsu, kanri: kanri, genka: genka, addK: addK, addG: addG }, parts = [];
+  sep.forEach(function (p) {
+    var f = RATE[p.type], kc = isNew ? f.kNew : f.kKai, jc = isNew ? f.jNew : f.jKai, b = p.direct - p.disposal, Pp = b / 1000;
+    p.Kr = skRound_(Math.exp(kc[0] - kc[1] * Math.log(Pp) + kc[2] * Math.log(T)), 2);
+    p.kasetsu = Math.floor(b * p.Kr / 100) + p.addK;
+    var jun = p.direct + p.kasetsu, Npp = (jun - p.disposal) / 1000;
+    p.Jo = skRound_(Math.exp(jc[0] - jc[1] * Math.log(Npp) + jc[2] * Math.log(T)), 2);
+    if (o.hoken) p.Jo = skRound_(p.Jo * 1.01, 2);
+    p.kanri = Math.floor((jun - p.disposal) * p.Jo / 100) + p.addG;
+    p.genka = jun + p.kanri;
+    if (Pp < (isNew ? f.loNew : f.loKai) || Pp > 1000000) warns.push(p.name + 'の直接工事費が基準の式の範囲の外です。発注者は別の決め方をすることがあります。');
+    parts.push(p);
+    direct += p.direct; disposal += p.disposal; kasetsu += p.kasetsu; kanri += p.kanri; genka += p.genka;
+  });
+  junkoji = direct + kasetsu;
+  if (merged.length) warns.push(merged.join('・') + 'は、建築に含めて建築の率で計算しています（発注者が軽微と判断したときの扱いです）。');
   // 一般管理費等
   var Cp = genka / 1000;
   if (isPaint) Gp = 11.5;
@@ -254,15 +304,17 @@ function sekisanCalc_(o) {
   var pct = function (x) { return x.toFixed(2) + '％'; };
   return {
     ok: true, errors: errors, warns: warns, T: T, Kr: Kr, Jo: Jo, Gp: Gp, hosei: hosei,
-    direct: direct, disposal: disposal, kasetsu: kasetsu, junkoji: junkoji, kanri: kanri, genka: genka, ippan: ippan,
+    direct: direct, disposal: disposal, kasetsu: kasetsu, junkoji: junkoji, kanri: kanri, genka: genka, ippan: ippan, main: main, parts: parts, merged: merged, extras: extras,
     price: price, tax: tax, total: price + tax, floor: floor, floorRaw: floorRaw, floorLow: floorLow, floorHigh: floorHigh,
     steps: [
-      ['直接工事費', direct, disposal ? 'うち処分費 ' + disposal.toLocaleString() + '円（率の計算からは除く）' : ''],
-      ['共通仮設費', kasetsu, (Kr ? '率 ' + pct(Kr) + (hosei !== 1 ? '（監理事務所なしの補正 ×' + hosei + ' 込み）' : '') : '率なし（積み上げ）') + (addK ? ' ＋ 積み上げ ' + addK.toLocaleString() + '円' : '')],
+      ['直接工事費', direct, (parts.length ? '建築 ' + main.direct.toLocaleString() + '円' + parts.map(function (p) { return ' ／ ' + p.name + ' ' + p.direct.toLocaleString() + '円'; }).join('') + '。' : '') + (merged.length ? merged.join('・') + 'を含む。' : '') + (disposal ? 'うち処分費 ' + disposal.toLocaleString() + '円（率の計算からは除く）' : '')],
+      ['共通仮設費', kasetsu, (parts.length ? '建築 ' : '') + (Kr ? '率 ' + pct(Kr) + (hosei !== 1 ? '（監理事務所なしの補正 ×' + hosei + ' 込み）' : '') : '率なし（積み上げ）') + (addK ? ' ＋ 積み上げ ' + addK.toLocaleString() + '円' : '') +
+        parts.map(function (p) { return ' ／ ' + p.name + ' 率 ' + pct(p.Kr) + (p.addK ? ' ＋ 積み上げ ' + p.addK.toLocaleString() + '円' : ''); }).join('')],
       ['純工事費', junkoji, '直接工事費＋共通仮設費'],
-      ['現場管理費', kanri, '率 ' + pct(Jo) + (addG ? ' ＋ 積み上げ ' + addG.toLocaleString() + '円' : '')],
+      ['現場管理費', kanri, (parts.length ? '建築 ' : '') + '率 ' + pct(Jo) + (addG ? ' ＋ 積み上げ ' + addG.toLocaleString() + '円' : '') +
+        parts.map(function (p) { return ' ／ ' + p.name + ' 率 ' + pct(p.Jo) + (p.addG ? ' ＋ 積み上げ ' + p.addG.toLocaleString() + '円' : ''); }).join('')],
       ['工事原価', genka, '純工事費＋現場管理費'],
-      ['一般管理費等', ippan, '率 ' + pct(Gp) + (o.hosho ? ' ＋ 契約保証費 0.04％' : '') + '（工事価格が千円単位になるよう調整）'],
+      ['一般管理費等', ippan, '率 ' + pct(Gp) + (parts.length ? '（工事原価の合計に、建築の率を掛ける）' : '') + (o.hosho ? ' ＋ 契約保証費 0.04％' : '') + '（工事価格が千円単位になるよう調整）'],
       ['工事価格（税抜）', price, 'これが予定価格の目安'],
       ['消費税', tax, taxPct + '％'],
       ['合計（税込）', price + tax, ''],
@@ -288,11 +340,18 @@ function skFind_(master, name, spec, unit) {
   if (loose.length === 1) return { price: loose[0], how: '単価表（名称・単位が同じ／規格ちがい・要確認）' };
   return null;
 }
-function skNum_(v) { if (v === '' || v === null) return ''; var n = Number(String(v).replace(/[,，円\s]/g, '')); return isNaN(n) ? '' : n; }
+function skNum_(v) {
+  if (v === '' || v === null || v === undefined) return '';
+  var t = String(v); if (t.normalize) t = t.normalize('NFKC');           // 全角の数字・コンマ・小数点も読む
+  t = t.replace(/[,円\s]/g, '');
+  if (t === '') return '';
+  var n = Number(t); return isNaN(n) ? '' : n;
+}
 function skTotal_(rows) {
-  var direct = 0, disposal = 0, amounts = [], blank = 0, used = 0;
+  var direct = 0, disposal = 0, amounts = [], blank = 0, used = 0, badQty = 0;
   rows.forEach(function (r) {
     var qty = skNum_(r[3]), price = skNum_(r[5]), name = String(r[1] || '').trim();
+    if (name && qty === '' && String(r[3] === null || r[3] === undefined ? '' : r[3]).trim() !== '') badQty++;   // 数量に数字でない文字
     if (!name || qty === '') { amounts.push(['']); return; }      // 見出しの行・空の行
     used++;
     if (price === '') { blank++; amounts.push(['']); return; }
@@ -300,10 +359,10 @@ function skTotal_(rows) {
     amounts.push([a]); direct += a;
     if (r[7] === true) disposal += a;
   });
-  return { direct: direct, disposal: disposal, amounts: amounts, blank: blank, used: used };
+  return { direct: direct, disposal: disposal, amounts: amounts, blank: blank, used: used, badQty: badQty };
 }
 function skSimilar_(master, name, spec, unit, word, limit) {
-  var norm = function (x) { return skKey_(x).replace(/[()（）\[\]［］「」・･、,。.:：;；\-‐－ー―~〜～\/／*＊×xｘ=＝@＠φΦ]/g, ''); };
+  var norm = function (x) { return skKey_(x).replace(/(\d)\.(?=\d)/g, '$1\u0001').replace(/[()（）\[\]［］「」・･、,。.:：;；\-‐－ー―~〜～\/／*＊×xｘ=＝@＠φΦ]/g, '').replace(/\u0001/g, '.'); };   // 数字の間の小数点は残す（1.5 と 15 を同じにしない）
   var unitKey = function (u) { return skKey_(u).replace(/^m2$/, '㎡').replace(/^m3$/, '㎥').replace(/[ヶケカヵ箇個]所/, 'か所'); };
   var grams = function (t) { var g = {}, n = 0, i; if (t.length === 1) { g[t] = 1; n = 1; } for (i = 0; i + 1 < t.length; i++) { var k = t.substr(i, 2); if (!g[k]) { g[k] = 1; n++; } } return { g: g, n: n }; };
   var dice = function (a, b) { if (!a.n || !b.n) return 0; var c = 0, k; for (k in a.g) if (b.g[k]) c++; return 2 * c / (a.n + b.n); };
@@ -312,7 +371,7 @@ function skSimilar_(master, name, spec, unit, word, limit) {
   for (var i = master.length - 1; i >= 0; i--) {                   // 後ろの行（新しい方）を先に
     var m = master[i], price = Number(m[3]);
     if (m[3] === '' || isNaN(price) || !String(m[0]).trim()) continue;
-    var n1 = norm(m[0]), s1 = norm(m[1]), key = n1 + '|' + s1 + '|' + unitKey(m[2]);
+    var n1 = norm(m[0]), s1 = norm(m[1]), key = skKey_(m[0]) + '|' + skKey_(m[1]) + '|' + unitKey(m[2]);
     if (seen[key]) continue;
     if (w && (n1 + s1).indexOf(w) === -1) continue;
     var same = !u0 || unitKey(m[2]) === u0;
@@ -402,7 +461,7 @@ function ymImport_(grid, guess) {
   };
   var heading = function (text) {
     if (!text || ymIsTotal_(text) || ymNum_(text) !== '') { skipped++; return; }
-    kubun = text.replace(/^[\s\d０-９IVXⅠ-Ⅹ一二三四五六七八九十A-Za-z]{1,3}[\s.．、)）:：-]+\s*/, '').slice(0, 100) || text.slice(0, 100);
+    kubun = text.replace(/^\s*(?:[(（]?(?:[\d０-９]{1,3}|[IVXⅠ-Ⅹ]{1,3}|[一二三四五六七八九十]{1,2}|[A-Za-zＡ-Ｚａ-ｚ])[)）.．、:：-]+|[\d０-９]{1,3}\s+)\s*/, '').slice(0, 100) || text.slice(0, 100);   // 「1. 」「(2)」「A.」は取る。「FRP 防水」「RC 外壁」は取らない
     used = false; heads++;
   };
 
@@ -456,7 +515,7 @@ function ymImport_(grid, guess) {
     }
     // ② 見出しが無いとき：「数字＋単位」のならびを探す
     var q = -1, qv = '', uv = '', next = -1, m;
-    for (j = 0; j < filled.length && q === -1; j++) {
+    for (j = filled.length - 1; j >= 0 && q === -1; j--) {       // 右から探す（規格に「30mm」「2回」などがあっても、数量の欄を先に見つける）
       if (j + 1 < filled.length && ymNum_(filled[j]) !== '' && ymIsUnit_(filled[j + 1])) { q = j; qv = ymNum_(filled[j]); uv = filled[j + 1]; next = j + 2; }
       else if (j > 0 && (m = /^([\d,]+(?:\.\d+)?)\s*([^\d.,].{0,5})$/.exec(filled[j])) && ymIsUnit_(m[2])) { q = j; qv = ymNum_(m[1]); uv = m[2]; next = j + 1; }
       else if (j > 0 && j + 1 < filled.length && ymIsUnit_(filled[j]) && ymNum_(filled[j + 1]) !== '' && ymNum_(filled[j - 1]) === '') { q = j; uv = filled[j]; qv = ymNum_(filled[j + 1]); next = j + 2; }
@@ -497,8 +556,9 @@ function ymPdfRows_(list) {
 function ymText_(text) {
   text = String(text || '').replace(/\r\n?/g, '\n');
   var tab = text.indexOf('\t') !== -1, comma = !tab && /,/.test(text) && text.split('\n').filter(function (l) { return l.split(',').length >= 3; }).length >= Math.max(1, text.split('\n').length / 3);
-  if (!comma) return text.split('\n').map(function (l) { return l.indexOf('\t') !== -1 ? l.split('\t') : l.trim().split(/[ \u3000]{2,}|\s*\|\s*/); });
-  var sep = ',', rows = [], row = [], cell = '', inq = false, i, ch;
+  var two = function (l) { return l.trim().split(/[ \u3000]{2,}|\s*\|\s*/); };
+  if (!tab && !comma) return text.split('\n').map(two);
+  var sep = tab ? '\t' : ',', rows = [], row = [], cell = '', inq = false, i, ch;
   for (i = 0; i < text.length; i++) {
     ch = text[i];
     if (inq) { if (ch === '"') { if (text[i + 1] === '"') { cell += '"'; i++; } else inq = false; } else cell += ch; }
@@ -508,9 +568,73 @@ function ymText_(text) {
     else cell += ch;
   }
   row.push(cell); rows.push(row);
-  return rows;
+  // セルの中の改行は空白に。タブの無い行が混ざっていたら、その行は空白2つ以上で区切る
+  return rows.map(function (r) { r = r.map(function (c) { return c.replace(/\n/g, ' '); }); return tab && r.length === 1 ? two(r[0]) : r; });
 }
-var BG={"PLUS":1.15,"UNITS":{"研磨紙":"枚"},"SHEET":"手間の表の単価"};
+function skEsc_(s) { return String(s === null || s === undefined ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+function skYen_(n) { return (n === '' || n === null || n === undefined) ? '' : Math.round(Number(n)).toLocaleString('ja-JP'); }
+function skQty_(n) { return (n === '' || n === null || n === undefined) ? '' : Number(n).toLocaleString('ja-JP', { maximumFractionDigits: 3 }); }
+function skGroups_(rows) {
+  var groups = [], cur = null;
+  var open = function (name) { cur = { name: name, sum: 0, rows: [] }; groups.push(cur); };
+  rows.forEach(function (r) {
+    var kubun = String(r[0] || '').trim(), name = String(r[1] || '').trim(), qty = skNum_(r[3]), price = skNum_(r[5]);
+    if (kubun && (!cur || cur.name !== kubun)) open(kubun);
+    if (!name) return;
+    if (!cur) open('（区分なし）');
+    if (qty === '') { cur.rows.push({ head: true, name: name, spec: String(r[2] || '').trim() }); return; }
+    var amount = price === '' ? '' : Math.floor(qty * price + 1e-6);
+    if (amount !== '') cur.sum += amount;
+    cur.rows.push({ head: false, name: name, spec: String(r[2] || '').trim(), qty: qty, unit: String(r[4] || '').trim(), price: price, amount: amount,
+      memo: String(r[8] || '').trim(), disposal: r[7] === true });
+  });
+  return groups.filter(function (g) { return g.rows.length; });
+}
+function sekisanHtml_(d) {
+  var r = d.res, h = [];
+  var css = 'body{font-family:"Hiragino Sans","Yu Gothic",Meiryo,sans-serif;font-size:10pt;color:#111;background:#fff;margin:0;}' +
+    'h1{font-size:18pt;text-align:center;letter-spacing:.3em;margin:0 0 14pt;}h2{font-size:12pt;margin:0 0 6pt;padding:3pt 6pt;background:#e8eef5;border-left:4pt solid #1a3a5f;}' +
+    'table{width:100%;border-collapse:collapse;margin-bottom:10pt;}th,td{border:.6pt solid #555;padding:3.5pt 5pt;vertical-align:top;}' +
+    'th{background:#e8eef5;font-weight:bold;text-align:center;}td.n{text-align:right;white-space:nowrap;}td.c{text-align:center;white-space:nowrap;}' +
+    'tr.sum td{font-weight:bold;background:#f3f6fa;}tr.big td{font-weight:bold;font-size:12pt;background:#e8eef5;}tr.hd td{font-weight:bold;background:#fafafa;}' +
+    '.meta td{border:0;padding:2pt 4pt;}.meta td.k{width:70pt;color:#444;}.note{font-size:8.5pt;color:#444;line-height:1.6;}.page{page-break-before:always;}';
+  h.push('<html><head><meta charset="UTF-8"><style>' + css + '</style></head><body>');
+  // 1. 総括
+  h.push('<h1>工事費内訳書</h1>');
+  h.push('<table class="meta"><tr><td class="k">工事名</td><td>' + skEsc_(d.title) + '</td><td class="k">作成日</td><td>' + skEsc_(d.date) + '</td></tr>' +
+    '<tr><td class="k">案件番号</td><td>' + skEsc_(d.no) + '</td><td class="k">作成</td><td>' + skEsc_(d.company) + '</td></tr>' +
+    '<tr><td class="k">工事の種類</td><td>' + skEsc_(d.kind) + '</td><td class="k">工期</td><td>' + (r.T ? skEsc_(r.T) + ' か月' : '') + '</td></tr></table>');
+  h.push('<h2>総括</h2><table><tr><th style="width:34%">名称</th><th style="width:22%">金額（円）</th><th>備考</th></tr>');
+  r.steps.forEach(function (s, i) {
+    if (i === 9) return;   // 最低制限価格の目安は内訳書に載せない
+    var cls = i === 6 || i === 8 ? 'big' : (i === 2 || i === 4 ? 'sum' : '');
+    h.push('<tr class="' + cls + '"><td>' + skEsc_(s[0]) + '</td><td class="n">' + skYen_(s[1]) + '</td><td>' + skEsc_(s[2]) + '</td></tr>');
+  });
+  h.push('</table>');
+  // 2. 科目別
+  h.push('<h2>科目別内訳（直接工事費）</h2><table><tr><th style="width:56%">科目</th><th style="width:22%">金額（円）</th><th>備考</th></tr>');
+  d.groups.forEach(function (g) { h.push('<tr><td>' + skEsc_(g.name) + '</td><td class="n">' + skYen_(g.sum) + '</td><td></td></tr>'); });
+  (r.extras || []).forEach(function (x) { h.push('<tr><td>' + skEsc_(x.name) + '（一式）</td><td class="n">' + skYen_(x.direct) + '</td><td>' + skEsc_(x.how + (x.disposal ? '／うち処分費 ' + skYen_(x.disposal) + '円' : '')) + '</td></tr>'); });
+  h.push('<tr class="sum"><td>計（直接工事費）</td><td class="n">' + skYen_(r.direct) + '</td><td></td></tr></table>');
+  if (d.blank) h.push('<div class="note">※ 単価が空の行が ' + d.blank + ' 行あります。その分は金額に入っていません。</div>');
+  h.push('<div class="note">※ 共通仮設費・現場管理費・一般管理費等は「大阪府公共建築工事共通費積算基準」の率の式で出した目安です。提出するときは、発注者が配る様式に写してください。</div>');
+  // 3. 細目別
+  h.push('<div class="page"></div><h1 style="font-size:14pt;">細目別内訳</h1>');
+  d.groups.forEach(function (g) {
+    h.push('<h2>' + skEsc_(g.name) + '</h2><table><tr><th style="width:24%">名称</th><th style="width:24%">規格・仕様</th><th style="width:9%">数量</th><th style="width:6%">単位</th><th style="width:11%">単価</th><th style="width:13%">金額</th><th>備考</th></tr>');
+    g.rows.forEach(function (x) {
+      if (x.head) { h.push('<tr class="hd"><td colspan="7">' + skEsc_(x.name) + (x.spec ? '　' + skEsc_(x.spec) : '') + '</td></tr>'); return; }
+      h.push('<tr><td>' + skEsc_(x.name) + '</td><td>' + skEsc_(x.spec) + '</td><td class="n">' + skQty_(x.qty) + '</td><td class="c">' + skEsc_(x.unit) + '</td><td class="n">' + skYen_(x.price) +
+        '</td><td class="n">' + skYen_(x.amount) + '</td><td>' + skEsc_((x.disposal ? '処分費 ' : '') + x.memo) + '</td></tr>');
+    });
+    h.push('<tr class="sum"><td colspan="5">計</td><td class="n">' + skYen_(g.sum) + '</td><td></td></tr></table>');
+  });
+  h.push('</body></html>');
+  return h.join('');
+}
+var BG={"PLUS":1.15,"UNITS":{"研磨紙":"枚"},"SHEET":"手間の表の単価","RATE_LABOR":"諸経費（手間に掛ける）","RATE_OTHER":"諸経費（材料に掛ける）"};
+var BG_ITEMS=[{"id":0,"group":"下地調整（塗替え面）","name":"下地調整","spec":"モルタル・プラスター面 RA種","src":"表RA-17-25","plus":true,"mats":{"エマルションシーラー":0.1,"エマルションパテ（耐水形）":0.23,"研磨紙":0.13},"labor":{"塗装工":0.041},"unit":"㎡"},{"id":1,"group":"下地調整（塗替え面）","name":"下地調整","spec":"モルタル・プラスター面 RB種","src":"表RA-17-25","plus":true,"mats":{"エマルションシーラー":0.03,"エマルションパテ（耐水形）":0.08,"研磨紙":0.07},"labor":{"塗装工":0.012},"unit":"㎡"},{"id":2,"group":"下地調整（塗替え面）","name":"下地調整","spec":"モルタル・プラスター面 RC種","src":"表RA-17-25","plus":true,"mats":{"研磨紙":0.07},"labor":{"塗装工":0.004},"unit":"㎡"},{"id":3,"group":"下地調整（塗替え面）","name":"付着物除去","spec":"モルタル・プラスター面","src":"表RA-17-25","plus":true,"mats":{},"labor":{"塗装工":0.002},"unit":"㎡"},{"id":4,"group":"下地調整（塗替え面）","name":"下地調整","spec":"コンクリート面 RA種","src":"表RA-17-26","plus":true,"mats":{"建築用下地調整塗材":1.5,"エマルションパテ（耐水形）":0.15,"研磨紙":0.13},"labor":{"左官":0.02,"塗装工":0.023},"unit":"㎡"},{"id":5,"group":"下地調整（塗替え面）","name":"下地調整","spec":"コンクリート面 RB種","src":"表RA-17-26","plus":true,"mats":{"建築用下地調整塗材":0.75,"研磨紙":0.07},"labor":{"左官":0.01,"塗装工":0.004},"unit":"㎡"},{"id":6,"group":"下地調整（塗替え面）","name":"下地調整","spec":"コンクリート面 RC種","src":"表RA-17-26","plus":true,"mats":{"研磨紙":0.07},"labor":{"塗装工":0.004},"unit":"㎡"},{"id":7,"group":"下地調整（塗替え面）","name":"下地調整","spec":"ボード面 RA種","src":"表RA-17-28","plus":true,"mats":{"エマルションパテ（一般形）":0.21,"研磨紙":0.13},"labor":{"塗装工":0.028},"unit":"㎡"},{"id":8,"group":"下地調整（塗替え面）","name":"下地調整","spec":"ボード面 RB種","src":"表RA-17-28","plus":true,"mats":{"エマルションパテ（一般形）":0.06,"研磨紙":0.07},"labor":{"塗装工":0.007},"unit":"㎡"},{"id":9,"group":"下地調整（塗替え面）","name":"下地調整","spec":"ボード面 RC種","src":"表RA-17-28","plus":true,"mats":{"研磨紙":0.07},"labor":{"塗装工":0.004},"unit":"㎡"},{"id":10,"group":"下地調整（塗替え面）","name":"下地調整","spec":"けい酸カルシウム板面 RA種","src":"表RA-17-29","plus":true,"mats":{"反応形合成樹脂シーラー":0.1,"エマルションパテ（一般形）":0.21,"研磨紙":0.13},"labor":{"塗装工":0.039},"unit":"㎡"},{"id":11,"group":"下地調整（塗替え面）","name":"下地調整","spec":"けい酸カルシウム板面 RB種","src":"表RA-17-29","plus":true,"mats":{"反応形合成樹脂シーラー":0.1,"エマルションパテ（一般形）":0.06,"研磨紙":0.07},"labor":{"塗装工":0.018},"unit":"㎡"},{"id":12,"group":"下地調整（塗替え面）","name":"下地調整","spec":"けい酸カルシウム板面 RC種","src":"表RA-17-29","plus":true,"mats":{"研磨紙":0.07},"labor":{"塗装工":0.004},"unit":"㎡"},{"id":13,"group":"下地調整（塗替え面）","name":"下地調整","spec":"押出成形セメント板面 RA種","src":"表RA-17-27","plus":true,"mats":{"反応形合成樹脂シーラー":0.08,"反応形合成樹脂パテ":0.3,"研磨紙":0.07},"labor":{"塗装工":0.033},"unit":"㎡"},{"id":14,"group":"下地調整（塗替え面）","name":"下地調整","spec":"押出成形セメント板面 RB種","src":"表RA-17-27","plus":true,"mats":{"反応形合成樹脂シーラー":0.08},"labor":{"塗装工":0.013},"unit":"㎡"},{"id":15,"group":"下地調整（塗替え面）","name":"下地調整","spec":"押出成形セメント板面 RC種","src":"表RA-17-27","plus":true,"mats":{"研磨紙":0.07},"labor":{"塗装工":0.004},"unit":"㎡"},{"id":16,"group":"下地調整（塗替え面）","name":"下地調整","spec":"鉄鋼面 RA種","src":"表RA-17-24","plus":true,"mats":{"研磨紙":0.07},"labor":{"塗装工":0.006},"unit":"㎡"},{"id":17,"group":"下地調整（塗替え面）","name":"下地調整","spec":"鉄鋼面 RB種","src":"表RA-17-24","plus":true,"mats":{"研磨紙":0.07},"labor":{"塗装工":0.006},"unit":"㎡"},{"id":18,"group":"下地調整（塗替え面）","name":"下地調整","spec":"鉄鋼面 RC種","src":"表RA-17-24","plus":true,"mats":{"研磨紙":0.07},"labor":{"塗装工":0.004},"unit":"㎡"},{"id":19,"group":"下地調整（塗替え面）","name":"下地調整","spec":"木部 RA種","src":"表RA-17-23","plus":true,"mats":{"木部下塗り用調合ペイント":0.01,"エマルションパテ（耐水形）":0.06,"研磨紙":0.13},"labor":{"塗装工":0.01},"unit":"㎡"},{"id":20,"group":"下地調整（塗替え面）","name":"下地調整","spec":"木部 RB種","src":"表RA-17-23","plus":true,"mats":{"研磨紙":0.07},"labor":{"塗装工":0.004},"unit":"㎡"},{"id":21,"group":"下地調整（塗替え面）","name":"下地調整","spec":"木部 RC種","src":"表RA-17-23","plus":true,"mats":{"研磨紙":0.07},"labor":{"塗装工":0.004},"unit":"㎡"},{"id":22,"group":"EP塗り（合成樹脂エマルションペイント）","name":"EP塗り","spec":"A種 一般（壁など）","src":"表RA-17-34","plus":true,"mats":{"エマルションシーラー":0.07,"合成樹脂エマルションペイント（EP）":0.3,"研磨紙":0.07},"labor":{"塗装工":0.054},"unit":"㎡"},{"id":23,"group":"EP塗り（合成樹脂エマルションペイント）","name":"EP塗り","spec":"A種 見上げ（天井など）","src":"表RA-17-34","plus":true,"mats":{"エマルションシーラー":0.07,"合成樹脂エマルションペイント（EP）":0.3},"labor":{"塗装工":0.06},"unit":"㎡"},{"id":24,"group":"EP塗り（合成樹脂エマルションペイント）","name":"EP塗り","spec":"B種・C種 一般（壁など）","src":"表RA-17-34","plus":true,"mats":{"エマルションシーラー（塗替えはしみ止めシーラー）":0.07,"合成樹脂エマルションペイント（EP）":0.2},"labor":{"塗装工":0.04},"unit":"㎡"},{"id":25,"group":"EP塗り（合成樹脂エマルションペイント）","name":"EP塗り","spec":"B種・C種 見上げ（天井など）","src":"表RA-17-34","plus":true,"mats":{"エマルションシーラー（塗替えはしみ止めシーラー）":0.07,"合成樹脂エマルションペイント（EP）":0.2},"labor":{"塗装工":0.046},"unit":"㎡"},{"id":26,"group":"EP-G塗り（つや有合成樹脂エマルションペイント）","name":"EP-G塗り","spec":"A種 一般（壁など）","src":"表RA-17-35","plus":true,"mats":{"エマルションシーラー":0.07,"つや有合成樹脂エマルションペイント（EP-G）":0.3,"研磨紙":0.25},"labor":{"塗装工":0.058},"unit":"㎡"},{"id":27,"group":"EP-G塗り（つや有合成樹脂エマルションペイント）","name":"EP-G塗り","spec":"A種 見上げ（天井など）","src":"表RA-17-35","plus":true,"mats":{"エマルションシーラー":0.07,"つや有合成樹脂エマルションペイント（EP-G）":0.3},"labor":{"塗装工":0.06},"unit":"㎡"},{"id":28,"group":"EP-G塗り（つや有合成樹脂エマルションペイント）","name":"EP-G塗り","spec":"B種・C種 一般（壁など）","src":"表RA-17-35","plus":true,"mats":{"エマルションシーラー（塗替えはしみ止めシーラー）":0.07,"つや有合成樹脂エマルションペイント（EP-G）":0.2},"labor":{"塗装工":0.04},"unit":"㎡"},{"id":29,"group":"EP-G塗り（つや有合成樹脂エマルションペイント）","name":"EP-G塗り","spec":"B種・C種 見上げ（天井など）","src":"表RA-17-35","plus":true,"mats":{"エマルションシーラー（塗替えはしみ止めシーラー）":0.07,"つや有合成樹脂エマルションペイント（EP-G）":0.2},"labor":{"塗装工":0.046},"unit":"㎡"},{"id":30,"group":"EP-G塗り（つや有合成樹脂エマルションペイント）","name":"EP-G塗り","spec":"木部 A種","src":"表RA-17-36","plus":true,"mats":{"エマルションシーラー":0.07,"つや有合成樹脂エマルションペイント（EP-G）":0.2,"エマルションパテ（耐水形）":0.03,"研磨紙":0.07},"labor":{"塗装工":0.046},"unit":"㎡"},{"id":31,"group":"EP-G塗り（つや有合成樹脂エマルションペイント）","name":"EP-G塗り","spec":"木部 B種","src":"表RA-17-36","plus":true,"mats":{"エマルションシーラー":0.07,"つや有合成樹脂エマルションペイント（EP-G）":0.1,"研磨紙":0.07},"labor":{"塗装工":0.031},"unit":"㎡"},{"id":32,"group":"EP-G塗り（つや有合成樹脂エマルションペイント）","name":"EP-G塗り","spec":"木部 C種","src":"表RA-17-36","plus":true,"mats":{"エマルションシーラー":0.07,"つや有合成樹脂エマルションペイント（EP-G）":0.1},"labor":{"塗装工":0.029},"unit":"㎡"},{"id":33,"group":"EP-G塗り（つや有合成樹脂エマルションペイント）","name":"EP-G塗り","spec":"鉄鋼面 A種","src":"表RA-17-37","plus":true,"mats":{"つや有合成樹脂エマルションペイント（EP-G）":0.3,"研磨紙":0.25},"labor":{"塗装工":0.048},"unit":"㎡"},{"id":34,"group":"EP-G塗り（つや有合成樹脂エマルションペイント）","name":"EP-G塗り","spec":"鉄鋼面 B種","src":"表RA-17-37","plus":true,"mats":{"つや有合成樹脂エマルションペイント（EP-G）":0.2},"labor":{"塗装工":0.029},"unit":"㎡"},{"id":35,"group":"EP-G塗り（つや有合成樹脂エマルションペイント）","name":"EP-G塗り","spec":"鉄鋼面 C種","src":"表RA-17-37","plus":true,"mats":{"つや有合成樹脂エマルションペイント（EP-G）":0.2},"labor":{"塗装工":0.029},"unit":"㎡"},{"id":36,"group":"EP-G塗り（つや有合成樹脂エマルションペイント）","name":"EP-G塗り","spec":"亜鉛めっき鋼面 A種・B種","src":"表RA-17-38","plus":true,"mats":{"つや有合成樹脂エマルションペイント（EP-G）":0.2},"labor":{"塗装工":0.029},"unit":"㎡"},{"id":37,"group":"SOP塗り（合成樹脂調合ペイント）","name":"SOP塗り","spec":"鉄鋼面 A種（塗替え面）","src":"表RA-17-33","plus":true,"mats":{"合成樹脂調合ペイント（SOP）":0.26,"不飽和ポリエステルパテ":0.08,"研磨紙":0.13},"labor":{"塗装工":0.063},"unit":"㎡"},{"id":38,"group":"SOP塗り（合成樹脂調合ペイント）","name":"SOP塗り","spec":"鉄鋼面 B種（塗替え面）","src":"表RA-17-33","plus":true,"mats":{"合成樹脂調合ペイント（SOP）":0.17,"不飽和ポリエステルパテ":0.08},"labor":{"塗装工":0.042},"unit":"㎡"},{"id":39,"group":"SOP塗り（合成樹脂調合ペイント）","name":"SOP塗り","spec":"鉄鋼面 C種（塗替え面）","src":"表RA-17-33","plus":true,"mats":{"合成樹脂調合ペイント（SOP）":0.08},"labor":{"塗装工":0.021},"unit":"㎡"},{"id":40,"group":"SOP塗り（合成樹脂調合ペイント）","name":"SOP塗り","spec":"鉄鋼面 A種（新規面）","src":"表RA-17-33","plus":true,"mats":{"合成樹脂調合ペイント（SOP）":0.26,"研磨紙":0.07},"labor":{"塗装工":0.056},"unit":"㎡"},{"id":41,"group":"SOP塗り（合成樹脂調合ペイント）","name":"SOP塗り","spec":"鉄鋼面 B種（新規面）","src":"表RA-17-33","plus":true,"mats":{"合成樹脂調合ペイント（SOP）":0.17},"labor":{"塗装工":0.038},"unit":"㎡"},{"id":42,"group":"SOP塗り（合成樹脂調合ペイント）","name":"SOP塗り","spec":"木部 B種（塗替え面）","src":"表RA-17-32","plus":true,"mats":{"木部下塗り用調合ペイント":0.09,"合成樹脂調合ペイント（SOP）":0.17,"エマルションパテ（耐水形）":0.03,"研磨紙":0.07},"labor":{"塗装工":0.059},"unit":"㎡"},{"id":43,"group":"SOP塗り（合成樹脂調合ペイント）","name":"SOP塗り","spec":"木部 C種（塗替え面）","src":"表RA-17-32","plus":true,"mats":{"合成樹脂調合ペイント（SOP）":0.08},"labor":{"塗装工":0.021},"unit":"㎡"},{"id":44,"group":"SOP塗り（合成樹脂調合ペイント）","name":"SOP塗り","spec":"木部 A種（新規面）","src":"表RA-17-32","plus":true,"mats":{"木部下塗り用調合ペイント":0.18,"合成樹脂調合ペイント（SOP）":0.17},"labor":{"塗装工":0.073},"unit":"㎡"},{"id":45,"group":"SOP塗り（合成樹脂調合ペイント）","name":"SOP塗り","spec":"木部 B種（新規面）","src":"表RA-17-32","plus":true,"mats":{"木部下塗り用調合ペイント":0.09,"合成樹脂調合ペイント（SOP）":0.17,"エマルションパテ（耐水形）":0.03,"研磨紙":0.07},"labor":{"塗装工":0.059},"unit":"㎡"},{"id":46,"group":"錆止め塗り（鉄鋼面）","name":"錆止め塗料塗り","spec":"SOP用 C種 現場2回（塗替え面）","src":"表RA-17-30","plus":true,"mats":{"錆止めペイント（1種）":0.15,"研磨紙":0.13},"labor":{"塗装工":0.027},"unit":"㎡"},{"id":47,"group":"錆止め塗り（鉄鋼面）","name":"錆止め塗料塗り","spec":"SOP用 A種 現場1回（新規面）","src":"表RA-17-30","plus":true,"mats":{"錆止めペイント（1種）":0.1,"研磨紙":0.13},"labor":{"塗装工":0.019},"unit":"㎡"},{"id":48,"group":"錆止め塗り（鉄鋼面）","name":"錆止め塗料塗り","spec":"SOP用 B種 現場1回（新規面）","src":"表RA-17-30","plus":true,"mats":{"錆止めペイント（1種）":0.1},"labor":{"塗装工":0.017},"unit":"㎡"},{"id":49,"group":"錆止め塗り（鉄鋼面）","name":"錆止め塗料塗り","spec":"EP-G用 C種 現場2回（塗替え面）","src":"表RA-17-31","plus":true,"mats":{"錆止めペイント（2種）":0.17,"研磨紙":0.13},"labor":{"塗装工":0.027},"unit":"㎡"},{"id":50,"group":"錆止め塗り（鉄鋼面）","name":"錆止め塗料塗り","spec":"EP-G用 A種 現場1回（新規面）","src":"表RA-17-31","plus":true,"mats":{"錆止めペイント（2種）":0.11,"研磨紙":0.13},"labor":{"塗装工":0.019},"unit":"㎡"},{"id":51,"group":"錆止め塗り（鉄鋼面）","name":"錆止め塗料塗り","spec":"EP-G用 B種 現場1回（新規面）","src":"表RA-17-31","plus":true,"mats":{"錆止めペイント（2種）":0.11},"labor":{"塗装工":0.017},"unit":"㎡"},{"id":52,"group":"NAD塗り（アクリル樹脂系非水分散形塗料）","name":"NAD塗り","spec":"A種","src":"表RA-17-39","plus":true,"mats":{"アクリル樹脂系非水分散形塗料（NAD）":0.3,"研磨紙":0.07},"labor":{"塗装工":0.044},"unit":"㎡"},{"id":53,"group":"NAD塗り（アクリル樹脂系非水分散形塗料）","name":"NAD塗り","spec":"B種","src":"表RA-17-39","plus":true,"mats":{"アクリル樹脂系非水分散形塗料（NAD）":0.2},"labor":{"塗装工":0.029},"unit":"㎡"},{"id":54,"group":"既存塗膜の除去","name":"既存塗膜除去","spec":"鉄鋼面・亜鉛めっき鋼面 RA種","src":"表A2-2-44","plus":false,"mats":{"研磨紙":0.85},"labor":{"塗装工":0.1},"unit":"㎡"},{"id":55,"group":"既存塗膜の除去","name":"既存塗膜除去","spec":"鉄鋼面・亜鉛めっき鋼面 RB種","src":"表A2-2-44","plus":false,"mats":{"研磨紙":0.25},"labor":{"塗装工":0.028},"unit":"㎡"},{"id":56,"group":"既存塗膜の除去","name":"既存塗膜除去","spec":"コンクリート・モルタル面 RA種","src":"表A2-2-44","plus":false,"mats":{"研磨紙":0.85},"labor":{"塗装工":0.06},"unit":"㎡"},{"id":57,"group":"既存塗膜の除去","name":"既存塗膜除去","spec":"コンクリート・モルタル面 RB種","src":"表A2-2-44","plus":false,"mats":{"研磨紙":0.25},"labor":{"塗装工":0.017},"unit":"㎡"},{"id":58,"group":"既存塗膜の除去","name":"既存塗膜除去","spec":"木部・ボード面 RA種","src":"表A2-2-44","plus":false,"mats":{"研磨紙":0.85},"labor":{"塗装工":0.054},"unit":"㎡"},{"id":59,"group":"既存塗膜の除去","name":"既存塗膜除去","spec":"木部・ボード面 RB種","src":"表A2-2-44","plus":false,"mats":{"研磨紙":0.25},"labor":{"塗装工":0.015},"unit":"㎡"},{"id":60,"group":"養生・清掃","name":"養生","spec":"外壁改修","src":"表A2-1-5","plus":false,"mats":{},"labor":{"普通作業員":0.015},"unit":"㎡"},{"id":61,"group":"養生・清掃","name":"整理清掃後片付け","spec":"外壁改修","src":"表A2-1-6","plus":false,"mats":{},"labor":{"軽作業員":0.07},"unit":"㎡"},{"id":62,"group":"養生・清掃","name":"養生","spec":"内部改修 塗装塗替え程度（床面積あたり）","src":"表A2-1-9","plus":false,"mats":{},"labor":{"普通作業員":0.004},"unit":"㎡"},{"id":63,"group":"養生・清掃","name":"整理清掃後片付け","spec":"内部改修 塗装塗替え程度（床面積あたり）","src":"表A2-1-10","plus":false,"mats":{},"labor":{"軽作業員":0.018},"unit":"㎡"}];
+var SK_LINES=300;
 </script>
 <script>
 function startApp(D) {
@@ -520,7 +644,11 @@ var esc = function (s) { return String(s === null || s === undefined ? '' : s).r
 var yen = function (n) { return Math.round(n).toLocaleString('ja-JP') + '円'; };
 var blankLine = function () { return { kubun: '', name: '', spec: '', qty: '', unit: '', price: '', disposal: false, memo: '', from: '', bg: undefined }; };
 var lines = [blankLine()];
-var TOPS = ['title', 'no', 'months', 'addKasetsu', 'addKanri', 'tax'], CHECKS = ['office', 'hosho', 'hoken', 'learn'];
+var TOPS = ['title', 'no', 'months', 'addKasetsu', 'addKanri', 'tax', 'eDirect', 'eDisposal', 'eMode', 'mDirect', 'mDisposal', 'mMode'], CHECKS = ['office', 'hosho', 'hoken', 'learn'];
+function partsNow() {
+  return [['elec', 'e'], ['mech', 'm']].map(function (x) { return { type: x[0], mode: $(x[1] + 'Mode').value === '含' ? '含' : '別', direct: skNum_($(x[1] + 'Direct').value), disposal: skNum_($(x[1] + 'Disposal').value) }; })
+    .filter(function (p) { return p.direct !== '' || p.disposal !== ''; });
+}
 
 $('kind').innerHTML = D.kinds.map(function (k) { return '<option>' + esc(k) + '</option>'; }).join('');
 $('job').innerHTML += D.jobs.map(function (j, i) { return '<option value="' + i + '">' + esc(j[1]) + '</option>'; }).join('');
@@ -529,7 +657,7 @@ $('mitsu').href = D.mitsuUrl; $('osaka').href = D.osakaUrl; $('joken').href = D.
 function sheetRows() { return lines.map(function (l) { return [l.kubun, l.name, l.spec, l.qty, l.unit, l.price, '', l.disposal, l.memo, '']; }); }
 function opts() {
   return { kind: $('kind').value, months: $('months').value, addKasetsu: skNum_($('addKasetsu').value), addKanri: skNum_($('addKanri').value),
-    office: !$('office').checked, hosho: $('hosho').checked, hoken: $('hoken').checked, taxPct: $('tax').value === '' ? 10 : $('tax').value };
+    office: !$('office').checked, hosho: $('hosho').checked, hoken: $('hoken').checked, taxPct: $('tax').value === '' ? 10 : $('tax').value, parts: partsNow() };
 }
 
 function lineAmount(l) { var q = skNum_(l.qty), p = skNum_(l.price); return (q === '' || p === '') ? '' : Math.floor(q * p + 1e-6); }
@@ -587,6 +715,7 @@ function calc() {
     return '<tr class="' + (i === 6 ? 'big' : i === 9 ? 'red' : '') + '"><td>' + esc(s[0]) + '<small>' + esc(s[2]) + '</small></td><td class="n">' + yen(s[1]) + '</td></tr>';
   }).join('') + '</table>' +
     (t.blank ? '<div class="warn">⚠ 単価が空の行が ' + t.blank + ' 行あります。その分は入っていません。</div>' : '') +
+    (t.badQty ? '<div class="warn">⚠ 数量が数字として読めない行が ' + t.badQty + ' 行あります。その行は金額に入っていません。</div>' : '') +
     (r.warns.length ? '<div class="warn">⚠ ' + esc(r.warns.join('\n⚠ ')) + '</div>' : '') +
     '<div class="hint" style="margin-top:8px;">※ 目安です。発注者の単価・補正・ランダム係数までは再現できません。</div>';
   $('tPrice').textContent = yen(r.price); $('tFloor').textContent = yen(r.floor);
@@ -647,11 +776,11 @@ $('job').addEventListener('change', function () {
   var j = D.jobs[Number($('job').value)];
   if ($('job').value !== '' && j) { $('title').value = j[1]; $('no').value = j[0]; changed(); }
 });
-TOPS.concat(['kind']).forEach(function (k) { $(k).addEventListener('input', changed); });
+TOPS.concat(['kind']).forEach(function (k) { $(k).addEventListener('input', changed); $(k).addEventListener('change', changed); });
 CHECKS.forEach(function (k) { $(k).addEventListener('change', changed); });
 $('reset').addEventListener('click', function () {
   if (!confirm('入力を全部消しますか？（覚えた単価は消えません）')) return;
-  lines = [blankLine()]; ['title', 'no', 'months', 'addKasetsu', 'addKanri'].forEach(function (k) { $(k).value = ''; }); $('job').value = '';
+  lines = [blankLine()]; ['title', 'no', 'months', 'addKasetsu', 'addKanri', 'eDirect', 'eDisposal', 'mDirect', 'mDisposal'].forEach(function (k) { $(k).value = ''; }); $('eMode').value = '別'; $('mMode').value = '別'; $('job').value = '';
   drawLines(); changed(); window.scrollTo(0, 0);
 });
 $('make').addEventListener('click', function () {
@@ -660,7 +789,8 @@ $('make').addEventListener('click', function () {
   var p = opts();
   p.title = $('title').value; p.no = $('no').value; p.tax = $('tax').value; p.learn = $('learn').checked;
   p.rows = lines.map(function (l) { return [l.kubun, l.name, l.spec, l.qty, l.unit, l.price, l.disposal, l.memo]; });
-  $('make').disabled = true; $('msg').textContent = 'つくっています…（10秒ほど）';
+  p.noLearn = lines.map(function (l, i) { return /^似た項目の単価|^手間の表から計算/.test(l.from) ? i : -1; }).filter(function (i) { return i !== -1; });   // 借りてきた単価・近い数字は覚えない
+  $('make').disabled = true; $('msg').textContent = 'つくっています…';
   google.script.run
     .withSuccessHandler(function (res) {
       $('make').disabled = false; $('msg').textContent = '';
@@ -677,10 +807,14 @@ $('back').addEventListener('click', function () { $('done').style.display = 'non
 /* ───── 数量書を読み込む ───── */
 var ymSets = [], ymItems = [];
 var YM_LIB = { xlsx: 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js', pdf: 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js',
-  pdfWorker: 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js', cmap: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/cmaps/' };
-function ymScript(url) {
+  pdfWorker: 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js', cmap: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/cmaps/',
+  xlsxSri: 'sha512-r22gChDnGvBylk90+2e/ycr3RVrDi8DIOkIGNhJlKfuyQM4tIRAI062MaV8sfjQKYVGjOBaZBOA87z+IhZE9DA==',
+  pdfSri: 'sha512-q+4liFwdPC/bNdhUpZx6aXDx/h77yEQtn4I1slHydcbZK34nLaR3cAeYSJshoxIOq3mjEf7xJE8YWIUHMn+oCQ==',
+  pdfWorkerSri: 'sha512-BbrZ76UNZq5BhH7LL7pn9A4TKQpQeNCHOo65/akfelcIBbcVvYWOFQKPXIrykE3qZxYjmDX573oa4Ywsc7rpTw==' };
+function ymScript(url, sri) {
   return new Promise(function (ok, ng) {
     var el = document.createElement('script'); el.src = url;
+    if (sri) { el.integrity = sri; el.crossOrigin = 'anonymous'; }     // 中身が1文字でも変わっていたら、ブラウザが読み込みを止める
     el.onload = ok; el.onerror = function () { ng(new Error('読み込みの部品を取れませんでした。電波のよい所でもう一度ためしてください。')); };
     document.head.appendChild(el);
   });
@@ -697,8 +831,11 @@ function ymReadFile(file) {
       return [{ label: file.name, grid: ymText_(text) }];
     }
     if (ext === 'pdf') {
-      return (window.pdfjsLib ? Promise.resolve() : ymScript(YM_LIB.pdf)).then(function () {
-        pdfjsLib.GlobalWorkerOptions.workerSrc = YM_LIB.pdfWorker;
+      return (window.pdfjsLib ? Promise.resolve() : ymScript(YM_LIB.pdf, YM_LIB.pdfSri)).then(function () {
+        // 読み取りの部品（ワーカー）も、中身を確かめてから使う
+        return fetch(YM_LIB.pdfWorker, { integrity: YM_LIB.pdfWorkerSri, mode: 'cors' }).then(function (r) { if (!r.ok) throw new Error('読み込みの部品を取れませんでした。'); return r.blob(); })
+          .then(function (b) { pdfjsLib.GlobalWorkerOptions.workerSrc = URL.createObjectURL(b); }, function () { throw new Error('読み込みの部品を取れませんでした。電波のよい所でもう一度ためしてください。'); });
+      }).then(function () {
         return pdfjsLib.getDocument({ data: buf, cMapUrl: YM_LIB.cmap, cMapPacked: true }).promise;
       }).then(function (doc) {
         var grid = [], chars = 0, n = Math.min(doc.numPages, 80), chain = Promise.resolve();
@@ -722,7 +859,7 @@ function ymReadFile(file) {
       });
     }
     if (ext === 'xlsx' || ext === 'xlsm' || ext === 'xls') {
-      return (window.XLSX ? Promise.resolve() : ymScript(YM_LIB.xlsx)).then(function () {
+      return (window.XLSX ? Promise.resolve() : ymScript(YM_LIB.xlsx, YM_LIB.xlsxSri)).then(function () {
         var wb = XLSX.read(new Uint8Array(buf), { type: 'array' });
         return wb.SheetNames.map(function (name) { return { label: name, grid: XLSX.utils.sheet_to_json(wb.Sheets[name], { header: 1, raw: false, defval: '' }) }; });
       });
@@ -877,7 +1014,7 @@ function bgOpen(i) {
 }
 function bgClose() { $('bgPanel').style.display = 'none'; bgLine = -1; }
 $('bgItem').addEventListener('change', function () { bgDraw(); });
-$('bgBusy').addEventListener('change', function () { try { localStorage.setItem(BGKEY, JSON.stringify({ busy: $('bgBusy').checked })); } catch (e) { /* なくても動く */ } bgDraw(true); });
+$('bgBusy').addEventListener('change', function () { try { localStorage.setItem(BGKEY, JSON.stringify({ busy: $('bgBusy').checked })); } catch (e) { /* なくても動く */ } bgDraw(); });
 $('bgOut').addEventListener('input', function (e) {
   var name = e.target.getAttribute('data-mat');
   if (!name) return;
@@ -904,42 +1041,82 @@ $('bgUse').addEventListener('click', function () {
 load();
 if (D.pick) { for (var pi = 0; pi < D.jobs.length; pi++) if (D.jobs[pi][0] === D.pick) { $('job').value = String(pi); $('title').value = D.jobs[pi][1]; $('no').value = D.pick; } }
 drawLines(); calc();
-$('gateOut').addEventListener('click', function (e) { e.preventDefault(); try { localStorage.removeItem(PASSKEY); } catch (err) {} location.reload(); });
+$('gateOut').addEventListener('click', function (e) { e.preventDefault(); try { PASSBOX.removeItem(PASSKEY); } catch (err) {} location.reload(); });
 }   // startApp ここまで
 
-var API_URL = "https://script.google.com/macros/s/AKfycbxmUCDufro7a-yv5X_Q4hiISVu7Zc1Va0AROjSskmRz3rr--_b7XpN-xorsQ5sB5Lqs_A/exec", PASSKEY = 'sekisan-pass-v1', apiPass = '';
-function apiCall(action, payload) {
-  return fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ pass: apiPass, action: action, payload: payload }), redirect: 'follow' })
-    .then(function (r) { if (!r.ok) throw new Error('つながりませんでした（' + r.status + '）。'); return r.text(); }, function () { throw new Error('つながりませんでした。電波を確かめて、もう一度ためしてください。\n（何度やってもだめなときは、保存先の準備がまだ済んでいません）'); })
-    .then(function (t) { try { return JSON.parse(t); } catch (e) { throw new Error('保存先の準備がまだ済んでいません。'); } })
-    .then(function (j) { if (!j.ok) { var e = new Error(j.error || 'できませんでした。'); e.badPass = j.badPass === true; throw e; } return j.data; });
+var SUPA_URL = "https://uniutujwbmwijizjdoyp.supabase.co", SUPA_KEY = "sb_publishable_T8oC_65bBzsHNoj1dBHP-Q_3wkv-zoi", PASSKEY = 'sekisan-pass-v1', PASSBOX = sessionStorage, apiPass = '', apiCompany = '';
+function rpc(fn, args) {
+  var body = { p_pass: apiPass }; for (var k in (args || {})) body[k] = args[k];
+  return fetch(SUPA_URL.replace(/\/+$/, '') + '/rest/v1/rpc/' + fn, { method: 'POST', headers: { 'Content-Type': 'application/json', apikey: SUPA_KEY, Authorization: 'Bearer ' + SUPA_KEY }, body: JSON.stringify(body) })
+    .then(function (r) { return r.text().then(function (t) { return { ok: r.ok, status: r.status, text: t }; }); }, function () { throw new Error('つながりませんでした。電波を確かめて、もう一度ためしてください。'); })
+    .then(function (x) {
+      var j = null; try { j = x.text === '' ? null : JSON.parse(x.text); } catch (e) { j = null; }
+      if (x.ok && j && j.qb_error) {
+        var e1 = new Error(j.qb_error === 'badpass' ? '合言葉がちがいます。' : j.qb_error === 'locked' ? '合言葉を何度もまちがえたので、しばらく開けません。15分ほど待ってから、もう一度ためしてください。' : '合言葉がまだ決まっていません。');
+        e1.badPass = j.qb_error === 'badpass'; throw e1;
+      }
+      if (x.ok) return j;
+      var e2 = new Error(j && j.message ? j.message : '保存先につながりませんでした（' + x.status + '）。');
+      e2.badPass = !!(j && j.code === 'P0002');
+      throw e2;
+    });
 }
-// 元のページの「google.script.run」を、受け口への呼び出しに置きかえる
+// 開くときの中身を、元のページと同じ形に直す
+function apiCall(action) {
+  return rpc('qb_load').then(function (d) {
+    var prices = {}, rl = '', ro = '';
+    (d.bg || []).forEach(function (b) { if (b[1] === BG.RATE_LABOR) rl = b[3]; else if (b[1] === BG.RATE_OTHER) ro = b[3]; else if (b[3] !== null && b[3] !== '') prices[b[1]] = Number(b[3]); });
+    apiCompany = d.company || '';
+    return { kinds: SK.KINDS, lines: SK_LINES, jobs: [], master: (d.master || []).map(function (m) { return [m[0], m[1], m[2], Number(m[3]), m[4] || '']; }),
+      bg: { items: BG_ITEMS, prices: prices, rateLabor: rl === null ? '' : rl, rateOther: ro === null ? '' : ro, units: BG.UNITS, sheet: BG.SHEET }, mitsuUrl: '', jokenUrl: '', osakaUrl: '', pick: '' };
+  });
+}
+// 内訳書：この端末で計算して組み立て、控えを残してから、別の画面で開けるようにする
+function makeLocal(p) {
+  var rows = (p.rows || []).slice(0, SK_LINES).map(function (r) { return [String(r[0] || '').trim(), String(r[1] || '').trim(), String(r[2] || '').trim(), skNum_(r[3]), String(r[4] || '').trim(), skNum_(r[5]), '', r[6] === true, String(r[7] || '').trim(), '']; });
+  var t = skTotal_(rows), tax = skNum_(p.tax) === '' ? 10 : skNum_(p.tax);
+  var res = sekisanCalc_({ kind: p.kind, months: p.months, direct: t.direct, disposal: t.disposal, addKasetsu: skNum_(p.addKasetsu), addKanri: skNum_(p.addKanri), office: p.office === true, hosho: p.hosho === true, hoken: p.hoken === true, taxPct: tax, parts: p.parts || [] });
+  if (!res.ok) return Promise.reject(new Error(res.errors.join('\n')));
+  if (!String(p.title || '').trim()) return Promise.reject(new Error('工事名を入れてください。'));
+  var now = new Date(), pad = function (n) { return (n < 10 ? '0' : '') + n; };
+  var name = '内訳書_' + String(p.title).replace(/[\\\/:*?"<>|]/g, '').slice(0, 40) + '_' + now.getFullYear() + pad(now.getMonth() + 1) + pad(now.getDate()) + '-' + pad(now.getHours()) + pad(now.getMinutes());
+  var html = sekisanHtml_({ title: p.title, no: p.no, date: now.getFullYear() + '年' + (now.getMonth() + 1) + '月' + now.getDate() + '日', company: apiCompany, kind: p.kind, res: res, groups: skGroups_(rows), blank: t.blank });
+  // 画面で見るとき用に、題名と「印刷／PDFに保存」のボタンを足す（印刷には出ない）
+  html = html.replace('<head>', '<head><meta name="viewport" content="width=device-width, initial-scale=1"><title>' + skEsc_(name) + '</title><style>@media screen{body{padding:14px;max-width:820px;margin:0 auto;}}@media print{.noprint{display:none;}}.noprint{position:sticky;top:0;background:#fff;padding:8px 0 12px;text-align:center;}.noprint button{font-size:17px;font-weight:bold;color:#fff;background:#1a3a5f;border:0;border-radius:8px;padding:12px 22px;}</style>')
+    .replace('<body>', '<body><div class="noprint"><button onclick="window.print()">印刷する／PDFに保存する</button></div>');
+  var skip = {}; (p.noLearn || []).forEach(function (i) { skip[Number(i)] = true; });
+  var learnRows = p.learn === true ? rows.filter(function (r, i) { return !skip[i] && r[1] && r[5] !== '' && r[3] !== ''; }).map(function (r) { return [r[1], r[2], r[4], String(r[5])]; }) : [];
+  return rpc('qb_make', { p: { title: p.title, no: String(p.no || ''), kind: p.kind, price: res.price, total: res.total, floor: res.floor, blank: t.blank, learn: p.learn === true, rows: learnRows, payload: { input: p, name: name, html: html } } })
+    .then(function (r) { return { ok: true, url: URL.createObjectURL(new Blob([html], { type: 'text/html;charset=utf-8' })), name: name, price: res.price, floor: res.floor, total: res.total, blank: t.blank, learned: (r && r.learned) || 0 }; });
+}
+// 元のページの「google.script.run」を、上の呼び出しに置きかえる
 var google = { script: {} };
 Object.defineProperty(google.script, 'run', { get: function () {
   var ok = function () {}, ng = function () {};
-  var go = function (action) { return function (p) { apiCall(action, p).then(ok, ng); }; };
-  var r = { withSuccessHandler: function (f) { ok = f; return r; }, withFailureHandler: function (f) { ng = f; return r; }, sekisanWebMake: go('make'), bugakariSave: go('saveMat') };
+  var r = { withSuccessHandler: function (f) { ok = f; return r; }, withFailureHandler: function (f) { ng = f; return r; },
+    sekisanWebMake: function (p) { makeLocal(p).then(ok, ng); }, bugakariSave: function (p) { rpc('qb_save_mat', { p_prices: p }).then(ok, ng); } };
   return r;
 } });
 (function () {
-  var g = function (id) { return document.getElementById(id); }, started = false;
+  var g = function (id) { return document.getElementById(id); }, started = false, turn = 0;
   function open(pass, quiet) {
+    var mine = ++turn;       // あとから押した分だけを生かす（前の分の返事は捨てる）
     apiPass = pass; g('gateGo').disabled = true; g('gateMsg').style.color = '#5f6368'; g('gateMsg').textContent = '開いています…';
     apiCall('load', null).then(function (data) {
       if (started) return; started = true;
-      try { localStorage.setItem(PASSKEY, pass); } catch (e) {}
+      try { PASSBOX.setItem(PASSKEY, pass); } catch (e) {}
       g('gate').style.display = 'none'; g('form').style.display = 'block'; g('bar').style.display = 'block';
       startApp(data);
     }).catch(function (e) {
+      if (started || mine !== turn) return;
       g('gateGo').disabled = false; g('gateMsg').style.color = '#c5221f';
-      if (e.badPass) { try { localStorage.removeItem(PASSKEY); } catch (err) {} }
+      if (e.badPass) { try { PASSBOX.removeItem(PASSKEY); } catch (err) {} }
       g('gateMsg').textContent = quiet && e.badPass ? '合言葉を入れてください。' : String(e.message || e);
     });
   }
   g('gateGo').addEventListener('click', function () { var p = g('gatePass').value.trim(); if (!p) { g('gateMsg').textContent = '合言葉を入れてください。'; return; } open(p, false); });
   g('gatePass').addEventListener('keydown', function (e) { if (e.key === 'Enter') g('gateGo').click(); });
-  var saved = ''; try { saved = localStorage.getItem(PASSKEY) || ''; } catch (e) {}
+  var saved = ''; try { saved = PASSBOX.getItem(PASSKEY) || ''; } catch (e) {}
   if (saved) open(saved, true);
 })();
 </script>
