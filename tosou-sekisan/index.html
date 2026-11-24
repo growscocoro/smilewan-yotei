@@ -1212,7 +1212,7 @@ Object.defineProperty(google.script, 'run', { get: function () {
       if (e.badPass) { try { PASSBOX.removeItem(PASSKEY); } catch (err) {} }
       // まだ合言葉が無いとき：受付中なら、いま入れた言葉を最初の合言葉にできる
       if (e.noPass && !quiet) {
-        if (pass.length < 8) { g('gateMsg').textContent = 'まだ合言葉が決まっていません。最初の合言葉は、8文字以上で入れてください。'; return; }
+        if (pass.length < 4) { g('gateMsg').textContent = 'まだ合言葉が決まっていません。最初の合言葉は、4文字以上で入れてください。'; return; }
         if (!confirm('まだ合言葉が決まっていません。\nいま入れた言葉を、このページの合言葉にしますか？\n（決めたあとは、この言葉を知っている人だけが開けます）')) { g('gateMsg').textContent = '合言葉は決めていません。'; return; }
         g('gateGo').disabled = true; g('gateMsg').style.color = '#5f6368'; g('gateMsg').textContent = '合言葉を決めています…';
         fetch(SUPA_URL.replace(/\/+$/, '') + '/rest/v1/rpc/qb_first', { method: 'POST', headers: { 'Content-Type': 'application/json', apikey: SUPA_KEY, Authorization: 'Bearer ' + SUPA_KEY }, body: JSON.stringify({ p_pass: pass }) })
