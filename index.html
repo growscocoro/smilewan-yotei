@@ -511,7 +511,7 @@
       </details>
       <label>文章のスタイル</label>
       <div class="radio-row">
-        <label class="check"><input type="radio" name="recStyle" value="tokki" checked> 特記事項（介護＝ヘルパーが行う／障害＝自立に向けた支援）</label>
+        <label class="check"><input type="radio" name="recStyle" value="tokki" checked> 特記事項（介護＝支援した内容／障害＝自立に向けた支援）</label>
         <label class="check"><input type="radio" name="recStyle" value="std"> 定型（丁寧な記録文）</label>
         <label class="check"><input type="radio" name="recStyle" value="short"> 短め</label>
       </div>
@@ -831,7 +831,7 @@ async function setSetting(key, localKey, list, opt = {}) {
 const SUPA = { url: '', key: '' }; // 旧（使わない）
 const GAS = {"url": "https://script.google.com/macros/s/AKfycbxKEAUthQx9wiZKncHZR43jbSKjPfO2lYhlc2K5yXWJNXI_zA8wChdQTFlINEhLTDQO/exec"};           // 保存先（Googleドライブに保存するGAS）。build-site.sh が入れる
 // 版の確認：公開版が新しくなったら知らせ、古い版のままでは記録を保存しない（古い決まりで上書きしないため）
-const APP_VER = '20261119103924';
+const APP_VER = '20261124144853';
 let appOutdated = false;
 async function checkVer() {
   if (APP_VER === 'dev' || appOutdated) return appOutdated;
@@ -1063,6 +1063,12 @@ async function initCloud() {
   });
 }
 // ---- 区分（介護／障害）: 利用者情報に保存。未設定なら予定表の書き方から推測（身体1生活1・入浴（身体2）など＝介護保険の書き方→介護） ----
+// 11/24 ユーザー「本人って言うのを丁寧語にするのにして」（→ご本人）「ヘルパーの名前を入れないようにして」：
+//   文の中は今までどおり「本人」で作る（文の決まりがこの言葉で動くため）。画面・コピー・Word・印刷・書き出しに出す時に「ご本人」に直す（介護の方は「利用者様」のまま）
+//   「ヘルパーが」「ヘルパーにて」などは書かない（作る時も、出す時も外す）
+const noHelper = t => String(t || '').replace(/ヘルパー(が|にて|では|で|は|と|も)?/g, '').replace(/、{2,}/g, '、').replace(/(^|。)、/g, '$1');
+function honor(t, name) { t = noHelper(t); return kubunOf(String(name || state.name || '').trim()) === '介護' ? t : t.replace(/(?<!ご)本人(?!様)/g, 'ご本人'); }
+const unhonor = t => String(t || '').replace(/ご本人/g, '本人');
 function guessKubun(days) { return (days || []).some(d => dayEntries(normDay(d)).some(e => /身体\s*\d|生活\s*\d/.test(e.type || ''))) ? '介護' : '障害'; }
 function kubunOf(name) {
   const c = clientDoc(name || ' ');
@@ -5027,7 +5033,7 @@ const ITEM_SENT = {
   '自立支援|通院・外出介助': ['外出時は側について見守った。', '外出時は本人の側について見守った。'],
   '自立支援|起床就寝介助': ['起床・就寝は利用者様が行い、声掛けで見守った。', '起床・就寝は本人が行い、声掛けで見守った。'],
   '自立支援|服薬': ['服薬は利用者様が行い、側で見守った。', '服薬は本人が行い、側で見守った。'],
-  '清掃|居室': ['ヘルパーが居室の掃除を行った。', '居室の掃除を行い、生活スペースを整えた。'], '清掃|トイレ': ['トイレの清掃を行った。', 'トイレの清掃を行った。'],
+  '清掃|居室': ['居室の掃除を行った。', '居室の掃除を行い、生活スペースを整えた。'], '清掃|トイレ': ['トイレの清掃を行った。', 'トイレの清掃を行った。'],
   '清掃|ポータブルトイレ': ['ポータブルトイレの洗浄・清掃を行った。', 'ポータブルトイレの洗浄・清掃を行った。'], '清掃|卓上': ['テーブルなど卓上を拭き、整えた。', 'テーブルなど卓上を拭き、整えた。'],
   '清掃|台所': ['台所の清掃を行った。', '台所の清掃を行った。'], '清掃|浴室': ['浴室の清掃を行った。', '浴室の清掃を行った。'], '清掃|玄関': ['玄関の掃き掃除を行った。', '玄関の掃き掃除を行った。'], '清掃|ゴミ出し': ['ゴミをまとめ、ゴミ出しを行った。', 'ゴミの分別を本人と確認し、ゴミ出しを行った。'],
   '洗濯|洗濯': ['洗濯を行った。', '洗濯を行った。'], '洗濯|乾燥（物干し）': ['洗濯物を干した。', '洗濯物を干した。'], '洗濯|取入れ・収納': ['洗濯物を取り入れて畳み、収納した。', '洗濯物を取り入れて畳み、収納場所を本人と確認した。'], '洗濯|アイロン': ['アイロンがけを行った。', 'アイロンがけを行った。'],
@@ -5748,6 +5754,7 @@ function uniqueText(row, others) {
   }
   t = nextLink(row, dedupeText(orderFix(consistText(row, addMore(row, fitTime(row, mnText(row, withVin(row, withKd(row, withPlan(row, t)))))))))); const keep = row.text; row.text = t; kpFromText(row); row.text = keep;
   t = t.split(/(?<=。)/).filter(x => !SENSITIVE_RE.test(x)).join(''); // 記録に薬の種類・病名・症状は書かない（11/19）
+  t = noHelper(t); // 「ヘルパーが／ヘルパーにて」は書かない（11/24）
   return t;
 }
 function dupGroups() {
@@ -5788,7 +5795,7 @@ async function showStaffMonth() {
       const rs = d.rows.map(savedRowToRec); recRows = rs; // その利用者のその月の全訪問を recRows に（「その日の最後の訪問」の決まり＝服薬の声かけなどは、同じ日のほかの訪問を見て決まる。11/17 担当者別のWordで服薬の声かけが抜けた）
       d.rows.filter(x => splitStaff(x.staff).includes(k)).forEach(x => {
         const r = rs[d.rows.indexOf(x)], tm = entryTime(r.e);
-        items.push({ c, kub: kubunOf(c), date: r.date, s: tm.s || '', e: tm.e || '', min: tm.s && tm.e ? Math.max(0, hm(tm.e) - hm(tm.s)) : 0, type: r.e.type || '', label: recLabel(r), staff: r.staff || '', text: String(r.text || ''), fields: kpFieldsLine(r), lines: kpLinesHtml(r), check: checkText(r) });
+        items.push({ c, kub: kubunOf(c), date: r.date, s: tm.s || '', e: tm.e || '', min: tm.s && tm.e ? Math.max(0, hm(tm.e) - hm(tm.s)) : 0, type: r.e.type || '', label: recLabel(r), staff: r.staff || '', text: honor(String(r.text || ''), c), fields: kpFieldsLine(r), lines: kpLinesHtml(r), check: checkText(r) });
       });
     }
     state.name = keep; recRows = keepRows;
@@ -6159,10 +6166,10 @@ function renderRecordView() {
       ${r.flag ? `<span class="flag">${esc(r.flag)}</span>` : ''}</td>
     <td class="staff"><select onchange="recRows[${i}].staff=this.value;recRows[${i}].staffEdited=true;recRows[${i}].staffFromShift=false;refreshMedNext(${i});markRecDirty()">${staffOptions(r.staff)}</select></td>
     <td class="kind">${r.kind}<br><small style="color:var(--muted)">${esc(r.e.type)}</small></td>
-    <td class="txt">${ngIdx.has(i) ? ngHits(r.text).map(w => `<span class="ng-badge">NG「${esc(w)}」</span>`).join('') : ''}${dupIdx.has(i) ? `<span class="dup-badge">⚠ 同じ文章（${dupIdx.get(i)}）</span>` : ''}${r.on !== false && (r.noShift || /シフトに無い予定（シフトを確認）/.test(r.flag || '')) ? '<span class="dup-badge">⚠ シフトに無い訪問</span>' : ''}<span class="ng-badge" id="lenw${i}" style="${String(r.text || '').length > TEXT_MAX ? '' : 'display:none'}">⚠ ${String(r.text || '').length}字（${TEXT_MAX}字まで）</span><textarea oninput="recRows[${i}].text=this.value;liveV(${i},this)" onchange="kpFromText(recRows[${i}]);renderRecordView();markRecDirty()">${esc(r.text)}</textarea></td>
+    <td class="txt">${ngIdx.has(i) ? ngHits(r.text).map(w => `<span class="ng-badge">NG「${esc(w)}」</span>`).join('') : ''}${dupIdx.has(i) ? `<span class="dup-badge">⚠ 同じ文章（${dupIdx.get(i)}）</span>` : ''}${r.on !== false && (r.noShift || /シフトに無い予定（シフトを確認）/.test(r.flag || '')) ? '<span class="dup-badge">⚠ シフトに無い訪問</span>' : ''}<span class="ng-badge" id="lenw${i}" style="${String(r.text || '').length > TEXT_MAX ? '' : 'display:none'}">⚠ ${String(r.text || '').length}字（${TEXT_MAX}字まで）</span><textarea oninput="recRows[${i}].text=unhonor(this.value);liveV(${i},this)" onchange="kpFromText(recRows[${i}]);renderRecordView();markRecDirty()">${esc(honor(r.text))}</textarea></td>
     ${recCheckCell(r, i)}
     <td class="act"><button class="small" title="別の言い回し" onclick="recRows[${i}].text=withMedNext(recRows[${i}],uniqueText(recRows[${i}],recRows.filter((_,j)=>j!==${i})));renderRecordView()">↻</button>
-      <button class="small" title="文章をコピー" onclick="copyText(recRows[${i}].text,this)">📋</button><br>
+      <button class="small" title="文章をコピー" onclick="copyText(honor(recRows[${i}].text),this)">📋</button><br>
       <button class="small" title="感情・状態を選んで文に追加" style="margin-top:4px" onclick="openStatePop(${i},this)">😊様子</button></td>
   </tr>`).join('')}</table>`;
   applyMonthLockUI(); renderMonthLock();
@@ -6335,7 +6342,7 @@ function appendState(i, k) {
   const r = recRows[i]; const t = statePhrase(k);
   r.text = (r.text || '').replace(/\s+$/, '') + t; markRecDirty();
   const ta = document.querySelector(`#recordView tr:nth-child(${i + 2}) td.txt textarea`);
-  if (ta) { ta.value = r.text; ta.style.borderColor = 'var(--accent)'; setTimeout(() => ta.style.borderColor = '', 600); }
+  if (ta) { ta.value = honor(r.text); ta.style.borderColor = 'var(--accent)'; setTimeout(() => ta.style.borderColor = '', 600); }
 }
 let popRow = -1;
 function openStatePop(i, btn) {
@@ -6376,7 +6383,7 @@ function copyRecordsTsv() {
   if (!rows.length) { alert('出力する行がありません'); return; }
   if (!dupConfirm()) return;
   saveRecords({ quiet: true });
-  const tsv = ['日時\t担当\t種別\t実施項目\t記録', ...rows.map(r => [fmtKaipoke(r.date, r.e), r.staff, r.kind, kpText(r), r.text.replace(/\t|\n/g, ' ')].join('\t'))].join('\n');
+  const tsv = ['日時\t担当\t種別\t実施項目\t記録', ...rows.map(r => [fmtKaipoke(r.date, r.e), r.staff, r.kind, kpText(r), honor(r.text).replace(/\t|\n/g, ' ')].join('\t'))].join('\n');
   copyText(tsv); alert(`${rows.length}件をコピーしました（Excelに貼り付けできます）`);
 }
 async function exportRecordsXlsx() {
@@ -6385,7 +6392,7 @@ async function exportRecordsXlsx() {
   if (!dupConfirm()) return;
   const name = (state.name || '').trim();
   const aoa = [];
-  rows.forEach(r => { aoa.push([fmtKaipoke(r.date, r.e)]); aoa.push([r.staff]); aoa.push([r.kind, '', r.text]); aoa.push([]); });
+  rows.forEach(r => { aoa.push([fmtKaipoke(r.date, r.e)]); aoa.push([r.staff]); aoa.push([r.kind, '', honor(r.text)]); aoa.push([]); });
   try { await loadLib('xlsx'); } catch {}
   if (window.XLSX) {
     const wb = XLSX.utils.book_new();
@@ -6472,7 +6479,7 @@ function docxCheckTable(D, r, FONT, avail) {
   row('買物等', [...items('買物等', ['日常品等の買物', '薬の受取り']), opt('預り', v.預り && v.預り + '円'), opt('購入', v.購入 && v.購入 + '円'), opt('お釣', v.お釣 && v.お釣 + '円'), opt('内訳', v.内訳)]);
   // 特記事項（文章）：10.5pt。残りの高さいっぱいまで欄を伸ばす（文章が長くて入らないときは自然な高さ）
   // 文章が長くて残りの高さに入らないときは、文字を少し小さくして1ページに収める（10.5pt→9.5pt→9pt→8.5pt）（10/30：手順書の文で長くなり2ページにはみ出していた）
-  const text = String(r.text || '').replace(/\n/g, ''), room = (avail || 0) - used - 300, FS = [[21, 330, 37], [19, 300, 41], [18, 280, 43], [17, 260, 46]];
+  const text = honor(r.text).replace(/\n/g, ''), room = (avail || 0) - used - 300, FS = [[21, 330, 37], [19, 300, 41], [18, 280, 43], [17, 260, 46]];
   let [sz, TL, cpl] = FS[0]; for (const f of FS) { [sz, TL, cpl] = f; if (Math.max(3, Math.ceil(wlen(text) / cpl)) * TL + PAD <= room) break; }
   const natural = Math.max(3, Math.ceil(wlen(text) / cpl)) * TL + PAD;
   const minH = Math.max(natural, Math.floor((avail || 0) - used - 100));
@@ -6570,7 +6577,7 @@ async function exportRecordsPdf(mode) {
   const itemsHtml = r => `<div style="font-size:11px;line-height:1.6">${kpLinesHtml(r).replace(/<b>/g, '<b style="display:inline-block;min-width:78px;color:#333">').replace(/<i[^>]*>/g, '<span style="display:inline-block;margin-right:8px;white-space:nowrap">').replace(/<\/i>/g, '</span>') || '（なし）'}</div>`;
   const rowHtml = r => chkMode
     ? `<tr>${dateCell(r)}<td style="${cell}font-size:11px">${esc(r.kind)}<br>${esc(String(r.e.detail || '').replace(/\n/g, '・'))}</td><td style="${cell}">${fieldsHtml(r)}</td><td style="${cell}">${itemsHtml(r)}</td></tr>`
-    : `<tr>${dateCell(r)}<td style="${cell}">${esc(r.kind)}</td><td style="${cell}line-height:1.55;white-space:pre-wrap">${esc(r.text)}</td></tr>`;
+    : `<tr>${dateCell(r)}<td style="${cell}">${esc(r.kind)}</td><td style="${cell}line-height:1.55;white-space:pre-wrap">${esc(honor(r.text))}</td></tr>`;
   const newPage = () => {
     const pg = document.createElement('div');
     pg.style.cssText = `width:${W}px;height:${H}px;padding:${PAD}px;box-sizing:border-box;background:#fff;color:#000;font-family:"Hiragino Kaku Gothic ProN","Hiragino Sans","Yu Gothic","Meiryo",sans-serif;font-size:13px;position:relative;`;
