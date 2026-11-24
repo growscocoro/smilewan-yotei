@@ -1,0 +1,913 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>精神訪問看護 記録文作成ツール</title>
+<style>
+:root{--bg:#f6f4ef;--card:#fff;--line:#d9d4c7;--ink:#222;--sub:#6b6658;--acc:#e08a00;--accbg:#fff3dc;--ok:#1f7a4d}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Hiragino Sans","Yu Gothic UI","Meiryo",sans-serif;font-size:16px;line-height:1.6}
+header{background:var(--acc);color:#fff;padding:10px 16px;display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+header h1{font-size:18px;margin:0;flex:1 0 auto}
+header small{opacity:.95;flex:1 1 260px}
+.wrap{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px;padding:16px;max-width:1400px;margin:0 auto}
+@media(max-width:900px){.wrap{grid-template-columns:1fr}}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin-bottom:12px}
+.card h2{font-size:16px;margin:0 0 8px;border-left:5px solid var(--acc);padding-left:8px}
+.card.slim{padding:8px 12px;margin-bottom:8px}
+.ttl{font-weight:bold;border-left:5px solid var(--acc);padding-left:8px}
+.pick{color:#7a4a00;background:var(--accbg);border-radius:6px;padding:1px 8px;margin-left:10px;font-weight:normal;font-size:14px}
+details.slim>summary{list-style:none;padding:8px 0;font-size:16px}
+.nextrow{justify-content:space-between;align-items:center;margin-top:14px}
+.nextrow .cnt{color:var(--sub);font-size:14px}
+/* 1つずつ選ぶ画面：出すのは今の1項目だけ */
+body.wiz #form details.slim:not([open]),body.wiz #form .more,body.wiz .out{display:none}
+body.wiz #form details.slim>summary{pointer-events:none;font-size:20px}
+body.wiz #form details.slim{margin-bottom:12px}
+.prevbox{margin-top:16px;padding:8px 12px}
+.prevbox>summary{font-weight:normal;color:var(--sub);font-size:14px}
+#left{margin:6px 0}
+body.wiz #form details.slim>summary::after{content:none}
+body.wiz .wrap{display:block;max-width:720px;margin:0 auto}
+body.wiz.kz #form,body.wiz.fin #form{display:none}
+body.wiz.kz .out,body.wiz.fin .out{display:block}
+body.wiz.kz .out>*:not(#kpanel){display:none}
+body.wiz.fin #kpanel{display:none!important}
+body:not(.wiz) .wizonly{display:none}
+body:not(.wiz) .nextrow .back,body:not(.wiz) .nextrow .cnt{display:none}
+body:not(.wiz) .nextrow{justify-content:flex-end}
+.nextrow .btn{font-size:15px;padding:8px 18px}
+details.slim>summary::-webkit-details-marker{display:none}
+details.slim>summary::after{content:'＋';float:right;color:var(--sub)}
+details.slim[open]>summary::after{content:'－'}
+summary{font-weight:bold;cursor:pointer}
+.dot{color:var(--acc);font-size:13px;margin-left:6px}
+.warn{background:#fde8e6;border:1px solid #d33;color:#a00000;padding:8px 10px;border-radius:6px;font-weight:bold;margin-top:6px}
+.sv{border-top:1px solid var(--line);padding:8px 0;font-size:14px}
+.sub{margin:6px 0 6px 14px}
+.sub>summary{font-weight:normal;font-size:14px;color:var(--sub);padding:4px 0}
+.more{margin-top:16px}
+.more>summary{padding:8px 4px;color:var(--sub)}
+.more[open]>summary{margin-bottom:8px}
+.sec{font-size:14px;font-weight:bold;color:var(--sub);margin:18px 0 6px}
+.row{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:6px 0}
+.row .lab{font-size:13px;color:var(--sub);min-width:4.5em;width:100%}
+.ind{margin-left:14px;padding-left:10px;border-left:2px dotted var(--line)}
+.chip{font:inherit;font-size:16px;padding:9px 16px;border:1px solid var(--line);border-radius:999px;background:#fff;color:var(--ink);cursor:pointer}
+.chip:hover{border-color:var(--acc)}
+.chip.on{background:var(--acc);border-color:var(--acc);color:#fff;font-weight:bold}
+.chip.sm{font-size:15px;padding:7px 13px}
+.chip.sm.on{background:var(--accbg);color:#7a4a00;border-color:var(--acc)}
+input[type=text],textarea{font:inherit;font-size:15px;width:100%;padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:#fff;color:var(--ink)}
+input[type=text]{max-width:420px}
+textarea{min-height:170px;resize:vertical}
+.out{position:sticky;top:12px;align-self:start;max-height:calc(100vh - 24px);overflow:auto}
+@media(max-width:900px){.out{position:static;max-height:none}}
+.btn{font:inherit;font-size:14px;padding:6px 14px;border:1px solid var(--acc);border-radius:6px;background:#fff;color:#7a4a00;cursor:pointer;white-space:nowrap}
+.btn.main{background:var(--acc);color:#fff;font-weight:bold}
+.btn.done{background:var(--ok);border-color:var(--ok);color:#fff}
+.head{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:6px}
+table{width:100%;border-collapse:collapse;font-size:14px}
+td{border-top:1px solid var(--line);padding:6px 4px;vertical-align:top}
+td:first-child{white-space:nowrap;color:var(--sub);width:1%}
+td:last-child{width:1%}
+.note{font-size:13px;color:var(--sub)}
+.empty{color:var(--sub);font-size:14px}
+</style>
+</head>
+<body>
+<header>
+  <h1>精神訪問看護 記録文作成ツール</h1>
+  <small>あてはまるものを選んで「次へ」。</small>
+  <button class="btn" id="mode">一覧で選ぶ</button>
+  <button class="btn" id="reset">全部消す</button>
+</header>
+<div class="wrap">
+  <div id="form"></div>
+  <div class="out">
+    <div class="card" id="kpanel" style="display:none"></div>
+    <div class="card">
+      <div class="head"><h2>全身状態フリー記入 に貼る文章</h2><button class="btn main" data-copy="zenshin">コピー</button></div>
+      <div class="row"><button class="btn wizonly" id="backsel">◀ 選び直す</button><button class="btn main" id="make" style="font-size:16px;padding:10px 20px">文章を作成する</button></div>
+      <div class="note" id="mknote"></div>
+      <textarea id="zenshin" placeholder="左で選び終わったら「文章を作成する」を押すと、ここに文章が出ます。"></textarea>
+      <div id="left"></div>
+      <details class="note"><summary>文章の設定</summary>
+        <label><input type="checkbox" id="nashi"> 押していない項目は「課題なし」と書く</label><br>
+        <label><input type="checkbox" id="midashi"> 【問題点】【改善案】【実施したこと】の見出しを付ける</label><br>
+        <label><input type="checkbox" id="atama" checked> 年代の特徴を文に入れる（「20代」などの数字は入れません）</label><br>
+        <label><input type="checkbox" id="kfirst"> 改善案を文の最初に書く</label><br>
+        <label><input type="checkbox" id="nagai"> 長い文章にする（400字くらい。外すと150字くらい）</label>
+      </details>
+      <div class="row"><input type="text" id="tag" placeholder="目印（なくてもよい・番号など。氏名は入れない）" style="max-width:300px"><button class="btn main" id="save">保存する</button></div>
+      <div id="warn"></div>
+    </div>
+    <div class="card" id="renkeiCard" style="display:none">
+      <div class="head"><h2>連携 に貼る文章</h2><button class="btn main" data-copy="renkei">コピー</button></div>
+      <textarea id="renkei" style="min-height:70px"></textarea>
+    </div>
+    <details class="card">
+      <summary>保存した文章（<span id="cnt">0</span>件）</summary>
+      <div id="saved"></div>
+    </details>
+    <details class="card">
+      <summary>各欄に入れる内容（チェックと かっこの中）</summary>
+      <div id="rows"></div>
+    </details>
+  </div>
+</div>
+<script>
+// ===== 選択肢の設定（ここを直せば選択肢を増やせます） =====
+const KADAI=[
+ {k:'食事',subs:[['不規則',['1日1食程度','1日2食程度','食事の時間がばらばら','買い置きの総菜で済ませている','調理の跡なし','間食が中心']],['拒食',['食事量が減少している','ほとんど食べていない','水分のみ摂取','食欲低下の訴えあり','体重減少あり']],['過食',['夜間に過食あり','間食が多い','体重増加あり','食べ過ぎて嘔吐あり']]]},
+ {k:'睡眠',subs:[['不眠',['ほとんど眠れていない','2〜3時間程度の睡眠','中途覚醒あり','日中の眠気の訴えあり','眠剤を使用しても眠れない']],['入眠困難',['入眠困難のみ','仕事のことで眠れない','入眠時刻が遅い','寝つきに1時間以上かかる','考えごとで寝つけない','眠剤使用で入眠できている']],['早朝覚醒',['3〜4時頃に目が覚める','再入眠できない']]]},
+ {k:'服薬',subs:[['不規則',['飲み忘れあり（週1〜2回）','飲み忘れあり（週3回以上）','就寝前薬の飲み忘れあり','飲む時間がばらばら','残薬あり']],['拒薬',['一部の薬を拒否','全ての薬を拒否','副作用の訴えあり','服薬の必要性を感じていない']],['怠薬',['数日分の残薬あり','自己判断による中断あり']]]},
+ {k:'保清',subs:[['やや不潔',['入浴は週1回程度','シャワーのみ','更衣が数日できていない','洗髪・整髪ができていない','促しにて更衣を実施']],['不潔',['入浴ができていない','洗濯ができていない','体臭あり','衣類の汚れあり']]]},
+ {k:'環境整備',subs:[['やや散乱',['衣類や物が床に置かれている','ごみ袋が数個溜まっている','動線が狭い']],['散乱',['ごみが溜まっている','足の踏み場がない','悪臭あり']]]},
+ {k:'金銭の扱い',subs:[['',['浪費の傾向あり','計画的に使えていない','支払いの遅れあり','使いみちの記憶があいまい','家族が管理している','金銭面の不安の訴えあり']]]},
+ {k:'対人関係',subs:[['',['家族との口論が増えている','家族との意見の食い違いあり','近隣とのトラブルあり','近隣とはあいさつのみ','対人場面を避ける様子あり','孤立の傾向あり']]]},
+];
+const KANRI=[['服薬なし',[]],['自己管理',['服薬カレンダー使用','一包化','飲み忘れなし','副作用の訴えなし']],['一部他者管理',['家族','ヘルパー','訪問看護師','薬局']],['全て他者管理',['家族','ヘルパー','訪問看護師','薬局']]];
+const KATSUDO={頻度:['月に数回外出','週1〜2回外出','週3回以上外出','ほぼ毎日外出'],外出先:['買い物','通院','デイケア','作業所','散歩'],過ごし方:['自宅で過ごすことが多い','日中は臥床がち','自室にこもりがち','テレビを見て過ごす','家事は自分で行っている','昼夜逆転の傾向あり','外出時の不安の訴えあり']};
+// 外出あり・外出なし それぞれの選択肢
+const GAISHUTSU={
+ あり:{頻度:['月に数回','週1〜2回','週3回以上','ほぼ毎日'],
+  先:['買い物','通院','散歩','デイケア','作業所','仕事','学校','外食','友人・家族に会う','役所・銀行の用事','趣味・習いごと'],
+  同伴:['一人で','家族と','支援者と'],
+  手段:['徒歩','自転車','バス・電車','車','タクシー'],
+  様子:['問題なく外出できている','短時間であれば外出できている','外出前の準備に時間がかかる','人混みでは不安が強くなる','外出後に疲労感がみられる','帰宅後は落ち着いて過ごしている']},
+ なし:{期間:['ここ数日','1週間ほど','1か月以上','長期間'],
+  理由:['意欲の低下','不安の強さ','人目が気になること','体調不良','体力への不安','外出する用事がないこと','天候や暑さ寒さ','金銭面の心配'],
+  用事:['買い物は家族が行っている','買い物は宅配・ネットを利用している','買い物はヘルパーが支援している','通院時のみ外出している'],
+  気持ち:['本人は外出したい気持ちがあると話す','本人は外出を希望していない','声をかければ外出できそうな様子である']},
+};
+const GLAB={頻度:'回数',先:'外出先',同伴:'だれと',手段:'行き方',様子:'外出時の様子',期間:'いつから',理由:'理由',用事:'買い物・通院など',気持ち:'本人の気持ち'};
+const SEISHIN={表情:['穏やか','明るい','暗い','硬い','乏しい'],言動:['落ち着いた様子で会話','口数は少ない','多弁','不安の訴えあり','気分の落ち込みあり','意欲低下あり','幻聴の訴えあり','被害的な内容の訴えあり','独語あり','興奮・易怒性あり','希死念慮の訴えあり']};
+const CARE=[
+ ['薬剤管理',['内服介助','内服確認','内服セット']],
+ ['清潔援助',['入浴介助','部分浴','洗髪','更衣','整容','寝具交換','口腔ケア','義歯洗浄']],
+ ['排泄援助',['トイレ介助','陰部洗浄','おむつ交換','温罨法','マッサージ','摘便','浣腸','座薬挿入']],
+ ['食事介助',[]],['飲水介助',[]],['皮膚・創部の処置',[]],['身体リハビリテーション',[]],
+ ['生活リハビリテーション',['調理','掃除','整頓','その他']],
+ ['受診状況確認',['定期受診できている','次回受診日を確認']],['受診介助',[]],
+ ['精神支援',['コミュニケーション','訴えを否定せず傾聴','不安の軽減','服薬状況を本人と確認','生活リズムを一緒に振り返り','本人の取り組みを確認し共有','リラクゼーション法（深呼吸）を提案','次回訪問日を確認']],
+];
+const SHIDO=[
+ ['情報提供',['受診について','服薬について','生活リズムについて','社会資源について','栄養補助食品の活用について']],
+ ['自己管理方法指導',['服薬の必要性を説明','睡眠・服薬の記録方法を提案','水分・食事のとり方を一緒に検討','短時間の活動から始めるよう助言','症状が悪化した時の対処を確認','金銭の使い方を一緒に確認']],
+ ['家族指導',['関わり方を助言','服薬の見守りを依頼','緊急時の連絡方法を確認','無理な外出の促しを控えるよう助言']],
+];
+const RENKEI={相手:['医師','ケアマネジャー','ヘルパー','相談支援専門員','家族','薬局','作業所・通所先'],内容:['状態を報告','服薬状況を報告','電話で報告し指示を受けた','受診・薬の調整について相談','情報を共有','サービス内容を調整']};
+// 身体の状態（血圧・体調）
+const SHINTAI={血圧:['100mmHg未満','110〜120mmHg台','130〜140mmHg台','150〜170mmHg台','180mmHg以上'],様子:['高値が持続','高値傾向','低値傾向','変動が大きい','安定している'],訴え:['頭重感','頭痛','めまい','ふらつき','動悸','倦怠感','便秘','口渇','手のふるえ','眠気'],良い変化:['降圧剤増量後は頭重感の改善がみられている','薬の調整後は症状の改善がみられている','前回より改善している'],残っていること:['血圧は依然高値傾向で経過している','症状は持続している','著変なく経過している'],対応:['血圧推移や体調変化の確認','服薬状況の確認','継続した健康管理支援','塩分・水分のとり方の確認','家庭での血圧測定の勧め','主治医への報告']};
+const REN={'高値が持続':'高値が持続し','高値傾向':'高値傾向で','低値傾向':'低値傾向で','変動が大きい':'変動が大きく','安定している':'安定しているが'};
+let HEAD=false; // 【問題点】などの見出しを付けるか
+// 改善案（課題ありの項目・活動・精神症状に出ます）
+const KAIZEN={
+ 食事:['1日2食以上を目標にする','食事の時間を決める','食べやすい物を常備する','配食サービスの利用を検討する','栄養補助食品を活用する','体重を定期的に測る'],
+ 睡眠:['就寝・起床の時間を決める','日中の臥床を減らす','寝る前のスマホ・カフェインを控える','睡眠の記録をつける','眠剤の調整を主治医に相談する'],
+ 服薬:['服薬カレンダーを使用する','一包化を検討する','訪問時に残薬を確認する','家族に声かけを依頼する','副作用について主治医に相談する','服薬の必要性を繰り返し説明する'],
+ 保清:['入浴する曜日を決める','訪問時に更衣を促す','まずはシャワー・清拭から始める','ヘルパーの利用を検討する'],
+ 環境整備:['ごみ出しの曜日を一緒に確認する','訪問時に一緒に片付ける','片付ける場所を1か所ずつ決める','ヘルパーの利用を検討する'],
+ 金銭の扱い:['1週間ごとの予算を決める','支払い予定を一緒に確認する','家族・支援者と管理方法を相談する','日常生活自立支援事業の利用を検討する'],
+ 対人関係:['困った時は早めに相談するよう伝える','家族との距離のとり方を一緒に考える','デイケア・通所の利用を検討する','関係者と情報を共有する'],
+ 活動:['短時間の散歩から始める','週1回の外出を目標にする','訪問時に一緒に近所まで出てみる','日中の過ごし方を一緒に考える','外出できた時は本人と振り返る','デイケア・作業所の利用を検討する'],
+ 精神:['不安が強い時は頓服を使用する','症状が強い時は早めに連絡するよう伝える','気分・症状の記録をつける','主治医に相談する','訪問回数の調整を検討する'],
+};
+const SHIKKAN=['うつ病','パニック障害','不安神経症','不眠症','高血圧症','腰痛','肥満症','双極性障害','認知症'];
+// 「その他」の検索で出る疾患名（名前|よみ）。足すときは1行足す
+const DLIST=`統合失調症|とうごうしっちょうしょう
+統合失調感情障害|とうごうしっちょうかんじょうしょうがい
+妄想性障害|もうそうせいしょうがい
+気分変調症|きぶんへんちょうしょう
+適応障害|てきおうしょうがい
+社交不安障害|しゃこうふあんしょうがい
+全般性不安障害|ぜんぱんせいふあんしょうがい
+強迫性障害|きょうはくせいしょうがい
+心的外傷後ストレス障害（PTSD）|しんてきがいしょうごすとれすしょうがい ぴーてぃーえすでぃー ptsd
+解離性障害|かいりせいしょうがい
+身体表現性障害|しんたいひょうげんせいしょうがい
+摂食障害|せっしょくしょうがい
+神経性やせ症|しんけいせいやせしょう きょしょくしょう
+神経性過食症|しんけいせいかしょくしょう
+アルコール依存症|あるこーるいぞんしょう
+薬物依存症|やくぶついぞんしょう
+ギャンブル依存症|ぎゃんぶるいぞんしょう
+自閉スペクトラム症|じへいすぺくとらむしょう はったつしょうがい
+注意欠如・多動症（ADHD）|ちゅういけつじょたどうしょう えーでぃーえいちでぃー adhd はったつしょうがい
+知的障害|ちてきしょうがい
+境界性パーソナリティ障害|きょうかいせいぱーそなりてぃしょうがい
+てんかん|てんかん
+アルツハイマー型認知症|あるつはいまーがたにんちしょう
+レビー小体型認知症|れびーしょうたいがたにんちしょう
+血管性認知症|けっかんせいにんちしょう
+前頭側頭型認知症|ぜんとうそくとうがたにんちしょう
+高次脳機能障害|こうじのうきのうしょうがい
+器質性精神障害|きしつせいせいしんしょうがい
+せん妄|せんもう
+睡眠時無呼吸症候群|すいみんじむこきゅうしょうこうぐん
+むずむず脚症候群|むずむずあししょうこうぐん
+自律神経失調症|じりつしんけいしっちょうしょう
+更年期障害|こうねんきしょうがい
+月経前症候群|げっけいぜんしょうこうぐん
+糖尿病|とうにょうびょう
+脂質異常症|ししついじょうしょう こうしけっしょう
+高尿酸血症|こうにょうさんけっしょう
+痛風|つうふう
+狭心症|きょうしんしょう
+心筋梗塞|しんきんこうそく
+心不全|しんふぜん
+心房細動|しんぼうさいどう
+不整脈|ふせいみゃく
+脳梗塞|のうこうそく
+脳出血|のうしゅっけつ
+くも膜下出血|くもまっかしゅっけつ
+パーキンソン病|ぱーきんそんびょう
+慢性閉塞性肺疾患（COPD）|まんせいへいそくせいはいしっかん しーおーぴーでぃー copd
+気管支喘息|きかんしぜんそく
+肺炎|はいえん
+誤嚥性肺炎|ごえんせいはいえん
+逆流性食道炎|ぎゃくりゅうせいしょくどうえん
+胃潰瘍|いかいよう
+慢性胃炎|まんせいいえん
+過敏性腸症候群|かびんせいちょうしょうこうぐん
+便秘症|べんぴしょう
+肝機能障害|かんきのうしょうがい
+脂肪肝|しぼうかん
+肝硬変|かんこうへん
+慢性腎臓病|まんせいじんぞうびょう
+前立腺肥大症|ぜんりつせんひだいしょう
+過活動膀胱|かかつどうぼうこう
+神経因性膀胱|しんけいいんせいぼうこう
+甲状腺機能低下症|こうじょうせんきのうていかしょう
+甲状腺機能亢進症|こうじょうせんきのうこうしんしょう ばせどうびょう
+貧血|ひんけつ
+骨粗鬆症|こつそしょうしょう
+変形性膝関節症|へんけいせいひざかんせつしょう
+変形性腰椎症|へんけいせいようついしょう
+腰部脊柱管狭窄症|ようぶせきちゅうかんきょうさくしょう
+椎間板ヘルニア|ついかんばんへるにあ
+関節リウマチ|かんせつりうまち
+頚椎症|けいついしょう
+肩関節周囲炎|かたかんせつしゅういえん
+片頭痛|へんずつう
+緊張型頭痛|きんちょうがたずつう
+めまい症|めまいしょう
+メニエール病|めにえーるびょう
+白内障|はくないしょう
+緑内障|りょくないしょう
+難聴|なんちょう
+アトピー性皮膚炎|あとぴーせいひふえん
+じんましん|じんましん
+褥瘡|じょくそう
+帯状疱疹|たいじょうほうしん
+乳がん|にゅうがん
+肺がん|はいがん
+胃がん|いがん
+大腸がん|だいちょうがん
+前立腺がん|ぜんりつせんがん
+廃用症候群|はいようしょうこうぐん
+脱水症|だっすいしょう
+低栄養|ていえいよう
+嚥下障害|えんげしょうがい
+フレイル|ふれいる
+サルコペニア|さるこぺにあ
+下肢筋力低下|かしきんりょくていか
+末梢神経障害|まっしょうしんけいしょうがい
+線維筋痛症|せんいきんつうしょう
+慢性疼痛|まんせいとうつう
+慢性疲労症候群|まんせいひろうしょうこうぐん
+起立性調節障害|きりつせいちょうせつしょうがい
+花粉症|かふんしょう
+アレルギー性鼻炎|あれるぎーせいびえん`.split('\n').map(x=>x.split('|'));
+let Q=''; // 検索に入れた文字
+// 上にいつも出す項目（ここに書いた名前だけ上に出て、ほかは「そのほかの項目」に入ります）
+const HISSU=['外出・過ごし方','年齢','疾患','身体の状態（血圧・体調）','食事','睡眠','服薬の管理','服薬','保清','環境整備','金銭の扱い','対人関係','表情・言動','実施した看護内容'];
+// 年齢区分。選ぶと、その年代に合った選択肢が下の各欄に増えます
+const NENREI=['10代','20代','30代','40代','50代','60代','70代','80代','90代以上'];
+const AGEGRP={'10代':'young','20代':'young','30代':'young','40代':'mid','50代':'mid'}; // それ以外は elder
+const AGE_ADD={
+ young:{'身体|訴え':['体重増加','月経不順'],'身体|対応':['生活リズムの確認'],
+  '活動|過ごし方':['スマホ・ゲームで過ごす時間が長い','就労・就学ができていない','就労に向けた意欲あり'],
+  '対人関係':['職場・学校での人間関係の悩みあり','友人との交流が減っている','SNSでのトラブルあり'],
+  'kaizen|睡眠':['昼夜逆転の改善を目標にする'],'kaizen|金銭の扱い':['スマホ決済・課金の使い方を一緒に確認する'],
+  'kaizen|活動':['起床時間を決めて生活リズムを整える','スマホ・ゲームの時間を決める','就労支援・作業所の利用を検討する'],
+  'kaizen|対人関係':['職場・学校への相談の仕方を一緒に考える']},
+ mid:{'身体|訴え':['体重増加','腰・膝の痛み'],'身体|対応':['生活習慣病の管理状況の確認'],
+  '活動|過ごし方':['仕事を休んでいる','親の介護の負担あり'],
+  'kaizen|食事':['塩分・糖分を控える','健診・内科受診を勧める'],
+  'kaizen|活動':['復職・就労について一緒に考える','無理のない運動を取り入れる']},
+ elder:{'身体|訴え':['食欲低下','むせ','もの忘れ','足腰の痛み','転倒への不安'],'身体|対応':['転倒・脱水の予防の声かけ','もの忘れの状況の確認','ケアマネジャーへの報告'],
+  '活動|過ごし方':['歩行が不安定','デイサービスを利用している'],
+  'kaizen|食事':['水分をこまめにとる','やわらかく食べやすい物にする'],
+  'kaizen|服薬':['家族・ヘルパーに服薬の見守りを依頼する'],
+  'kaizen|環境整備':['転倒しないよう動線を片付ける'],
+  'kaizen|活動':['転倒に注意して室内で体を動かす','デイサービスの利用を検討する']},
+};
+const AGEREF=id=>id.startsWith('kaizen|')?KAIZEN[id.slice(7)]:{'身体|訴え':SHINTAI.訴え,'身体|対応':SHINTAI.対応,'活動|過ごし方':KATSUDO.過ごし方,'対人関係':KADAI.find(i=>i.k==='対人関係').subs[0][1]}[id];
+const AGEBASE={};
+for(const g of Object.values(AGE_ADD))for(const id of Object.keys(g))AGEBASE[id]=AGEREF(id).length;
+let LONG=false; // 長い文章（400字くらい）にするか。ふだんは150字くらい
+const MIJIKAI=160; // 短い文章の上限の目安（字）
+let ATAMA=true; // 文の最初に年齢区分を入れるか
+KAIZEN.身体=['家庭での血圧測定を記録する','塩分・水分のとり方を見直す','受診時に主治医へ報告する','体調の変化があれば早めに連絡するよう伝える'];
+// 選んだ内容ごとの、合う改善案（左が選んだもの、右がその時に先に出す案）
+const KBY={
+ '食事|あり|不規則':['1日2食以上を目標にする','食事の時間を決める','食べやすい物を常備する'],
+ '食事|あり|不規則|買い置きの総菜で済ませている':['配食サービスの利用を検討する','簡単に作れる献立を一緒に考える'],
+ '食事|あり|不規則|調理の跡なし':['配食サービスの利用を検討する','簡単に作れる献立を一緒に考える'],
+ '食事|あり|拒食':['食べられる物を少量ずつとる','栄養補助食品を活用する','体重を定期的に測る'],
+ '食事|あり|拒食|水分のみ摂取':['水分と一緒にゼリー・スープなどをとる','食事量の低下を主治医に報告する'],
+ '食事|あり|過食':['食べた物を記録する','間食の量と時間を決める','買い置きを減らす'],
+ '睡眠|あり|不眠':['就寝・起床の時間を決める','日中の臥床を減らす','眠剤の調整を主治医に相談する'],
+ '睡眠|あり|入眠困難':['寝る前のスマホ・カフェインを控える','就寝前にリラックスできる時間をつくる','睡眠の記録をつける'],
+ '睡眠|あり|入眠困難|仕事のことで眠れない':['仕事の悩みを書き出して整理する','仕事の負担について主治医・職場に相談する'],
+ '睡眠|あり|早朝覚醒':['早く目が覚めた時の過ごし方を決める','就寝時間を見直す','気分の落ち込みと合わせて主治医に相談する'],
+ '服薬|あり|不規則':['服薬カレンダーを使用する','飲む時間をアラームで知らせる','訪問時に残薬を確認する'],
+ '服薬|あり|拒薬':['薬への不安や困りごとを聞き取る','副作用について主治医に相談する','服薬の必要性を繰り返し説明する'],
+ '服薬|あり|怠薬':['訪問時に残薬を確認する','一包化を検討する','家族に声かけを依頼する'],
+ '保清|あり|やや不潔':['入浴する曜日を決める','訪問時に更衣を促す','まずはシャワー・清拭から始める'],
+ '保清|あり|不潔':['訪問時に一緒に清拭・更衣を行う','入浴の介助を検討する','ヘルパーの利用を検討する'],
+ '環境整備|あり|やや散乱':['片付ける場所を1か所ずつ決める','ごみ出しの曜日を一緒に確認する','訪問時に一緒に片付ける'],
+ '環境整備|あり|散乱':['訪問時に一緒に片付ける','ヘルパーの利用を検討する','ごみ出しの支援を関係者と相談する'],
+ '金銭の扱い|あり||浪費の傾向あり':['1週間ごとの予算を決める','使ったお金を記録する','買う前に一度相談するよう伝える'],
+ '金銭の扱い|あり||計画的に使えていない':['1週間ごとの予算を決める','日常生活自立支援事業の利用を検討する'],
+ '金銭の扱い|あり||支払いの遅れあり':['支払い予定を一緒に確認する','口座引き落としへの変更を検討する'],
+ '対人関係|あり||家族との口論が増えている':['家族との距離のとり方を一緒に考える','口論になりそうな時の対処を決める','家族からも話を聞く'],
+ '対人関係|あり||近隣とのトラブルあり':['困った時は早めに相談するよう伝える','関係者と情報を共有する'],
+ '対人関係|あり||対人場面を避ける様子あり':['訪問時の会話の時間を大切にする','デイケア・通所の利用を検討する'],
+ '活動|外出|なし':['訪問時に一緒に近所まで出てみる','短時間の散歩から始める','週1回の外出を目標にする'],
+ '活動|外出|なし|理由|意欲の低下':['できたことを一緒に確認する','日中の過ごし方を一緒に考える'],
+ '活動|外出|なし|理由|不安の強さ':['不安が強い時の対処を一緒に考える','付き添いのある外出から始める'],
+ '活動|外出|なし|理由|人目が気になること':['人の少ない時間帯・場所から試す'],
+ '活動|外出|なし|理由|体調不良':['体調について主治医に相談する'],
+ '活動|外出|なし|理由|体力への不安':['室内でできる軽い運動から始める'],
+ '活動|外出|なし|理由|金銭面の心配':['お金のかからない外出先を一緒に考える'],
+ '活動|外出|あり':['いまの外出を続けられるよう声をかける','外出できた時は本人と振り返る','疲れすぎないよう休む日を決める'],
+ '活動|外出|あり|様子|人混みでは不安が強くなる':['人の少ない時間帯・場所を選ぶ','不安な時の頓服の使い方を確認する'],
+ '活動|外出|あり|様子|外出後に疲労感がみられる':['外出の時間・回数を調整する'],
+ '活動|過ごし方|日中は臥床がち':['日中の臥床を減らす','起床時間を決めて生活リズムを整える'],
+ '精神|表情|暗い':['気分・症状の記録をつける','つらい時は早めに連絡するよう伝える','楽しめる活動を一緒に探す'],
+ '精神|表情|硬い':['緊張がやわらぐ話題から会話を始める','不安に思っていることを聞き取る'],
+ '精神|表情|乏しい':['気分・症状の記録をつける','楽しめる活動を一緒に探す'],
+ '精神|言動|不安の訴えあり':['不安が強い時は頓服を使用する','不安な時の対処を一緒に考える'],
+ '精神|言動|気分の落ち込みあり':['無理をせず休息をとる','症状が強い時は早めに連絡するよう伝える','主治医に相談する'],
+ '精神|言動|意欲低下あり':['できたことを一緒に確認する','短時間でできることから始める'],
+ '精神|言動|幻聴の訴えあり':['幻聴がある時の対処を一緒に確認する','つらい時は頓服を使用する','主治医に相談する'],
+ '精神|言動|被害的な内容の訴えあり':['訴えを否定せず聞き、安心できる方法を一緒に考える','主治医に相談する'],
+ '精神|言動|興奮・易怒性あり':['いらいらした時の対処を一緒に決める','主治医に相談する'],
+ '精神|言動|多弁':['睡眠・活動の様子を記録する','主治医に相談する'],
+ '精神|言動|希死念慮の訴えあり':['つらい時の連絡先を確認する','主治医へ速やかに報告する','訪問回数の調整を検討する'],
+};
+const KOFF={}; // 「別の案」を押した回数
+let KFIRST=false; // 改善案を文の最初に書くか
+// どれか1つしか選べないグループ
+const EXG=[...KADAI.map(i=>i.k),'nenrei','身体|血圧','身体|様子','身体|良い変化','身体|残っていること','kanri','活動|外出','活動|外出|あり|頻度','活動|外出|あり|同伴','活動|外出|なし|期間','活動|外出|なし|気持ち','精神|表情'];
+
+// ===== 状態 =====
+const S=new Set(), T={};
+const txt=k=>(T[k]||'').trim();
+function drop(pred){for(const x of [...S])if(pred(x))S.delete(x);for(const x of Object.keys(T))if(pred(x))delete T[x];}
+function toggle(id){
+  if(S.has(id)){drop(x=>x===id||x.startsWith(id+'|'));applyAge();return;}
+  const seg=id.split('|');
+  for(let i=1;i<=seg.length;i++)S.add(seg.slice(0,i).join('|'));
+  for(const g of EXG)if(id.startsWith(g+'|')){
+    const keep=g+'|'+id.slice(g.length+1).split('|')[0];
+    drop(x=>x.startsWith(g+'|')&&x!==keep&&!x.startsWith(keep+'|'));
+  }
+  applyAge();
+}
+const age=()=>NENREI.find(a=>S.has('nenrei|'+a));
+function applyAge(){
+  for(const id of Object.keys(AGEBASE))AGEREF(id).length=AGEBASE[id];
+  const a=age();if(!a)return;
+  const add=AGE_ADD[AGEGRP[a]||'elder'];
+  for(const id of Object.keys(add))AGEREF(id).push(...add[id].filter(x=>!AGEREF(id).includes(x)));
+}
+const picks=(id,opts)=>opts.filter(o=>S.has(id+'|'+o));
+function det(id,opts){const p=picks(id,opts);if(txt(id))p.push(txt(id));return p.join('、');}
+const shikkanOther=()=>[...S].filter(x=>x.startsWith('shikkan|')&&!SHIKKAN.includes(x.slice(8))).map(x=>x.slice(8));
+const shikkanAll=()=>picks('shikkan',SHIKKAN).concat(shikkanOther());
+const onSubs=it=>it.subs.filter(([n,o])=>n?S.has(it.k+'|あり|'+n):det(it.k+'|あり|',o));
+const OPEN=new Set();
+// 改善案：いま選んでいる内容に合う案を、合う順に並べる
+const KLAB={活動:'外出・過ごし方',精神:'表情・言動',身体:'身体の状態'};
+const kpre=K=>KAIZEN[K]&&KADAI.some(i=>i.k===K)?K+'|あり|':K+'|';
+const kpicked=K=>[...S].filter(x=>x.startsWith('kaizen|'+K+'|')).map(x=>x.slice(('kaizen|'+K+'|').length));
+function kactive(){return KADAI.filter(it=>onSubs(it).length).map(it=>it.k).concat(['活動','精神','身体'].filter(K=>[...S].some(x=>x.startsWith(K+'|'))));}
+function suggest(K){
+  const pre=kpre(K),ids=[...S].filter(x=>(x+'|').startsWith(pre)||x.startsWith(pre)).reverse().sort((a,b)=>b.split('|').length-a.split('|').length);
+  const base=KAIZEN[K]||[],nb=AGEBASE['kaizen|'+K]??base.length;
+  const all=[].concat(...ids.map(id=>KBY[id]||[]),base.slice(nb),base.slice(0,nb));
+  return [...new Set(all)];
+}
+const kakko=d=>d?'（'+d+'）':'';
+
+// ===== 文をつなぐ（選択肢の言い切りの形を、文の途中の形・文末の形に直す） =====
+// ===== 文例バンク（介護の記録文と同じ考え方：言い方をいくつか持ち、作るたびに入れ替える） =====
+// 足すときは [] の中に言い方を足すだけ。SEED が変わると選ばれる言い方が変わる
+let SEED=Math.floor(Math.random()*1e6),VS=0;
+const hsh=t=>{let h=2166136261;for(let i=0;i<t.length;i++){h^=t.charCodeAt(i);h=Math.imul(h,16777619);}h^=h>>>13;h=Math.imul(h,0x5bd1e995);h^=h>>>15;return h>>>0;};
+const pv=(key,arr)=>arr[hsh(VS+'|'+key)%arr.length];
+const BANK={
+ あり途中:['があり','がみられ','を認め','が確認され','が観察され'],あり文末:['がみられる','を認める','がある','が確認される','が観察される','がうかがえる'],
+ 回数途中:['あり','みられ','確認され'],回数文末:['みられる','ある','確認される'],
+ 改善頭:['今後は、','今後、','今後の方針として、','これからは、','次回以降は、','当面は、'],改善つなぎ:['については','に関しては','の面では','について'],改善しめ:['','','こととする','方針とする','よう支援していく'],
+ 実施頭:['訪問時は、','本日の訪問では、','訪問時、','今回の訪問では、','本日は、','訪問中は、'],実施途中:['を行い','を実施し','を行ったうえで'],実施文末:['を行った','を実施した'],
+ 外出理由:['から、','のため、','を理由に、','により、','が影響し、'],
+ 課題なし:['に課題はみられない。','は問題なく経過している。','については特に課題を認めない。','には特に問題を認めない。','は安定している。','について課題となる点はみられない。'],
+ 自己管理:['服薬は自己管理で行っている','服薬は自己管理している','内服は自己管理で行えている','服薬は本人が管理している','内服は自分で管理できている'],
+ 他者管理:['で行っている。','となっている。'],
+ 全体1:['がみられる。','を認める。','が課題となっている。','が残っている。'],全体2:['が目立っている。','を伴っている。','が続いている。','が重なっている。','も認められる。'],
+ リズム:['生活リズムの乱れ','生活リズムの不安定さ','不規則な生活'],活動:['活動量の低下','活動性の低下','活動範囲の縮小'],服薬面:['服薬の不安定さ','服薬管理の乱れ'],身辺:['身の回りのことの行いにくさ','セルフケアの低下','身辺の整えにくさ'],課題語:['の課題','の負担','の困りごと'],
+};
+const HYO={穏やか:['表情は穏やか','穏やかな表情で過ごしている','表情は穏やかで落ち着いている'],明るい:['表情は明るい','明るい表情がみられる','表情に明るさがある'],暗い:['表情は暗い','暗い表情がみられる','表情はさえない'],硬い:['表情は硬い','硬い表情がみられる','表情にこわばりがある'],乏しい:['表情は乏しい','表情の変化が乏しい','表情の動きが少ない']};
+// つながりの見立ての言い方
+const MITATE={
+ m0:['希死念慮の訴えがあることから、安全の確認と主治医との早めの連携が必要である。','希死念慮の訴えを認めるため、安全面の確認を優先し、主治医と情報を共有していく必要がある。','希死念慮の訴えがみられており、安全の確保を最優先に、主治医へ速やかに報告する必要がある。','希死念慮の訴えがあるため、気持ちの変化を注意して見守り、関係者と早めに連携していく。'],
+ m1:['睡眠が十分にとれていないことが、日中の意欲や活動性の低下に影響していると考えられる。','睡眠の乱れが日中の活動のしづらさにつながっていると考えられる。','夜間に十分休めていないことが、日中の気力の低下を招いている可能性がある。','睡眠の問題が続いていることで、日中の活動に取り組みにくくなっていると思われる。'],
+ m2:['不安の強さが外出の妨げとなっており、活動範囲が狭まっていると考えられる。','不安から外出を控える状態が続いており、活動の機会が限られていると考えられる。','外に出ることへの不安が強く、活動の場が自宅内に限られていると思われる。','不安が外出へのためらいにつながり、人や社会と関わる機会が減っている可能性がある。'],
+ m3:['意欲の低下に伴い、活動範囲が狭まっていると考えられる。','気分・意欲の低下が外出の減少につながっていると考えられる。','気力がわかない状態が続き、外に出るきっかけを持ちにくくなっていると思われる。','意欲の低下から、自宅で過ごす時間が長くなっている可能性がある。'],
+ m4:['服薬が安定していないことが、症状の揺らぎにつながるおそれがある。','服薬の乱れが症状の不安定さに影響している可能性がある。','服薬が決まった通りにできていないことが、症状の変動に関わっていると考えられる。','服薬の不規則さにより、症状が再び強まることが懸念される。'],
+ m5:['意欲の低下から、身の回りのことに手が回りにくくなっている様子がうかがえる。','気分・意欲の低下が、身の回りのことの行いにくさに表れていると考えられる。','気力の低下により、清潔や片付けまで取り組む余裕が持てていないと思われる。','意欲がわきにくい状態が、身辺を整えることの難しさにつながっている可能性がある。'],
+ m6:['食事量の不足による体力・体調面への影響が懸念される。','食事が十分にとれておらず、体力や体調への影響に注意が必要である。','食事量が少ない状態が続いており、体重や体力の低下に注意していく必要がある。','十分な栄養がとれていない可能性があり、体調の変化を継続して確認する必要がある。'],
+};
+const SURU=/(拒否|摂取|実施|使用|会話|一包化)$/;
+function ren(s){ // 文の途中の形（〜しており、〜で、）
+  s=s.replace(/。$/,'');
+  const m=s.match(/^(.*)あり（(.+)）$/);
+  if(m)return m[1]+'が'+m[2]+pv('r'+s,BANK.回数途中);
+  const R=[[/ていない$/,'ておらず'],[/ている$/,'ており'],[/でいる$/,'でおり'],[/である$/,'であり'],[/([えけせてねめれげべき])ない$/,'$1ず'],[/ない$/,'なく'],[/なし$/,'はなく'],[/あり$/,pv('r'+s,BANK.あり途中)],
+    [/(多|遅|狭|長|強|暗|硬|明る|大き|乏し)い$/,'$1く'],[/する$/,'し'],[/(測|と|つく|かか|な|取|作|返|あ)る$/,'$1り'],[/る$/,''],[/す$/,'し'],[/う$/,'い'],[/く$/,'き'],[/ぶ$/,'び'],[/む$/,'み'],[/つ$/,'ち']];
+  for(const [a,b] of R)if(a.test(s))return s.replace(a,b);
+  return s+(SURU.test(s)?'し':'で');
+}
+function fin(s){ // 文の終わりの形
+  s=s.replace(/。$/,'');
+  const m=s.match(/^(.*)あり（(.+)）$/);
+  if(m)return m[1]+'が'+m[2]+pv('f'+s,BANK.回数文末);
+  if(/あり$/.test(s))return s.replace(/あり$/,pv('f'+s,BANK.あり文末));
+  if(/なし$/.test(s))return s.replace(/なし$/,'はない');
+  if(/[るすうくぶむつただ]$/.test(s)||(/い$/.test(s)&&!/あいまい$/.test(s)))return s;
+  return s+(SURU.test(s)?'している':'である');
+}
+function chain(cl,open){ // 言い切りの形の並び → つなげた1文（open＝最後も途中の形）
+  const isA=c=>/あり$/.test(c),ari=cl.filter(isA),i=cl.findIndex(isA);
+  if(ari.length>1){cl=cl.filter(c=>!isA(c));cl.splice(i,0,ari.map(c=>c.replace(/あり$/,'')).join('や')+'あり');}
+  const o=cl.map((c,j)=>j<cl.length-1||open?ren(c):fin(c));
+  for(let j=0;j<o.length-1;j++)for(const w of ['がみられ','を認め','が確認され','が観察され'])if(o[j].endsWith(w)&&(o[j+1].endsWith(w)||o[j+1].endsWith(w+'る')))o[j]=o[j].slice(0,-w.length)+'があり'; // 同じ言い方が続かないように
+  return o.join('、');
+}
+const chunk=(a,n)=>a.length?[a.slice(0,n)].concat(chunk(a.slice(n),n)):[];
+const PFX={食事:['食事面では','食事については','食生活は','食事の状況は','食事に関しては'],睡眠:['睡眠面では','睡眠については','夜間の睡眠は','睡眠の状況は','睡眠に関しては'],服薬:['服薬面では','服薬については','内服については','服薬状況は','内服に関しては'],保清:['保清面では','保清については','清潔面では','身体の清潔については','保清に関しては'],環境整備:['環境面では','住環境については','室内の環境は','居室の様子は','生活環境に関しては'],金銭の扱い:['金銭面では','金銭の扱いについては','金銭管理の面では','お金の使い方については','金銭に関しては'],対人関係:['対人関係では','対人面では','人との関わりでは','周囲との関係では','対人関係については']};
+const STATE={食事:{不規則:['不規則となっている','不規則な状態が続いている','規則的にとれていない','食事のリズムが整っていない','規則正しい食事がとれていない'],拒食:['拒食がみられる','拒食の状態を認める','食事を拒む様子がみられる','食事を受けつけない状態が続いている'],過食:['過食がみられる','過食の傾向を認める','食べ過ぎてしまう状態がみられる']},
+ 睡眠:{不眠:['不眠が続いている','不眠を認める','十分な睡眠がとれていない','眠れない状態が続いている','睡眠が十分に確保できていない'],入眠困難:['入眠困難がみられる','入眠困難を認める','寝つきの悪さが続いている','寝つくまでに時間を要している','入眠までに時間がかかっている'],早朝覚醒:['早朝覚醒がみられる','早朝覚醒を認める','朝早くに目が覚める状態が続いている']},
+ 服薬:{不規則:['服薬が不規則となっている','服薬が規則的に行えていない','服薬が安定していない','決まった通りの服薬ができていない'],拒薬:['拒薬がみられる','拒薬を認める','服薬を拒む様子がみられる'],怠薬:['怠薬がみられる','怠薬を認める','服薬が途切れがちである']},
+ 保清:{やや不潔:['やや不潔な状態がみられる','保清がやや不十分である','清潔の保持がやや不十分である'],不潔:['不潔な状態がみられる','保清が保てていない','清潔が保たれていない']},
+ 環境整備:{やや散乱:['室内はやや散乱している','室内にやや散乱がみられる','室内がやや片付いていない'],散乱:['室内は散乱している','室内の散乱が目立つ','室内が片付けられていない']}};
+const YOI=/(できている|実施)$/; // 良い内容は「〜が、」の後ろに回す
+
+// ===== 文章を作る =====
+// 選んだ言葉を1つずつ足すのではなく、全体をまとめて組み立てる：
+//  ①全体像（精神面＋生活面のまとめ）→ ②内容ごとのまとまり（睡眠と食事／外出／服薬／身の回り／対人・金銭）
+//  → ③つながりの見立て（〜と考えられる）→ ④年代の特徴 → 改善案 → 実施したこと
+const PFXMO={食事:['食事も','食事面でも','食事についても'],睡眠:['睡眠も','睡眠面でも','睡眠についても'],服薬:['服薬も','服薬面でも'],保清:['保清も','保清面でも'],環境整備:['室内の環境も','環境面でも','住環境についても'],金銭の扱い:['金銭面でも','金銭の扱いでも','お金の使い方でも'],対人関係:['対人面でも','対人関係でも','人との関わりでも']};
+const MATOME=[['睡眠','食事'],['服薬'],['保清','環境整備'],['対人関係','金銭の扱い']];
+// 年代の特徴（年代の数字は文に入れない）。[ふつうの時, 外出なし・こもりがちの時]
+// 年代の特徴の文＝「年代の前置き」＋「選んだ内容に合う一言」。選んでいない内容（もの忘れ等）は書かない
+const AGEHEAD={'10代':'学業や家族関係の影響を受けやすい時期であり、','20代':'就労や自立に向かう時期であり、','30代':'仕事や家庭の役割が増える時期であり、','40代':'仕事や家庭の責任が重くなる時期であり、','50代':'心身の変化や負担が重なりやすい時期であり、','60代':'生活環境が変わりやすい時期であり、','70代':'体力が低下しやすい時期であり、','80代':'心身の機能が低下しやすい時期であり、','90代以上':'心身の機能が低下しやすい時期であり、'};
+// 左＝選んだ内容、右＝年代のグループ（young=10〜30代 mid=40〜50代 elder=60代以上）ごとの言い方
+const AGEFOCUS={
+ komori:{young:['社会とのつながりを保てるよう、活動の機会を広げる支援が必要である。','外に出るきっかけを少しずつ増やしていく支援が求められる。'],mid:['体力の低下や孤立を防ぐため、日中の活動を保つ必要がある。','人と関わる機会や通える場所を確保していく必要がある。'],elder:['筋力低下や閉じこもりを防ぐため、体を動かす機会を保つ必要がある。','活動量の低下が体力の低下につながらないよう見守る必要がある。']},
+ body:{young:['体調の変化にも目を向けた健康管理が必要である。','身体面の状態も併せて確認していく必要がある。'],mid:['身体面の健康管理を併せて行う必要がある。','体調の変化を見逃さないよう確認を続ける必要がある。'],elder:['体調の変化を継続して観察する必要がある。','身体面の状態をこまめに確認していく必要がある。']},
+ shokuji:{young:['食生活を整えることが今後の生活の土台となる。','規則的に食事をとる習慣づくりが課題である。'],mid:['食生活の乱れが体調に響かないよう整えていく必要がある。','食事を整え、体調を保つことが課題である。'],elder:['低栄養や脱水を防ぐため、食事量の確認が必要である。','食事と水分が十分にとれているかを見守る必要がある。']},
+ suimin:{young:['睡眠を整えることが生活リズムの土台となる。','睡眠のリズムを整えていくことが課題である。'],mid:['疲労をためないよう、睡眠の確保が必要である。','十分に休息がとれるよう整えていく必要がある。'],elder:['日中の活動を保ち、昼夜のリズムを整えることが必要である。','睡眠の乱れが日中の体調に響かないよう見守る必要がある。']},
+ fukuyaku:{young:['服薬を自分で続けられる方法を一緒に整える必要がある。','無理なく服薬を続けられる工夫を考えていく必要がある。'],mid:['服薬を続けやすい方法を一緒に整える必要がある。','服薬が生活の中で続けられるよう支援が必要である。'],elder:['飲み忘れや飲み間違いを防ぐ見守りが必要である。','服薬が確実に続けられるよう周囲の見守りが必要である。']},
+ shinpen:{young:['身の回りのことを自分で整える力を保つ支援が必要である。','生活の基本を自分で行えるよう支援が求められる。'],mid:['身の回りのことを無理なく続けられるよう支援が必要である。','生活を整える負担を減らす工夫が求められる。'],elder:['安全に過ごせるよう、身の回りや住環境を整える必要がある。','清潔と住環境が保てるよう支援を調整する必要がある。']},
+ taijin:{young:['人との関わり方や生活の管理を身につけていく支援が必要である。','周囲との関係を無理なく保てるよう支援が求められる。'],mid:['家族や周囲との関係の負担を軽くする調整が必要である。','周囲との関係や生活上の負担を一人で抱えないよう支援が必要である。'],elder:['孤立を防ぎ、家族や支援者とのつながりを保つ必要がある。','周囲との関係が途切れないよう支援者と連携する必要がある。']},
+ kibun:{young:['不安に寄り添い、できることを増やしていく支援が必要である。','気持ちの揺れに配慮しながら見守る必要がある。'],mid:['負担を一人で抱え込まないよう支援が必要である。','気持ちの変化に配慮しながら見守る必要がある。'],elder:['気持ちの変化に配慮した関わりが必要である。','不安や孤独感に配慮しながら見守る必要がある。']},
+ none:{young:['生活リズムの安定を支えていくことが大切である。','本人のペースを大切にした支援が求められる。'],mid:['心身両面の健康を保てるよう見守る必要がある。','無理のない生活が続けられるよう見守る必要がある。'],elder:['体調と生活の変化を継続して見守る必要がある。','安全に生活が続けられるよう見守る必要がある。']},
+};
+// 短い文章用：項目の出だし
+const PFXS={食事:'食事は',睡眠:'睡眠は',服薬:'服薬は',保清:'保清は',環境整備:'室内は',金銭の扱い:'金銭面は',対人関係:'対人面は'};
+function gen(seed){
+  VS=seed===undefined?SEED:seed;
+  const rows=[],nashi=[],etc=[],kai=[],done=[],prob={};
+  const has=p=>[...S].some(x=>x===p||x.startsWith(p+'|'));
+  const kz=(key,label)=>{const p=kpicked(key);if(p.length){kai.push([label,p]);rows.push([label+'の改善案',p.join('、')]);}};
+  let taiou='',body='';
+  { // 身体の状態：問題 → 経過 → 対応
+    const fin=t=>t&&!/。$/.test(t)?t+'。':t;
+    const bp=picks('身体|血圧',SHINTAI.血圧)[0],yo=picks('身体|様子',SHINTAI.様子)[0],ut=picks('身体|訴え',SHINTAI.訴え);
+    const keika=[picks('身体|良い変化',SHINTAI.良い変化)[0],picks('身体|残っていること',SHINTAI.残っていること)[0]].filter(Boolean).join('が、');
+    const past=(keika||txt('身体|経過'))?'いた':'いる';
+    const X=yo?(ut.length?REN[yo]:yo):'';
+    const bpPart=bp?'血圧'+bp+(yo?'と'+X:''):(yo?'血圧は'+X:'');
+    let t='';
+    if(ut.length)t=(bpPart?bpPart+(yo?'、':'で、'):'')+ut.join('・')+'の訴えを認めて'+past+'。';
+    else if(bpPart)t=bpPart+(yo?'':'で経過')+'。';
+    t+=fin(txt('身体'))+fin(keika)+fin(txt('身体|経過'));
+    if(t){body=t;kz('身体','身体面');}
+    const ta=picks('身体|対応',SHINTAI.対応);if(txt('身体|対応'))ta.push(txt('身体|対応'));
+    if(ta.length)taiou=(ta.length>1&&/の確認$/.test(ta[0])?ta[0].replace(/の確認$/,'を確認し、')+ta.slice(1).join('と'):ta.join('と'))+'を行う。';
+  }
+  for(const it of KADAI){
+    const ari=it.k+'|あり';
+    const on=onSubs(it);
+    if(on.length){
+      kz(it.k,it.k);
+      const named=on.filter(([n])=>n).map(([n,o])=>n+(S.has(ari+'|'+n+'|'+n+'のみ')?'のみ':'')+kakko(det(ari+'|'+n,o.filter(x=>x!==n+'のみ'))));
+      const un=on.filter(([n])=>!n).map(([n,o])=>det(ari+'|'+n,o)).join('');
+      if(named.length)rows.push([it.k,'課題あり　'+named.join('、')]);
+      else rows.push([it.k,'課題あり'+(un?'　'+un:'')]);
+      const neg=[],pos=[];
+      for(const [n,o] of on){
+        const ds=picks(ari+'|'+n,o).filter(x=>x!==n+'のみ');
+        if(txt(ari+'|'+n))ds.push(txt(ari+'|'+n));
+        for(const d of ds)(YOI.test(d)?pos:neg).push(d);
+        if(n&&!ds.some(d=>d.includes(n)))neg.push(S.has(ari+'|'+n+'|'+n+'のみ')?n+'のみ'+pv('のみ',['がみられる','を認める']):pv('st'+it.k+n,STATE[it.k][n]));
+      }
+      prob[it.k]={rest:neg.concat(pos).slice(1),c1:neg[0]||pos[0],n:neg.length+pos.length,p:pos.length,f:(open,mo)=>pv((mo?'mo':'pfx')+it.k,mo?PFXMO[it.k]:PFX[it.k])+(neg.length?(pos.length?chain(neg)+'が、'+chain(pos,open):chain(neg,open)):chain(pos,open))};
+    }else if(S.has('nashiAll')){nashi.push(it.k);rows.push([it.k,'課題なし']);}
+    if(it.k==='睡眠'){ // 画面の並びに合わせ、服薬の前に管理方法
+      const m=KANRI.find(([n])=>S.has('kanri|'+n));
+      if(m){const d=det('kanri|'+m[0],m[1]);
+        const ds=picks('kanri|'+m[0],m[1]);if(txt('kanri|'+m[0]))ds.push(txt('kanri|'+m[0]));
+        if(m[0]==='服薬なし')etc.push('服薬はしていない。');
+        else if(m[0]==='自己管理')etc.push(chain([pv('jiko',BANK.自己管理)].concat(ds.map(x=>x.replace(/([^を])使用$/,'$1を使用'))))+'。');
+        else etc.push('服薬は'+(ds.length?ds.join('・')+'による':'')+m[0]+pv('tasha',BANK.他者管理));
+        rows.push(['服薬 管理方法',m[0]+(d?'　'+d:'')]);}
+    }
+  }
+  // ② 内容ごとのまとまり（同じまとまりの2つは「〜しており、〜も…」と1文に）
+  const grp={};
+  for(const g of MATOME){const a=prob[g[0]],b=prob[g[1]];
+    grp[g[0]]=a&&b?(a.p||a.n+b.n>5?a.f()+'。'+b.f()+'。':a.f(true)+'、'+b.f(false,true)+'。'):a?a.f()+'。':b?b.f()+'。':'';}
+  if(nashi.length)etc.push(nashi.join('・')+pv('nashi',BANK.課題なし));
+
+  const act=[]; // 外出・過ごし方
+  {
+    const gp=(br,g)=>picks('活動|外出|'+br+'|'+g,GAISHUTSU[br][g]);
+    if(S.has('活動|外出|あり')){
+      const f=gp('あり','頻度')[0],saki=gp('あり','先'),do_=gp('あり','同伴')[0]||'',shu=gp('あり','手段');
+      const B=(saki.length?saki.join('・')+'に':'')+do_+(shu.length?shu.join('・')+'で':'');
+      act.push(B?(f?pv('ga1',['外出は'+f+'あり、'+B+'出かけている',f+'、'+B+'外出している',f+'の頻度で'+B+'外出できている']):pv('ga2',['外出あり、'+B+'出かけている',B+'外出している',B+'外出できている'])):f?pv('ga3',[f+'外出している','外出は'+f+'できている',f+'の頻度で外出している']):pv('ga4',['外出はできている','外出の機会は保たれている']));
+      act.push(...gp('あり','様子'));
+    }else if(S.has('活動|外出|なし')){
+      const ki=gp('なし','期間')[0]||'',ri=gp('なし','理由');
+      act.push((ri.length?ri.join('や')+pv('riyu',BANK.外出理由):'')+pv('gn1',['外出は'+ki+'していない',ki+'外出していない','外出は'+ki+'できていない',ki+'自宅から出ていない']));
+      act.push(...gp('なし','用事'),...gp('なし','気持ち'));
+    }
+    act.push(...picks('活動|過ごし方',KATSUDO.過ごし方));
+  }
+  let actT='';
+  if(act.length){actT=chunk(act,3).map(g=>chain(g)+'。').join('');rows.push(['活動の状況',actT]);kz('活動','活動');}
+
+  const hyo=picks('精神|表情',SEISHIN.表情)[0];
+  const gen_=picks('精神|言動',SEISHIN.言動);
+  const se=[];
+  if(hyo)se.push(pv('hyo',HYO[hyo]));
+  se.push(...gen_);
+  if(txt('精神'))se.push(txt('精神'));
+  if(se.length){rows.push(['精神症状',se.join('、')]);kz('精神','精神症状');}
+
+  // ① 全体像：精神面と、生活面のまとめを1文に
+  const komori=S.has('活動|外出|なし')||S.has('活動|過ごし方|自室にこもりがち')||S.has('活動|過ごし方|日中は臥床がち');
+  const life=[];
+  if(prob.食事||prob.睡眠||S.has('活動|過ごし方|昼夜逆転の傾向あり'))life.push(pv('l1',BANK.リズム));
+  if(komori)life.push(pv('l2',BANK.活動));
+  if(prob.服薬)life.push(pv('l3',BANK.服薬面));
+  if(prob.保清||prob.環境整備)life.push(pv('l4',BANK.身辺));
+  if(prob.対人関係||prob.金銭の扱い)life.push([prob.対人関係&&'対人面',prob.金銭の扱い&&'金銭面'].filter(Boolean).join('・')+pv('l5',BANK.課題語));
+  const lifeT=life.length>2?life.slice(0,-1).join('、')+'と'+life[life.length-1]:life.join('と');
+  const odayaka=se.length&&(!hyo||hyo==='穏やか'||hyo==='明るい')&&gen_.every(x=>x==='落ち着いた様子で会話')&&!txt('精神');
+  let zentai='';
+  if(se.length&&life.length)zentai=odayaka?chain(se)+'が、'+lifeT+pv('z1',BANK.全体1):chain(se,true)+'、'+lifeT+pv('z2',BANK.全体2);
+  else if(se.length)zentai=chain(se)+'。';
+  else if(life.length>1)zentai='生活面では、'+lifeT+pv('z3',BANK.全体1);
+
+  // ③ つながりの見立て（選んだ内容の組み合わせから。多くても2つ）
+  const mi=[];
+  const iyoku=S.has('精神|言動|意欲低下あり')||S.has('精神|言動|気分の落ち込みあり'),fuan=S.has('活動|外出|なし|理由|不安の強さ')||S.has('活動|外出|なし|理由|人目が気になること')||(S.has('精神|言動|不安の訴えあり')&&!has('活動|外出|なし|理由'));
+  const shojo=['不安の訴えあり','気分の落ち込みあり','意欲低下あり','幻聴の訴えあり','被害的な内容の訴えあり','興奮・易怒性あり','多弁','希死念慮の訴えあり'].some(x=>S.has('精神|言動|'+x));
+  if(S.has('精神|言動|希死念慮の訴えあり'))mi.push(pv('m0',MITATE.m0));
+  if(prob.睡眠&&(iyoku||S.has('活動|過ごし方|日中は臥床がち')))mi.push(pv('m1',MITATE.m1));
+  if(S.has('活動|外出|なし')&&fuan)mi.push(pv('m2',MITATE.m2));
+  else if(S.has('活動|外出|なし')&&iyoku&&!prob.睡眠)mi.push(pv('m3',MITATE.m3));
+  if(prob.服薬&&shojo)mi.push(pv('m4',MITATE.m4));
+  if((prob.保清||prob.環境整備)&&iyoku)mi.push(pv('m5',MITATE.m5));
+  if(prob.食事&&(has('食事|あり|拒食')||S.has('食事|あり|不規則|1日1食程度')))mi.push(pv('m6',MITATE.m6));
+
+  // ④ 年代の特徴（年代の数字は入れない）
+  const gk=AGEGRP[age()]||'elder';
+  const fk=komori?'komori':(body&&gk==='elder')?'body':prob.食事?'shokuji':prob.睡眠?'suimin':prob.服薬?'fukuyaku':(prob.保清||prob.環境整備)?'shinpen':(prob.対人関係||prob.金銭の扱い)?'taijin':body?'body':shojo?'kibun':'none';
+  const ag=ATAMA&&age()?AGEHEAD[age()]+pv('af'+fk,AGEFOCUS[fk][gk]):'';
+
+  // 実施したこと：名詞の内容は「〜を行い」、動きの内容は「〜し」でつなぐ
+  const nouns=[],verbs=[],free=[];
+  const addAct=(d,pre='')=>{
+    if(/ている$/.test(d))verbs.push([pre+d+'ことを確認し',pre+d+'ことを確認した']);
+    else if(/振り返り$/.test(d))verbs.push([pre+d,pre+d.replace(/り$/,'った')]);
+    else if(/(を|せず|よう)/.test(d)&&/[一-龠ァ-ヶー]$/.test(d))verbs.push([pre+d+'し',pre+d+'した']);
+    else if(/[ぁ-ん。]$/.test(d))free.push(d.replace(/。$/,'')+'。');
+    else nouns.push(pre+d);
+  };
+  for(const [base,arr] of [['care',CARE],['shido',SHIDO]])for(const [n,o] of arr){
+    const id=base+'|'+n;if(!S.has(id)&&!txt(id))continue;
+    const d=det(id,o);rows.push([n,'✓'+(d?'　'+d:'')]);
+    const ds=picks(id,o);
+    if(n==='生活リハビリテーション'){const x=ds.filter(v=>v!=='その他');nouns.push(n+kakko(x.join('・')));}
+    else if(n==='情報提供'){if(ds.length)verbs.push([ds.map(v=>v.replace(/について$/,'')).join('・')+'について情報提供し','']);else nouns.push(n);}
+    else if(n==='家族指導'){if(ds.length)ds.forEach(v=>addAct(v,'家族へ'));else nouns.push(n);}
+    else if(n==='自己管理方法指導'){if(ds.length)ds.forEach(v=>addAct(v));else nouns.push('自己管理方法の指導');}
+    else if(ds.length)ds.forEach(v=>addAct(v));
+    else if(!txt(id))nouns.push(n);
+    if(txt(id))addAct(txt(id),n==='家族指導'?'家族へ':'');
+  }
+  for(const v of verbs)if(!v[1])v[1]=v[0].replace(/し$/,'した');
+  const all=(nouns.length?[[nouns.join('・')+pv('jt',BANK.実施途中),nouns.join('・')+pv('jf',BANK.実施文末)]]:[]).concat(verbs);
+  chunk(all,4).forEach((g,gi)=>done.push((gi?'また、':pv('jh',BANK.実施頭))+g.map((p,i)=>i<g.length-1?p[0]:p[1]).join('、')+'。'));
+  done.push(...free);
+  if(txt('memo'))done.push(txt('memo').replace(/。$/,'')+'。');
+  if(taiou)done.push(taiou);
+
+  const aite=picks('renkei|相手',RENKEI.相手),nai=picks('renkei|内容',RENKEI.内容);
+  let rk='';
+  if(aite.length&&nai.length)rk=aite.join('・')+'へ'+nai.join('、')+'。';
+  else if(aite.length)rk=aite.join('・')+'と連携。';
+  else if(nai.length)rk=nai.join('、')+'。';
+  if(txt('renkei'))rk+=txt('renkei');
+  // 改善案：2項目ずつ1文にまとめる
+  const kaiT=chunk(kai,2).map((g,gi)=>(gi?'':pv('kh',BANK.改善頭))+g.map(([l,p],i)=>l+pv('kt'+l,BANK.改善つなぎ)+chain(p,i<g.length-1)+(i<g.length-1?'':pv('ks'+gi,BANK.改善しめ))).join('、')+'。').join('');
+  const blk={a:grp.睡眠,b:actT,c:grp.服薬,d:grp.保清,e:grp.対人関係};
+  const mondai=zentai+body+[...pv('narabi',['abcde','bacde','acbde','cabed','baced','abced'])].map(k=>blk[k]).join('')+etc.join('')+mi.slice(0,2).join('');
+  let sec=[['問題点',mondai+ag],['改善案',kaiT],['実施したこと',done.join('')]];
+  if(!LONG){ // 短い文章（150字くらい）：大事なものから入れ、長すぎるときは数を減らす
+    const sk0=shikkanAll().join('・');
+    const gai=act[0]||'';
+    // 項目ごとの言葉の並び（外出を先頭に。同じ言葉が重なる時は出だしを付けない）
+    const items=(gai?[act]:[]).concat(Object.keys(prob).map(k=>{const c=prob[k].c1;return [(/食事|睡眠|服薬|内服|保清|清潔|室内|なし$|^[^、]{1,8}は/.test(c)?'':PFXS[k])+c].concat(prob[k].rest);}));
+    const kp=kai.map(([l,p])=>p[0]);
+    const ags=ag;
+    const mk=(nd,np,na,ua,ns,nc)=>{
+      const use=items.slice(0,nd).map(x=>x.slice(0,nc)),dl=use.flat(),nokori=items.slice(nd).flat().concat(items.slice(0,nd).flatMap(x=>x.slice(nc)));
+      const seS=se.length?chain(se.slice(0,ns))+'。':'';
+      const dS=dl.length?chunk(dl,4).map(g=>chain(g)+'。').join(''):'';
+      const pS=np&&kp.length?pv('kh',BANK.改善頭)+chain(kp.slice(0,np))+'。':'';
+      const aa=all.slice(0,na);
+      const aS=(aa.length?pv('jh',BANK.実施頭)+aa.map((p,i)=>i<aa.length-1?p[0]:p[1]).join('、')+'。':'')+(taiou&&(!aa.length||body)?taiou:'');
+      const left=[],L=(x,t)=>left.push([x.replace(/。$/,''),t||fin(x)+'。']);
+      se.slice(ns).forEach(x=>L(x));
+      nokori.forEach(x=>L(x));
+      etc.forEach(x=>L(x,x));
+      kp.slice(np).forEach(x=>L(x,x+'。'));kai.forEach(([l,p])=>p.slice(1).forEach(x=>L(x,x+'。')));
+      all.slice(na).forEach(p=>L(p[1],p[1]+'。'));free.forEach(x=>L(x,x));
+      if(taiou&&!(!aa.length||body))L(taiou,taiou);
+      if(aS&&txt('memo'))L(txt('memo'),txt('memo').replace(/。$/,'')+'。');
+      const r=[['問題点',seS+body+dS+ags],['改善案',pS],['実施したこと',aS||(txt('memo')?txt('memo').replace(/。$/,'')+'。':'')]];r.left=left;return r;
+    };
+    const len=x=>x.reduce((n,y)=>n+y[1].length,sk0?sk0.length+1:0);
+    for(const lv of [[9,3,3,1,4,3],[5,3,3,1,4,2],[4,2,2,1,3,2],[4,2,2,1,3,1],[3,2,2,1,3,1],[3,2,1,1,3,1],[2,2,1,1,3,1],[2,1,1,1,2,1],[2,1,1,1,1,1],[1,1,1,1,1,1]]){sec=mk(...lv);if(len(sec)<=MIJIKAI)break;}
+  }
+  if(KFIRST)sec.unshift(sec.splice(1,1)[0]);
+  const zen=sec.filter(x=>x[1]).map(([h,b])=>HEAD?'【'+h+'】\n'+b:b).join(HEAD?'\n':'');
+  const sk=shikkanAll().join('・');
+  const head=sk&&zen?sk+'。'+(HEAD?'\n':''):'';
+  return {zenshin:head+zen,renkei:rk,rows,left:sec.left||[]};
+}
+
+// ===== 以前の文章とどれだけ同じか（2文字ずつの重なりで 0〜1） =====
+function sim(a,b){
+  const bg=t=>{t=t.replace(/\s/g,'');const m=new Map();for(let i=0;i<t.length-1;i++){const k=t.slice(i,i+2);m.set(k,(m.get(k)||0)+1);}return m;};
+  const A=bg(a),B=bg(b);let x=0,na=0,nb=0;
+  for(const v of A.values())na+=v;for(const v of B.values())nb+=v;
+  for(const [k,v] of A)x+=Math.min(v,B.get(k)||0);
+  return na+nb?2*x/(na+nb):0;
+}
+const KEISHO=0.8; // これ以上同じなら警告
+
+// ===== 画面 =====
+if(typeof document!=='undefined'){
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const chip=(id,label,sm)=>`<button type="button" class="chip${sm?' sm':''}${S.has(id)?' on':''}" data-id="${esc(id)}">${esc(label)}</button>`;
+const inp=(key,ph)=>`<input type="text" data-t="${esc(key)}" value="${esc(T[key]||'')}" placeholder="${esc(ph||'そのほか（自由に書く）')}">`;
+const optrow=(id,opts)=>`<div class="row ind">${opts.map(o=>chip(id+'|'+o,o,1)).join('')}${inp(id)}</div>`;
+const kzrow=key=>`<div class="row ind"><span class="lab">改善案</span></div>`+optrow('kaizen|'+key,KAIZEN[key]);
+const card=(title,body)=>`<div class="card"><h2>${esc(title)}</h2>${body}</div>`;
+
+let ORDER=[],TOPN=0;
+// 「次へ」：今の項目を閉じて、次の項目を開く。最後の項目では文章を作る
+let WIZ=true,PHASE='step'; // 1つずつ選ぶ画面か／いまの場面（step=項目 kz=改善案 fin=文章）
+function setPhase(p){PHASE=p;document.body.className=WIZ?'wiz'+(p==='kz'?' kz':p==='fin'?' fin':''):'';}
+// 1つずつ選ぶ画面の順番（[ ] の中は同じ画面に一緒に出す）。ここにない項目は「一覧で選ぶ」の中だけに出ます
+const STEPS=[['外出・過ごし方'],['年齢'],['疾患'],['身体'],['食事','睡眠'],['服薬'],['保清','環境整備'],['金銭の扱い','対人関係'],['表情・言動'],['care']];
+const stepOf=k=>STEPS.findIndex(g=>g.includes(k));
+function showStep(i){OPEN.clear();STEPS[i].forEach(k=>OPEN.add(k));setPhase('step');render();out();window.scrollTo(0,0);}
+function show1(k){OPEN.clear();if(k)OPEN.add(k);setPhase('step');render();out();const el=k&&document.querySelector('details[data-d="'+CSS.escape(k)+'"]');if(el)el.scrollIntoView({behavior:'smooth',block:'center'});}
+function finish(){OPEN.clear();setPhase('fin');render();out();make();if(WIZ)window.scrollTo(0,0);else document.getElementById('make').scrollIntoView({behavior:'smooth',block:'start'});}
+function showKz(){OPEN.clear();setPhase('kz');render();out();window.scrollTo(0,0);}
+function goNext(k){
+  if(WIZ){const i=stepOf(k);
+    if(i===STEPS.length-2&&kactive().length)return showKz();
+    return i>=STEPS.length-1?finish():showStep(i+1);}
+  const i=ORDER.indexOf(k);
+  if(i===TOPN-1||i===ORDER.length-1)return finish();
+  show1(ORDER[i+1]);
+}
+function goBack(k){
+  const i=stepOf(k);
+  if(i===STEPS.length-1&&kactive().length)return showKz();
+  if(i>0)showStep(i-1);
+}
+function render(){
+  const lim=(id,arr,n)=>arr.slice(0,n).concat(arr.slice(Math.max(n,AGEBASE[id]??arr.length)));
+  const chips=(id,opts,sm)=>opts.map(o=>chip(id+'|'+o,o,sm)).join('');
+  const line=(lab,inner)=>`<div class="row ind"><span class="lab">${esc(lab)}</span>${inner}</div>`;
+  const sumOf=pre=>{const ids=[...S].filter(x=>x.startsWith(pre));
+    const lab=ids.filter(x=>!ids.some(y=>y.startsWith(x+'|'))).map(x=>x.endsWith('外出|なし')?'外出なし':x.endsWith('外出|あり')?'外出あり':x.split('|').pop()).filter(Boolean);
+    if(Object.keys(T).some(x=>x.startsWith(pre.replace(/\|$/,''))&&txt(x)))lab.push('書き込みあり');
+    return lab.join('・');};
+  const top=[],rest=[];
+  const fold=(key,pre,title,body)=>{const m=sumOf(pre);const html=`<details class="card slim" data-d="${esc(key)}"${OPEN.has(key)?' open':''}><summary><span class="ttl">${esc(title)}</span>${m?`<span class="pick">${esc(m)}</span>`:''}</summary>${body}<div class="row nextrow"><button class="btn back" data-back="${esc(key)}">◀ 戻る</button><span class="cnt"></span><button class="btn main" data-next="${esc(key)}">次へ ▶</button></div></details>`;(HISSU.includes(title)?top:rest).push([title,html,key]);return '';};
+  const slim=(title,first,rest,pre)=>fold(title,pre,title,`<div class="row">${first}</div>`+(rest||''));
+  const any=pre=>[...S].some(x=>x.startsWith(pre));
+  const kzl=(key,n=3)=>line('改善案',chips('kaizen|'+key,lim('kaizen|'+key,KAIZEN[key],n),1));
+
+  let h=slim('年齢',NENREI.map(a=>chip('nenrei|'+a,a,1)).join(''),'','nenrei|');
+  h+=slim('疾患',chips('shikkan',SHIKKAN,1)+chip('shikkanOther','その他',1),
+    S.has('shikkanOther')?`<div class="row ind">${chips('shikkan',shikkanOther(),1)}</div><div class="row ind"><input type="text" id="dq" value="${esc(Q)}" placeholder="疾患名を入れて探す（例：とうにょう）" autocomplete="off"></div><div class="row ind" id="dres"></div>`:'','shikkan|');
+
+  for(const it of KADAI){
+    const ari=it.k+'|あり';let first,rest='';
+    if(it.subs[0][0]){
+      first=it.subs.map(([n])=>chip(ari+'|'+n,n)).join('');
+      for(const [n,o] of it.subs)if(S.has(ari+'|'+n))rest+=line(n+'のくわしい様子',chips(ari+'|'+n,o.slice(0,4),1));
+    }else first=chips(ari+'|',lim(it.k,it.subs[0][1],4));
+    h+=slim(it.k,first,rest,ari+'|');
+    if(it.k==='睡眠'){
+      const m=KANRI.find(([n])=>S.has('kanri|'+n));
+      h+=slim('服薬の管理',KANRI.map(([n])=>chip('kanri|'+n,n)).join(''),m&&m[1].length?line('くわしく',chips('kanri|'+m[0],m[1],1)):'','kanri|');
+    }
+  }
+
+  { // 外出：主な項目だけ見せ、補佐的な項目は「その他」にまとめる
+    const MAING=['頻度','先','期間','理由'];
+    const br=['あり','なし'].find(b=>S.has('活動|外出|'+b));
+    const gl=main=>br?Object.entries(GAISHUTSU[br]).filter(([g])=>MAING.includes(g)===main).map(([g,o])=>line(GLAB[g],chips('活動|外出|'+br+'|'+g,o,1))).join(''):'';
+    const auxSel=[...S].some(x=>/^活動\|外出\|(あり|なし)\|(同伴|手段|様子|用事|気持ち)\|/.test(x)||x.startsWith('活動|過ごし方|'));
+    const sub=`<details class="sub" data-d="gai-sub"${OPEN.has('gai-sub')?' open':''}><summary>その他（${br==='あり'?'だれと・行き方・外出時の様子・':br==='なし'?'買い物や通院・本人の気持ち・':''}過ごし方）${auxSel?'<span class="pick">入力あり</span>':''}</summary>${gl(false)+line('過ごし方',chips('活動|過ごし方',lim('活動|過ごし方',KATSUDO.過ごし方,4),1))}</details>`;
+    h+=slim('外出・過ごし方',chip('活動|外出|あり','外出あり')+chip('活動|外出|なし','外出なし'),gl(true)+sub,'活動|');
+  }
+  h+=slim('表情・言動',chips('精神|表情',SEISHIN.表情),line('言動',chips('精神|言動',SEISHIN.言動,1)),'精神|');
+
+  const list=(base,arr)=>`<div class="row">${arr.map(([n])=>chip(base+'|'+n,n)).join('')}</div>`
+    +arr.filter(([n,o])=>S.has(base+'|'+n)&&o.length).map(([n,o])=>line(n+'の内容',chips(base+'|'+n,o,1))).join('');
+  h+=fold('care','care|','実施した看護内容',list('care',CARE));
+
+  h+=fold('身体','身体|','身体の状態（血圧・体調）',Object.entries(SHINTAI).map(([g,o])=>line(g,chips('身体|'+g,g==='訴え'||g==='対応'?lim('身体|'+g,o,6):o,1))).join('')
+    +`<div class="row">${inp('身体','そのほかの状態（自由に書く）')}</div><div class="row">${inp('身体|経過','そのほかの経過（自由に書く）')}</div>`);
+  h+=fold('shido','shido|','指導・教育',list('shido',SHIDO));
+  h+=fold('renkei','renkei|','連携（医師・ケアマネジャーなど）',line('相手',chips('renkei|相手',RENKEI.相手,1))+line('内容',chips('renkei|内容',RENKEI.内容,1))+`<div class="row">${inp('renkei')}</div>`);
+  h+=fold('memo','memo','そのほか実施したこと（自由に書く）',`<div class="row">${inp('memo','例：バイタルサインを測定した。')}</div>`);
+  top.sort((a,b)=>HISSU.indexOf(a[0])-HISSU.indexOf(b[0]));
+  const tj=a=>a.map(x=>x[1]).join('');
+  const n=rest.filter(x=>x[1].includes('class="pick"')).length;
+  document.getElementById('form').innerHTML=tj(top)+`<details class="more" data-d="more"${OPEN.has('more')?' open':''}><summary>そのほかの項目（必要なときだけ開く）${n?`<span class="pick">${n}項目に入力あり</span>`:''}</summary>${tj(rest)}</details>`;
+  ORDER=top.concat(rest).map(x=>x[2]);TOPN=top.length;
+  for(const k of [ORDER[TOPN-1],ORDER[ORDER.length-1]]){const nb=document.querySelector('[data-next="'+CSS.escape(k)+'"]');if(nb)nb.textContent='選び終わり ▶ 文章を作成する';}
+  if(WIZ)document.querySelectorAll('#form details.slim').forEach(d=>{const k=d.dataset.d,i=stepOf(k),row=d.querySelector(':scope > .nextrow');if(i<0||!row)return;if(STEPS[i][STEPS[i].length-1]!==k){row.style.display='none';return;}row.querySelector('.cnt').textContent=(i+1)+' / '+STEPS.length;if(i===0)row.querySelector('.back').style.visibility='hidden';});
+  if(WIZ&&PHASE==='step'&&OPEN.has(STEPS[0][0])){ // 最初の画面だけ：前に保存した内容から始められる
+    const sv=load().map((r,i)=>[r,i]).filter(x=>x[0].sel).reverse().slice(0,8);
+    if(sv.length)document.getElementById('form').insertAdjacentHTML('beforeend','<details class="card prevbox"><summary>前回の内容から始める（'+sv.length+'件）</summary>'+sv.map(([r,i])=>`<div class="row"><button class="btn" data-load="${i}">${esc((r.tag||'目印なし')+'　'+hi(r.t))}</button><span class="note">${esc(r.zenshin.slice(0,28))}…</span></div>`).join('')+'</details>');
+  }
+  const dr=document.getElementById('dres');if(dr)dr.innerHTML=resHtml();
+  const kp=document.getElementById('kpanel'),act=kactive();
+  kp.style.display=act.length?'':'none';
+  kp.innerHTML='<h2>改善案（選んだ内容に合う案から選ぶ）</h2>'+act.map(K=>{
+    const sel=kpicked(K),cand=suggest(K).filter(x=>!sel.includes(x));
+    const off=cand.length?((KOFF[K]||0)*3)%cand.length:0,show=cand.slice(off,off+3);
+    return `<div class="row"><span class="lab">${esc(KLAB[K]||K)}</span>${chips('kaizen|'+K,sel.concat(show),1)}${cand.length>3?`<button class="btn" data-kmore="${esc(K)}">別の案</button>`:''}</div>`;}).join('')+'<div class="row nextrow wizonly"><button class="btn" id="kzback">◀ 戻る</button><span class="cnt">改善案</span><button class="btn main" id="kznext">次へ ▶</button></div>';
+}
+function resHtml(){
+  const q=Q.trim().replace(/\|/g,'');
+  if(!q)return '<span class="note">文字を入れると候補が出ます。ひらがなでも探せます。</span>';
+  const k=q.toLowerCase().replace(/[ァ-ヶ]/g,c=>String.fromCharCode(c.charCodeAt(0)-0x60));
+  const hit=DLIST.filter(([n,y])=>!S.has('shikkan|'+n)&&(n.toLowerCase().includes(q.toLowerCase())||(y||'').includes(k))).slice(0,20);
+  const exact=DLIST.some(([n])=>n===q)||SHIKKAN.includes(q)||S.has('shikkan|'+q);
+  return hit.map(([n])=>chip('shikkan|'+n,n,1)).join('')+(exact?'':chip('shikkan|'+q,'「'+q+'」をそのまま追加',1))+(hit.length?'':'<span class="note">候補にありません。そのまま追加できます。</span>');
+}
+// 文章は、選ぶたびには作らない。選び終わってから「文章を作成する」で、選んだ内容をまとめて作る
+const MADE={key:null,left:[]};
+const selKey=()=>JSON.stringify([[...S].sort(),Object.keys(T).sort().map(k=>[k,txt(k)]).filter(x=>x[1]),HEAD,ATAMA,KFIRST,LONG]);
+function out(){
+  const g=gen();
+  document.getElementById('rows').innerHTML=g.rows.length
+    ?'<table>'+g.rows.map(([a,b],i)=>`<tr><td>${esc(a)}</td><td>${esc(b)}</td><td><button class="btn" data-row="${i}">コピー</button></td></tr>`).join('')+'</table>'
+    :'<div class="empty">左で選ぶと、ここに出ます。</div>';
+  out.rows=g.rows;
+  const z=document.getElementById('zenshin').value.trim();
+  document.getElementById('mknote').textContent=MADE.key===null||!z?'':MADE.key!==selKey()?'選んだ内容が変わりました。もう一度「文章を作成する」を押すと、作り直します。':'もう一度押すと、別の言い方で作り直します。';
+  if(z)document.getElementById('mknote').textContent+='（'+z.length+'字）';
+}
+function make(){
+  const key=selKey(),cur=document.getElementById('zenshin').value;
+  if(!gen().zenshin){document.getElementById('mknote').textContent='まだ何も選ばれていません。左で選んでから押してください。';return;}
+  let g=null;
+  for(let t=0;t<20&&(!g||g.zenshin===cur);t++){
+    SEED+=101;g=gen();
+    const a=load();
+    if(a.length){let best=1e9;for(let i=0;i<6;i++){const c=gen(SEED+i);if(c.zenshin===cur)continue;const v=Math.max(...a.map(r=>sim(c.zenshin,r.zenshin)));if(v<best-1e-9){best=v;g=c;}}}
+  }
+  document.getElementById('zenshin').value=g.zenshin;
+  document.getElementById('renkei').value=g.renkei;
+  document.getElementById('renkeiCard').style.display=g.renkei?'':'none';
+  MADE.key=key;MADE.left=g.left;renderLeft();out();check();
+}
+// 文章に入らなかったもの（押すと文章の最後に足す）
+function renderLeft(){
+  const a=MADE.left||[];
+  document.getElementById('left').innerHTML=a.length?'<div class="note">文章に入っていないもの（押すと文章の最後に足します）</div><div class="row">'+a.map((x,i)=>`<button type="button" class="chip sm" data-add="${i}">＋ ${esc(x[0])}</button>`).join('')+'</div>':'';
+}
+// ===== 保存（このパソコンのブラウザの中） =====
+const SKEY='kangoKirokuBun.saved';
+function load(){try{return JSON.parse(localStorage.getItem(SKEY)||'[]');}catch(e){return [];}}
+function store(a){try{localStorage.setItem(SKEY,JSON.stringify(a));return true;}catch(e){alert('保存できませんでした。ブラウザの設定で保存が止められている可能性があります。');return false;}}
+const hi=t=>{const d=new Date(t);return `${d.getFullYear()}/${d.getMonth()+1}/${d.getDate()} ${d.getHours()}:${String(d.getMinutes()).padStart(2,'0')}`;};
+let lastSaved='';
+function nearest(text){
+  let best=null;
+  for(const r of load()){const v=sim(text,r.zenshin);if(!best||v>best.v)best={v,r};}
+  return best;
+}
+function check(){
+  const cur=document.getElementById('zenshin').value.trim(),w=document.getElementById('warn');
+  const b=cur.length>=10&&cur!==lastSaved?nearest(cur):null;
+  w.innerHTML=b&&b.v>=KEISHO?`<div class="warn">⚠ 以前の文章と ${Math.round(b.v*100)}% 同じです（${esc(hi(b.r.t))} 保存${b.r.tag?'・目印：'+esc(b.r.tag):''}）。内容を見直してください。</div>`:'';
+}
+function renderSaved(){
+  const a=load();
+  document.getElementById('cnt').textContent=a.length;
+  document.getElementById('saved').innerHTML=a.length
+    ?a.map((r,i)=>[r,i]).reverse().map(([r,i])=>`<div class="sv"><div class="note">${esc(hi(r.t))}${r.tag?'　目印：'+esc(r.tag):''}</div><div>${esc(r.zenshin)}</div>${r.renkei?`<div class="note">連携：${esc(r.renkei)}</div>`:''}<div class="row">${r.sel?`<button class="btn" data-load="${i}">この内容から始める</button>`:''}<button class="btn" data-cp="${i}">コピー</button><button class="btn" data-del="${i}">削除</button></div></div>`).join('')+'<div class="row"><button class="btn" id="delall">保存した文章を全部削除</button></div>'
+    :'<div class="empty">まだ保存していません。</div>';
+}
+// 保存した時の選んだ内容を呼び出す（文章は作り直す）
+function loadSel(r){
+  if(!r||!r.sel)return;
+  S.clear();for(const k of Object.keys(T))delete T[k];
+  r.sel.forEach(x=>S.add(x));Object.assign(T,r.txts||{});
+  document.getElementById('nashi').checked=S.has('nashiAll');document.getElementById('tag').value=r.tag||'';
+  applyAge();MADE.key=null;MADE.left=[];renderLeft();
+  document.getElementById('zenshin').value='';document.getElementById('renkei').value='';document.getElementById('renkeiCard').style.display='none';
+  if(WIZ)showStep(0);else{render();out();}check();
+}
+function saveNow(){
+  const z=document.getElementById('zenshin').value.trim();
+  if(!z){alert('文章がまだありません。');return;}
+  const b=nearest(z);
+  if(b&&b.v>=KEISHO&&!confirm(`以前の文章と ${Math.round(b.v*100)}% 同じです（${hi(b.r.t)} 保存）。\nこのまま保存しますか？`))return;
+  const a=load();
+  a.push({t:Date.now(),tag:document.getElementById('tag').value.trim(),zenshin:z,renkei:document.getElementById('renkei').value.trim(),sel:[...S],txts:Object.fromEntries(Object.keys(T).filter(k=>txt(k)).map(k=>[k,T[k]]))});
+  if(!store(a))return;
+  lastSaved=z;renderSaved();render();check();
+  const s=document.getElementById('save');s.textContent='保存しました';s.classList.add('done');
+  setTimeout(()=>{s.textContent='保存する';s.classList.remove('done');},1200);
+}
+async function copy(text,btn){
+  try{await navigator.clipboard.writeText(text);}
+  catch(e){const t=document.createElement('textarea');t.value=text;document.body.appendChild(t);t.select();document.execCommand('copy');t.remove();}
+  const old=btn.textContent;btn.textContent='コピーしました';btn.classList.add('done');
+  setTimeout(()=>{btn.textContent=old;btn.classList.remove('done');},1200);
+}
+document.addEventListener('click',e=>{
+  const b=e.target.closest('button');if(!b)return;
+  if(b.dataset.id!==undefined){if(b.closest('#dres'))Q='';toggle(b.dataset.id);render();out();if(b.dataset.id.startsWith('nenrei|')&&S.has(b.dataset.id))goNext('年齢');}
+  else if(b.dataset.next!==undefined)goNext(b.dataset.next);
+  else if(b.dataset.add!==undefined){const z=document.getElementById('zenshin'),x=MADE.left.splice(b.dataset.add,1)[0];if(x){z.value=z.value.replace(/\s+$/,'')+x[1];renderLeft();out();check();}}
+  else if(b.dataset.load!==undefined)loadSel(load()[b.dataset.load]);
+  else if(b.dataset.back!==undefined)goBack(b.dataset.back);
+  else if(b.id==='kznext')showStep(STEPS.length-1);
+  else if(b.id==='kzback')showStep(STEPS.length-2);
+  else if(b.id==='backsel')showStep(0);
+  else if(b.id==='mode'){WIZ=!WIZ;b.textContent=WIZ?'一覧で選ぶ':'1つずつ選ぶ';if(WIZ)showStep(0);else{setPhase('step');render();out();}}
+  else if(b.dataset.copy)copy(document.getElementById(b.dataset.copy).value,b);
+  else if(b.dataset.row!==undefined)copy(out.rows[b.dataset.row][1].replace(/^(✓|課題あり|課題なし)　?/,'')||out.rows[b.dataset.row][1],b);
+  else if(b.dataset.kmore!==undefined){KOFF[b.dataset.kmore]=(KOFF[b.dataset.kmore]||0)+1;render();}
+  else if(b.id==='save')saveNow();
+  else if(b.dataset.cp!==undefined)copy(load()[b.dataset.cp].zenshin,b);
+  else if(b.dataset.del!==undefined){if(confirm('この保存した文章を削除します。元に戻せません。よろしいですか？')){const a=load();a.splice(b.dataset.del,1);store(a);renderSaved();check();}}
+  else if(b.id==='delall'){if(confirm('保存した文章を全部削除します。元に戻せません。よろしいですか？')){store([]);renderSaved();check();}}
+  else if(b.id==='make')make();
+  else if(b.id==='reset'&&confirm('選んだ内容を全部消します。よろしいですか？')){S.clear();for(const k of Object.keys(T))delete T[k];OPEN.clear();OPEN.add('外出・過ごし方');setPhase('step');Q='';document.getElementById('nashi').checked=false;applyAge();MADE.key=null;MADE.left=[];renderLeft();document.getElementById('zenshin').value='';document.getElementById('renkei').value='';document.getElementById('renkeiCard').style.display='none';render();out();check();}
+});
+document.addEventListener('toggle',e=>{const k=e.target.dataset&&e.target.dataset.d;if(k){e.target.open?OPEN.add(k):OPEN.delete(k);
+  if(!WIZ&&e.target.open&&e.target.classList.contains('slim'))document.querySelectorAll('details.slim[open]').forEach(d=>{if(d!==e.target){OPEN.delete(d.dataset.d);d.open=false;}});}},true); // 開くのは1つだけ
+document.addEventListener('change',e=>{if(e.target.id==='nashi'){e.target.checked?S.add('nashiAll'):S.delete('nashiAll');out();}if(e.target.id==='midashi'){HEAD=e.target.checked;out();}if(e.target.id==='kfirst'){KFIRST=e.target.checked;out();}if(e.target.id==='atama'){ATAMA=e.target.checked;out();}if(e.target.id==='nagai'){LONG=e.target.checked;out();}});
+document.addEventListener('input',e=>{const k=e.target.dataset&&e.target.dataset.t;if(e.target.id==='dq'){Q=e.target.value;document.getElementById('dres').innerHTML=resHtml();}else if(k!==undefined){T[k]=e.target.value;out();}else if(e.target.id==='zenshin')check();});
+OPEN.add('外出・過ごし方');setPhase('step');renderSaved();render();out();
+}
+</script>
+</body>
+</html>
