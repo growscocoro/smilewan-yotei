@@ -31,8 +31,107 @@
   .links { font-size: 14px; margin: 22px 2px; line-height: 2; } .links a { color: #1a73e8; }
   .dirty { font-size: 12px; color: #b06000; margin-left: 8px; font-weight: normal; }
 </style>
-</head>
-<body>
+<style>
+:root { color-scheme: light; --ink: #1b2430; --sub: #667085; --line: #e4e8ee; --navy: #1f3a5f; --navy2: #2b4f80; --tint: #eef3fb; --blue: #2563c9; --ok: #12805c; --warn: #b54708; --ng: #c5221f; --bg: #f4f6f9; }
+html { -webkit-text-size-adjust: 100%; }
+body { background: var(--bg); color: var(--ink); font-family: -apple-system, BlinkMacSystemFont, 'Hiragino Sans', 'Hiragino Kaku Gothic ProN', 'Yu Gothic UI', 'Yu Gothic', Meiryo, sans-serif; line-height: 1.5; -webkit-font-smoothing: antialiased; }
+
+/* 上のメニュー */
+.qb-top { position: sticky; top: 0; z-index: 10; margin: -14px -14px 16px; background: rgba(255,255,255,.92); -webkit-backdrop-filter: saturate(160%) blur(10px); backdrop-filter: saturate(160%) blur(10px); border-bottom: 1px solid var(--line); }
+.qb-in { max-width: 640px; margin: 0 auto; padding: 10px 14px 0; }
+.qb-brand { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 700; color: var(--navy); letter-spacing: .04em; }
+.qb-brand i { width: 18px; height: 18px; border-radius: 5px; background: linear-gradient(135deg, var(--navy) 0 50%, #4c7fd0 50% 100%); display: inline-block; }
+.qb-top nav { display: flex; gap: 2px; margin-top: 6px; overflow-x: auto; scrollbar-width: none; }
+.qb-top nav::-webkit-scrollbar { display: none; }
+.qb-top nav a { flex: 1; text-align: center; white-space: nowrap; font-size: 14px; font-weight: 600; color: var(--sub); text-decoration: none; padding: 9px 10px 10px; border-bottom: 3px solid transparent; }
+.qb-top nav a.on { color: var(--navy); border-bottom-color: var(--navy); }
+
+/* 見出し・文 */
+h1 { font-size: 21px; font-weight: 800; color: var(--ink); letter-spacing: .01em; margin: 2px 2px 6px; }
+h2 { font-size: 13px; font-weight: 700; color: var(--sub); letter-spacing: .06em; margin: 26px 4px 8px; padding-left: 0; border-left: 0; }
+.lead { font-size: 13px; color: var(--sub); line-height: 1.7; margin: 0 2px 14px; }
+.hint, .note { font-size: 12px; color: var(--sub); line-height: 1.65; }
+
+/* 箱 */
+.card { background: #fff; border: 1px solid var(--line); border-radius: 16px; padding: 16px; margin-bottom: 12px; box-shadow: 0 1px 2px rgba(16,24,40,.04); }
+.card.warn { background: #fff8ed; border-color: #f5d9a8; color: var(--warn); }
+
+/* 入れる所 */
+label.f, .card > label, .row label { font-size: 12px; font-weight: 600; color: var(--sub); margin: 12px 0 5px; }
+input[type=text], input:not([type]), select, textarea { background: #fff; border: 1px solid #d3dae3; border-radius: 10px; padding: 11px 12px; font-size: 16px; color: var(--ink); transition: border-color .12s, box-shadow .12s; -webkit-appearance: none; appearance: none; }
+select { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5l5 5 5-5' fill='none' stroke='%23667085' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 12px center; padding-right: 32px; }
+input[type=text]:focus, input:not([type]):focus, select:focus, textarea:focus { outline: none; border-color: var(--navy2); box-shadow: 0 0 0 3px rgba(43,79,128,.16); }
+input::placeholder, textarea::placeholder { color: #a3adba; }
+input[type=checkbox] { accent-color: var(--navy); }
+.chk { font-size: 14px; color: var(--ink); line-height: 1.5; }
+
+/* ボタン */
+button { border-radius: 10px; border: 1px solid #d3dae3; background: #fff; color: var(--navy); font-weight: 700; font-size: 15px; padding: 11px 14px; cursor: pointer; transition: background .12s, transform .05s, box-shadow .12s; -webkit-tap-highlight-color: transparent; }
+button:active { transform: translateY(1px); }
+button.main, a.open { background: var(--navy); border-color: var(--navy); color: #fff; border-radius: 12px; font-size: 17px; padding: 14px; box-shadow: 0 2px 6px rgba(31,58,95,.25); }
+button.main:active { background: #18304f; }
+button:disabled { opacity: .45; box-shadow: none; cursor: default; }
+button.del, .line .del { border-color: transparent; background: transparent; color: var(--ng); font-weight: 600; padding: 6px 8px; }
+button.mv { border-color: var(--line); color: var(--sub); font-weight: 600; }
+button.bg, #ymOpen, #add, #addItem { background: var(--tint) !important; border-color: transparent !important; color: var(--blue) !important; font-weight: 700; }
+#ymOpen { padding: 13px; border-radius: 12px; }
+
+/* 項目の行 */
+.line .no, .item .no { display: inline-flex; align-items: center; justify-content: center; min-width: 26px; height: 26px; padding: 0 7px; border-radius: 13px; background: var(--tint); color: var(--navy); font-size: 13px; font-weight: 800; }
+.amt { font-size: 17px; font-weight: 800; color: var(--ink); margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--line); }
+.amt small { font-size: 12px; font-weight: 400; color: var(--sub); }
+.from { font-size: 12px; color: var(--ok); } .from.chk2 { color: var(--warn); }
+.cand .t { font-size: 12px; font-weight: 600; color: var(--sub); }
+.cand button { border: 1px solid var(--line); border-left: 4px solid #e0a13a; border-radius: 10px; background: #fff; padding: 9px 11px; font-weight: 400; color: var(--ink); }
+.cand button.hi { border-left-color: var(--ok); }
+.cand button span.p, .smRow .p { color: var(--ok); font-weight: 800; }
+.smRow { border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; font-weight: 400; color: var(--ink); box-shadow: 0 1px 2px rgba(16,24,40,.04); }
+
+/* 計算の結果 */
+table.res td { padding: 9px 6px; border-bottom: 1px solid var(--line); }
+table.res tr.big td { background: #ecf7f1; font-size: 16px; } table.res tr.big td:first-child { border-radius: 10px 0 0 10px; } table.res tr.big td:last-child { border-radius: 0 10px 10px 0; }
+table.res tr.red td { background: #fdf1f0; font-size: 16px; } table.res tr.red td:first-child { border-radius: 10px 0 0 10px; } table.res tr.red td:last-child { border-radius: 0 10px 10px 0; }
+table.res small { color: var(--sub); }
+.warn { color: var(--warn); }
+
+/* 下に固定の帯 */
+.bar { background: rgba(255,255,255,.94); -webkit-backdrop-filter: saturate(160%) blur(12px); backdrop-filter: saturate(160%) blur(12px); border-top: 1px solid var(--line); box-shadow: 0 -6px 20px rgba(16,24,40,.07); padding: 12px 14px calc(12px + env(safe-area-inset-bottom)); }
+.tot { font-size: 12px; color: var(--sub); margin-bottom: 6px; }
+.tot b { font-size: 21px; font-weight: 800; color: var(--ok); letter-spacing: .01em; } .tot b.r { font-size: 17px; color: var(--ng); }
+#total { color: var(--ng); }
+
+/* 全画面の小窓 */
+#ymPanel, #bgPanel, #smPanel { background: var(--bg); }
+#ymPanel h1, #bgPanel h1, #smPanel h1 { margin-top: 6px; }
+.ymKubun, #bg .sub { background: var(--tint); color: var(--navy); border-radius: 8px; padding: 5px 10px; font-size: 12px; font-weight: 700; }
+table.bgT tr.big td { background: #ecf7f1; }
+
+/* 一覧（つくった書類）・設定 */
+.tabs { background: #e9edf3; border-radius: 12px; padding: 4px; gap: 4px; }
+.tabs button { border: 0; background: transparent; color: var(--sub); font-size: 14px; padding: 9px 6px; border-radius: 9px; }
+.tabs button.on { background: #fff; color: var(--navy); box-shadow: 0 1px 3px rgba(16,24,40,.12); }
+.doc .ttl { font-size: 16px; font-weight: 800; } .doc .amt { border-top: 0; padding-top: 0; margin: 6px 0; color: var(--ok); }
+.doc .top { font-size: 12px; color: var(--sub); } .doc .sub { font-size: 13px; color: var(--sub); } .tag { border-radius: 999px; padding: 2px 9px; font-size: 11px; }
+.sum { background: var(--tint); border-radius: 12px; padding: 12px 14px; color: var(--ink); }
+details.ans { border-top: 1px solid var(--line); } details.ans summary, details summary { color: var(--blue); font-weight: 700; cursor: pointer; }
+.bgRow { border-bottom: 1px solid var(--line); }
+.dirty { color: var(--warn); }
+.msg.ok, #msg.ok { color: var(--ok); }
+
+/* 下のリンク（上のメニューがあるので、控えめに） */
+.links { font-size: 13px; margin: 26px 4px 8px; line-height: 2.1; } .links a { color: var(--blue); text-decoration: none; }
+
+/* 合言葉の入口 */
+#gate { padding-top: 6vh; }
+#gate h1 { text-align: center; font-size: 22px; margin-bottom: 14px; }
+#gate .card { padding: 22px 18px; border-radius: 18px; box-shadow: 0 8px 28px rgba(16,24,40,.08); }
+#gate label { font-size: 13px !important; }
+#gatePass { font-size: 18px !important; padding: 13px 14px !important; letter-spacing: .08em; }
+#gateGo { margin-top: 14px !important; }
+
+@media (min-width: 700px) { .qb-in { padding-top: 12px; } h1 { font-size: 23px; } }
+</style></head>
+<body><header class="qb-top"><div class="qb-in"><div class="qb-brand"><i></i>塗装の仕事</div><nav><a href="./">積算</a><a href="mitsumori.html">見積</a><a href="rireki.html">書類</a><a href="settei.html" class="on">設定</a></nav></div></header>
 <div class="wrap" id="gate">
   <h1>設定</h1>
   <div class="card">
@@ -61,7 +160,7 @@
   <p class="lead">積算ページの「手間の表から単価を作る」に使います。材料の値段は、1kg（研磨紙は1枚）あたり・税抜きです。空の材料は0円で計算されます。</p>
   <div class="card"><div id="bg"></div><button id="saveBg" class="main" type="button">手間の表の単価を保存する</button><div id="msgBg" class="msg"></div></div>
 
-  <div class="links"><a href="./">積算のページへ</a><br><a href="mitsumori.html">見積書をつくるページへ</a><br><a href="rireki.html">つくった見積書・内訳書を見る</a><br><a id="gateOut" href="#">合言葉を入れ直す</a></div>
+  <div class="links"><a id="gateOut" href="#">合言葉を入れ直す</a></div>
 </div>
 
 <script>
