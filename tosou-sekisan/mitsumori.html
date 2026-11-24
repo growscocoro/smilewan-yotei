@@ -442,7 +442,7 @@ try {
 } catch (e) { /* 読めなければ空から */ }
 }   // startApp ここまで
 
-var SUPA_URL = "https://uniutujwbmwijizjdoyp.supabase.co", SUPA_KEY = "sb_publishable_T8oC_65bBzsHNoj1dBHP-Q_3wkv-zoi", PASSKEY = 'sekisan-pass-v1', PASSBOX = sessionStorage, apiPass = '', apiMe = {};
+var SUPA_URL = "https://uniutujwbmwijizjdoyp.supabase.co", SUPA_KEY = "sb_publishable_T8oC_65bBzsHNoj1dBHP-Q_3wkv-zoi", PASSKEY = 'sekisan-pass-v1', PASSBOX = localStorage, apiPass = '', apiMe = {};
 function rpc(fn, args) {
   var body = { p_pass: apiPass }; for (var k in (args || {})) body[k] = args[k];
   return fetch(SUPA_URL.replace(/\/+$/, '') + '/rest/v1/rpc/' + fn, { method: 'POST', headers: { 'Content-Type': 'application/json', apikey: SUPA_KEY, Authorization: 'Bearer ' + SUPA_KEY }, body: JSON.stringify(body) })
