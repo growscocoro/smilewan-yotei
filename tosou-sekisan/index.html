@@ -1234,5 +1234,25 @@ Object.defineProperty(google.script, 'run', { get: function () {
   if (saved) open(saved, true);
 })();
 </script>
-</body>
+<script>
+(function () {
+  var tries = 0, done = false;
+  function pass() { try { return localStorage.getItem('sekisan-pass-v1') || sessionStorage.getItem('sekisan-pass-v1') || ''; } catch (e) { return ''; } }
+  function tick() {
+    if (done || ++tries > 200) return;
+    var p = pass();
+    if (!p || typeof SUPA_URL === 'undefined') { setTimeout(tick, 1500); return; }
+    done = true;
+    fetch(SUPA_URL.replace(/\/+$/, '') + '/rest/v1/rpc/qb_links', { method: 'POST', headers: { 'Content-Type': 'application/json', apikey: SUPA_KEY, Authorization: 'Bearer ' + SUPA_KEY }, body: JSON.stringify({ p_pass: p }) })
+      .then(function (r) { return r.json(); }).then(function (j) {
+        if (!j || j.qb_error) { done = false; setTimeout(tick, 4000); return; }
+        if (!j.sheet_url || !/^https:\/\/docs\.google\.com\//.test(j.sheet_url)) return;
+        var nav = document.querySelector('.qb-top nav'); if (!nav || nav.querySelector('.ext')) return;
+        var a = document.createElement('a'); a.className = 'ext'; a.target = '_blank'; a.rel = 'noopener'; a.href = j.sheet_url; a.textContent = 'シート↗';
+        nav.appendChild(a);
+      }).catch(function () { done = false; setTimeout(tick, 6000); });
+  }
+  setTimeout(tick, 800);
+})();
+</script></body>
 </html>
