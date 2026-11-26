@@ -34,7 +34,16 @@ body.wiz.kz #form,body.wiz.fin #form{display:none}
 body.wiz.kz .out,body.wiz.fin .out{display:block}
 body.wiz.kz .out>*:not(#kpanel){display:none}
 body.wiz.fin #kpanel{display:none!important}
-body:not(.wiz) .wizonly{display:none}
+body:not(.wiz):not(.ken) .wizonly{display:none}
+/* 検索して追加する画面 */
+#ken{display:none}
+body.ken #ken{display:block}
+body.ken #form,body.ken .out,body.ken.fin #ken{display:none}
+body.ken.fin .out{display:block}
+body.ken.fin #kpanel{display:none!important}
+body.ken .wrap{display:block;max-width:760px;margin:0 auto}
+#ken .chip small{opacity:.7;font-size:12px}
+#ken .lab{min-width:3em}
 body:not(.wiz) .nextrow .back,body:not(.wiz) .nextrow .cnt{display:none}
 body:not(.wiz) .nextrow{justify-content:flex-end}
 .nextrow .btn{font-size:15px;padding:8px 18px}
@@ -79,11 +88,12 @@ td:last-child{width:1%}
 <body>
 <header>
   <h1>精神訪問看護 記録文作成ツール</h1>
-  <small>あてはまるものを選んで「次へ」。</small>
-  <button class="btn" id="mode">一覧で選ぶ</button>
+  <small id="hint">言葉を探して追加し、「文章を作成する」。</small>
+  <button class="btn" id="mode">順に選ぶ</button>
   <button class="btn" id="reset">全部消す</button>
 </header>
 <div class="wrap">
+  <div id="ken"></div>
   <div id="form"></div>
   <div class="out">
     <div class="card" id="kpanel" style="display:none"></div>
@@ -469,6 +479,57 @@ const STATE={食事:{不規則:['不規則となっている','不規則な状�
  環境整備:{やや散乱:['室内はやや散乱している','室内にやや散乱がみられる','室内がやや片付いていない'],散乱:['室内は散乱している','室内の散乱が目立つ','室内が片付けられていない']}};
 const YOI=/(できている|実施)$/; // 良い内容は「〜が、」の後ろに回す
 
+// ===== 検索して言葉を追加する画面 =====
+let KEN=true,KQ=''; // 検索で選ぶ画面か／検索に入れた文字
+// 検索で引っかかる読みがな・別の言い方（左の言葉を含む選択肢が、右の文字でも出る）
+const KEYS={食事:'しょくじ ごはん たべ',不規則:'ふきそく',拒食:'きょしょく たべない 食べない',過食:'かしょく たべすぎ 食べ過ぎ',間食:'かんしょく おやつ',体重:'たいじゅう',食欲:'しょくよく',水分:'すいぶん',調理:'ちょうり りょうり 料理 じすい 自炊',総菜:'そうざい',
+ 睡眠:'すいみん ねむ ねる 寝る',不眠:'ふみん ねむれない 眠れない',入眠:'にゅうみん ねつき 寝つき',寝つ:'ねつ',早朝覚醒:'そうちょうかくせい はやく',中途覚醒:'ちゅうとかくせい よなか 夜中',眠剤:'みんざい すいみんやく 睡眠薬',眠気:'ねむけ',昼夜逆転:'ちゅうやぎゃくてん',
+ 服薬:'ふくやく くすり 薬 のむ 飲む',内服:'ないふく くすり 薬',飲み忘れ:'のみわすれ',残薬:'ざんやく',拒薬:'きょやく',怠薬:'たいやく',副作用:'ふくさよう',一包化:'いっぽうか',自己管理:'じこかんり',他者管理:'たしゃかんり',
+ 保清:'ほせい せいけつ 清潔 ふろ 風呂',入浴:'にゅうよく ふろ 風呂',シャワー:'しゃわー',更衣:'こうい きがえ 着替え',洗髪:'せんぱつ',洗濯:'せんたく',体臭:'たいしゅう におい',不潔:'ふけつ',整容:'せいよう',口腔:'こうくう はみがき 歯',
+ 環境:'かんきょう へや 部屋',散乱:'さんらん ちらか 散らか かたづ 片付',ごみ:'ゴミ',悪臭:'あくしゅう におい',動線:'どうせん',
+ 金銭:'きんせん おかね お金',浪費:'ろうひ むだづかい',支払い:'しはらい',予算:'よさん',
+ 対人:'たいじん にんげんかんけい 人間関係',家族:'かぞく',近隣:'きんりん きんじょ 近所',孤立:'こりつ',口論:'こうろん けんか',友人:'ゆうじん ともだち 友達',
+ 外出:'がいしゅつ でかけ 出かけ',買い物:'かいもの',通院:'つういん びょういん 病院',散歩:'さんぽ',デイケア:'でいけあ',デイサービス:'でいさーびす',作業所:'さぎょうしょ',仕事:'しごと',学校:'がっこう',徒歩:'とほ あるき 歩き',意欲:'いよく やるき やる気',不安:'ふあん',体調:'たいちょう',臥床:'がしょう よこ 横になる ねて',自宅:'じたく いえ 家',自室:'じしつ へや こもり',テレビ:'てれび',家事:'かじ',就労:'しゅうろう はたら 働',
+ 表情:'ひょうじょう かお 顔',穏やか:'おだやか',明るい:'あかるい',暗い:'くらい',硬い:'かたい',乏しい:'とぼしい',気分:'きぶん おちこみ 落ち込み うつ',落ち着:'おちつ',幻聴:'げんちょう こえ 声',被害:'ひがい もうそう 妄想',独語:'どくご ひとりごと 独り言',興奮:'こうふん',易怒:'いど おこり 怒り いらいら',希死念慮:'きしねんりょ しにたい 死にたい',多弁:'たべん',口数:'くちかず',
+ 血圧:'けつあつ',頭重感:'ずじゅうかん あたま 頭',頭痛:'ずつう あたま 頭',めまい:'目まい',ふらつき:'フラつき',動悸:'どうき',倦怠感:'けんたいかん だるい',便秘:'べんぴ',口渇:'こうかつ のど',ふるえ:'震え',高値:'こうち たかい 高い',低値:'ていち ひくい 低い',安定:'あんてい',眠:'ねむ',
+ 傾聴:'けいちょう きく 聞く',清潔援助:'せいけつえんじょ',排泄:'はいせつ といれ',トイレ:'といれ',摘便:'てきべん',浣腸:'かんちょう',おむつ:'オムツ',受診:'じゅしん',リハビリ:'りはびり',精神支援:'せいしんしえん',薬剤管理:'やくざいかんり',情報提供:'じょうほうていきょう',指導:'しどう',連携:'れんけい',医師:'いし せんせい 先生 しゅじい',主治医:'しゅじい せんせい 先生',ケアマネ:'けあまね',ヘルパー:'へるぱー',報告:'ほうこく',相談:'そうだん',記録:'きろく',配食:'はいしょく',頓服:'とんぷく',確認:'かくにん',
+ うつ病:'うつびょう',パニック障害:'ぱにっくしょうがい',不安神経症:'ふあんしんけいしょう',不眠症:'ふみんしょう',高血圧症:'こうけつあつしょう',腰痛:'ようつう こし',肥満症:'ひまんしょう',双極性障害:'そうきょくせいしょうがい そううつ 躁うつ',認知症:'にんちしょう',改善案:'かいぜんあん',実施:'じっし',疾患:'しっかん びょうき 病気'};
+const KOYOKU=['睡眠|あり|不眠','睡眠|あり|入眠困難','食事|あり|不規則','服薬|あり|不規則','精神|表情|穏やか','精神|言動|落ち着いた様子で会話','精神|言動|不安の訴えあり','精神|言動|気分の落ち込みあり','精神|言動|意欲低下あり','care|薬剤管理|内服確認','care|精神支援|訴えを否定せず傾聴','care|精神支援|不安の軽減']; // 最初に出す「よく使う言葉」
+const FKEY='kangoKirokuBun.freq';
+function freq(){try{return JSON.parse(localStorage.getItem(FKEY)||'{}');}catch(e){return {};}}
+function freqAdd(id){try{const f=freq();f[id]=(f[id]||0)+1;localStorage.setItem(FKEY,JSON.stringify(f));}catch(e){}}
+const hira=t=>String(t).toLowerCase().replace(/[ァ-ヶ]/g,c=>String.fromCharCode(c.charCodeAt(0)-0x60));
+// 検索できる言葉の一覧（今の年齢に合う選択肢も入る）
+function kIndex(){
+  const a=[],add=(id,label,cat,yomi)=>a.push({id,label,cat,yomi:yomi||''});
+  for(const it of KADAI)for(const [n,o] of it.subs){if(n)add(it.k+'|あり|'+n,n,it.k);for(const x of o)add(it.k+'|あり|'+n+'|'+x,x,n?it.k+'・'+n:it.k);}
+  for(const [n,o] of KANRI){add('kanri|'+n,n,'服薬の管理');for(const x of o)add('kanri|'+n+'|'+x,x,'服薬の管理・'+n);}
+  for(const br of ['あり','なし'])for(const [g,o] of Object.entries(GAISHUTSU[br]))for(const x of o)add('活動|外出|'+br+'|'+g+'|'+x,x,'外出'+br+'・'+GLAB[g]);
+  for(const x of KATSUDO.過ごし方)add('活動|過ごし方|'+x,x,'過ごし方');
+  for(const x of SEISHIN.表情)add('精神|表情|'+x,x,'表情');for(const x of SEISHIN.言動)add('精神|言動|'+x,x,'言動');
+  for(const [g,o] of Object.entries(SHINTAI))for(const x of o)add('身体|'+g+'|'+x,x,'身体・'+(g==='血圧'?'血圧':g));
+  for(const [base,arr,c] of [['care',CARE,'実施'],['shido',SHIDO,'指導']])for(const [n,o] of arr){add(base+'|'+n,n,c);for(const x of o)add(base+'|'+n+'|'+x,x,c+'・'+n);}
+  for(const x of RENKEI.相手)add('renkei|相手|'+x,x,'連携・相手');for(const x of RENKEI.内容)add('renkei|内容|'+x,x,'連携・内容');
+  for(const x of SHIKKAN)add('shikkan|'+x,x,'疾患');for(const [n,y] of DLIST)add('shikkan|'+n,n,'疾患',y);
+  const kz={};for(const [K,o] of Object.entries(KAIZEN))kz[K]=new Set(o);
+  for(const [key,o] of Object.entries(KBY)){const K=key.split('|')[0];(kz[K]=kz[K]||new Set());o.forEach(x=>kz[K].add(x));}
+  for(const [K,set] of Object.entries(kz))for(const x of set)add('kaizen|'+K+'|'+x,x,'改善案・'+(KLAB[K]||K));
+  for(const e of a){const t=e.label+' '+e.cat;e.key=hira(t+' '+e.yomi+' '+Object.keys(KEYS).filter(w=>t.includes(w)).map(w=>KEYS[w]).join(' '));}
+  return a;
+}
+const jiyu=()=>txt('jiyu')?txt('jiyu').split('\n').filter(Boolean):[];
+function kSearch(q,idx){
+  const ws=hira(q).split(/[\s　]+/).filter(Boolean);if(!ws.length)return [];
+  const hit=idx.filter(e=>!S.has(e.id)&&ws.every(w=>e.key.includes(w)));
+  const sc=e=>(hira(e.label).startsWith(ws[0])?0:hira(e.label).includes(ws[0])?1:2)+(e.cat.startsWith('改善案')?0.5:0)+(e.cat==='疾患'?0.3:0);
+  return hit.sort((x,y)=>sc(x)-sc(y)).slice(0,24);
+}
+// 選んだあとに残った「入れ物だけ」の印を片付ける
+function kPrune(idx){
+  const ok=new Set(idx.map(e=>e.id));
+  const keep=x=>ok.has(x)||x==='nashiAll'||x==='shikkanOther'||x.startsWith('nenrei|')||x==='活動|外出|あり'||x==='活動|外出|なし'||x.startsWith('shikkan|');
+  for(let ch=true;ch;){ch=false;for(const x of [...S])if(!keep(x)&&![...S].some(y=>y.startsWith(x+'|'))){S.delete(x);ch=true;}}
+}
 // ===== 言いかえの表（選んだ言葉をそのまま文に入れず、書き言葉に直す） =====
 // 左＝選択肢の言葉、右＝文に入れる言い方（いくつか書くと、作るたびに入れ替わる）。右は言い切りの形で書く
 const IIKAE={
@@ -706,9 +767,13 @@ function gen(seed){
   else if(nai.length)rk=nai.join('、')+'。';
   if(txt('renkei'))rk+=txt('renkei');
   // 改善案：2項目ずつ1文にまとめる
+  { const done_=new Set(kai.map(x=>x[0])),lab={身体:'身体面',活動:'活動',精神:'精神症状'},g={};
+    for(const x of S)if(x.startsWith('kaizen|')){const p=x.split('|');if(p.length===3)(g[p[1]]=g[p[1]]||[]).push(p[2]);}
+    for(const [K,p] of Object.entries(g)){const l=lab[K]||K;if(!done_.has(l)){kai.push([l,p]);rows.push([l+'の改善案',p.join('、')]);}} } // 検索で改善案だけ足した時も文に入れる
+  const jy=jiyu().map(w=>w.replace(/。$/,'')+'。').join('');
   const kaiT=chunk(kai,2).map((g,gi)=>(gi?'':pv('kh',BANK.改善頭))+g.map(([l,p],i)=>l+pv('kt'+l,BANK.改善つなぎ)+chain(p,i<g.length-1)+(i<g.length-1?'':pv('ks'+gi,BANK.改善しめ))).join('、')+'。').join('');
   const blk={a:grp.睡眠,b:actT,c:grp.服薬,d:grp.保清,e:grp.対人関係};
-  const mondai=zentai+body+[...pv('narabi',['abcde','bacde','acbde','cabed','baced','abced'])].map(k=>blk[k]).join('')+etc.join('')+mi.slice(0,2).join('');
+  const mondai=zentai+body+[...pv('narabi',['abcde','bacde','acbde','cabed','baced','abced'])].map(k=>blk[k]).join('')+jy+etc.join('')+mi.slice(0,2).join('');
   let sec=[['問題点',mondai+ag],['改善案',kaiT],['実施したこと',done.join('')]];
   if(!LONG){ // 短い文章（150字くらい）：大事なものから入れ、長すぎるときは数を減らす
     const sk0=shikkanAll().join('・');
@@ -732,7 +797,7 @@ function gen(seed){
       all.slice(na).forEach(p=>L(p[1],p[1]+'。'));free.forEach(x=>L(x,x));
       if(taiou&&!(!aa.length||body))L(taiou,taiou);
       if(aS&&txt('memo'))L(txt('memo'),txt('memo').replace(/。$/,'')+'。');
-      const r=[['問題点',seS+body+dS+ags],['改善案',pS],['実施したこと',aS||(txt('memo')?txt('memo').replace(/。$/,'')+'。':'')]];r.left=left;return r;
+      const r=[['問題点',seS+body+dS+jy+ags],['改善案',pS],['実施したこと',aS||(txt('memo')?txt('memo').replace(/。$/,'')+'。':'')]];r.left=left;return r;
     };
     const len=x=>x.reduce((n,y)=>n+y[1].length,sk0?sk0.length+1:0);
     for(const lv of [[9,3,3,1,4,3],[5,3,3,1,4,2],[4,2,2,1,3,2],[4,2,2,1,3,1],[3,2,2,1,3,1],[3,2,1,1,3,1],[2,2,1,1,3,1],[2,1,1,1,2,1],[2,1,1,1,1,1],[1,1,1,1,1,1]]){sec=mk(...lv);if(len(sec)<=MIJIKAI)break;}
@@ -766,13 +831,13 @@ const card=(title,body)=>`<div class="card"><h2>${esc(title)}</h2>${body}</div>`
 let ORDER=[],TOPN=0;
 // 「次へ」：今の項目を閉じて、次の項目を開く。最後の項目では文章を作る
 let WIZ=true,PHASE='step'; // 1つずつ選ぶ画面か／いまの場面（step=項目 kz=改善案 fin=文章）
-function setPhase(p){PHASE=p;document.body.className=WIZ?'wiz'+(p==='kz'?' kz':p==='fin'?' fin':''):'';}
+function setPhase(p){PHASE=p;document.body.className=KEN?'ken'+(p==='fin'?' fin':''):WIZ?'wiz'+(p==='kz'?' kz':p==='fin'?' fin':''):'';}
 // 1つずつ選ぶ画面の順番（[ ] の中は同じ画面に一緒に出す）。ここにない項目は「一覧で選ぶ」の中だけに出ます
 const STEPS=[['外出・過ごし方'],['年齢'],['疾患'],['身体'],['食事','睡眠'],['服薬'],['保清','環境整備'],['金銭の扱い','対人関係'],['表情・言動'],['care']];
 const stepOf=k=>STEPS.findIndex(g=>g.includes(k));
-function showStep(i){OPEN.clear();STEPS[i].forEach(k=>OPEN.add(k));setPhase('step');render();out();window.scrollTo(0,0);}
+function showStep(i){if(KEN){setPhase('step');render();out();window.scrollTo(0,0);return;}OPEN.clear();STEPS[i].forEach(k=>OPEN.add(k));setPhase('step');render();out();window.scrollTo(0,0);}
 function show1(k){OPEN.clear();if(k)OPEN.add(k);setPhase('step');render();out();const el=k&&document.querySelector('details[data-d="'+CSS.escape(k)+'"]');if(el)el.scrollIntoView({behavior:'smooth',block:'center'});}
-function finish(){OPEN.clear();setPhase('fin');render();out();make();if(WIZ)window.scrollTo(0,0);else document.getElementById('make').scrollIntoView({behavior:'smooth',block:'start'});}
+function finish(){OPEN.clear();setPhase('fin');render();out();make();if(WIZ||KEN)window.scrollTo(0,0);else document.getElementById('make').scrollIntoView({behavior:'smooth',block:'start'});}
 function showKz(){OPEN.clear();setPhase('kz');render();out();window.scrollTo(0,0);}
 function goNext(k){
   if(WIZ){const i=stepOf(k);
@@ -787,7 +852,37 @@ function goBack(k){
   if(i===STEPS.length-1&&kactive().length)return showKz();
   if(i>0)showStep(i-1);
 }
-function render(){
+function render(){renderForm();if(KEN)renderKen();}
+function renderKen(){
+  const el=document.getElementById('ken');
+  if(!el.firstChild)el.innerHTML='<div class="card"><div class="row"><span class="lab">年齢</span><span id="kage"></span></div><div class="row"><span class="lab">外出</span><span id="kgai"></span></div></div>'
+    +'<div class="card"><input type="search" id="kq" placeholder="言葉を入れて探す（例：ふみん、のみわすれ、けいちょう）" autocomplete="off" style="width:100%;font-size:17px;padding:12px"><div class="note" id="khead" style="margin-top:10px"></div><div class="row" id="kres"></div></div>'
+    +'<div class="card"><h2>選んだ言葉<span class="note" style="font-weight:normal">（押すと消えます）</span></h2><div class="row" id="ksel"></div><details class="sub" id="kkzbox"><summary>合う改善案を選ぶ</summary><div id="kkz"></div></details>'
+    +'<div class="row" style="margin-top:12px"><button class="btn main" id="kmake" style="font-size:17px;padding:12px 24px">文章を作成する</button></div><div class="note" id="knote"></div></div>'
+    +'<details class="card prevbox" id="kprev"></details>';
+  const idx=kIndex(),by=new Map(idx.map(e=>[e.id,e]));
+  const chipS=(id,t)=>`<button type="button" class="chip${S.has(id)?' on':''}" data-id="${esc(id)}">${esc(t)}</button>`;
+  document.getElementById('kage').innerHTML=NENREI.map(a=>chipS('nenrei|'+a,a)).join('');
+  document.getElementById('kgai').innerHTML=chipS('活動|外出|あり','外出あり')+chipS('活動|外出|なし','外出なし');
+  const q=KQ.trim(),res=q?kSearch(q,idx):[];
+  const f=freq(),yoku=[...new Set(Object.keys(f).sort((a,b)=>f[b]-f[a]).concat(KOYOKU))].filter(id=>by.has(id)&&!S.has(id)).slice(0,12).map(id=>by.get(id));
+  const addB=e=>`<button type="button" class="chip sm" data-kadd="${esc(e.id)}">＋ ${esc(e.label)}<small> ${esc(e.cat)}</small></button>`;
+  document.getElementById('khead').textContent=q?(res.length?'押すと追加します':'見つかりません。別の言葉で探すか、そのまま追加できます。'):'よく使う言葉（押すと追加します）';
+  document.getElementById('kres').innerHTML=(q?res:yoku).map(addB).join('')+(q&&!idx.some(e=>e.label===q)?`<button type="button" class="chip sm" data-kfree="1">＋「${esc(q)}」をそのまま追加</button>`:'');
+  const leaf=[...S].filter(x=>by.has(x)&&![...S].some(y=>y!==x&&y.startsWith(x+'|')&&by.has(y)));
+  const others=[...S].filter(x=>x.startsWith('shikkan|')&&!by.has(x));
+  document.getElementById('ksel').innerHTML=leaf.map(id=>`<button type="button" class="chip on" data-krem="${esc(id)}">${esc(by.get(id).label)}<small> ${esc(by.get(id).cat)}</small> ×</button>`).join('')
+    +others.map(id=>`<button type="button" class="chip on" data-krem="${esc(id)}">${esc(id.slice(8))}<small> 疾患</small> ×</button>`).join('')
+    +jiyu().map((w,i)=>`<button type="button" class="chip on" data-kfreerem="${i}">${esc(w)}<small> 自由</small> ×</button>`).join('')
+    ||'<span class="note">まだありません。上で探して追加してください。</span>';
+  const kp=document.getElementById('kpanel');
+  document.getElementById('kkzbox').style.display=kactive().length?'':'none';
+  document.getElementById('kkz').innerHTML=[...kp.querySelectorAll(':scope > .row:not(.nextrow)')].map(r=>r.outerHTML).join('');
+  const sv=load().map((r,i)=>[r,i]).filter(x=>x[0].sel).reverse().slice(0,8),pv_=document.getElementById('kprev');
+  pv_.style.display=sv.length?'':'none';
+  pv_.innerHTML='<summary>前回の内容から始める（'+sv.length+'件）</summary>'+sv.map(([r,i])=>`<div class="row"><button class="btn" data-load="${i}">${esc((r.tag||'目印なし')+'　'+hi(r.t))}</button><span class="note">${esc(r.zenshin.slice(0,28))}…</span></div>`).join('');
+}
+function renderForm(){
   const lim=(id,arr,n)=>arr.slice(0,n).concat(arr.slice(Math.max(n,AGEBASE[id]??arr.length)));
   const chips=(id,opts,sm)=>opts.map(o=>chip(id+'|'+o,o,sm)).join('');
   const line=(lab,inner)=>`<div class="row ind"><span class="lab">${esc(lab)}</span>${inner}</div>`;
@@ -927,7 +1022,7 @@ function loadSel(r){
   document.getElementById('nashi').checked=S.has('nashiAll');document.getElementById('tag').value=r.tag||'';
   applyAge();MADE.key=null;MADE.left=[];renderLeft();
   document.getElementById('zenshin').value='';document.getElementById('renkei').value='';document.getElementById('renkeiCard').style.display='none';
-  if(WIZ)showStep(0);else{render();out();}check();
+  if(WIZ||KEN)showStep(0);else{render();out();}check();
 }
 function saveNow(){
   const z=document.getElementById('zenshin').value.trim();
@@ -949,7 +1044,7 @@ async function copy(text,btn){
 }
 document.addEventListener('click',e=>{
   const b=e.target.closest('button');if(!b)return;
-  if(b.dataset.id!==undefined){if(b.closest('#dres'))Q='';toggle(b.dataset.id);render();out();if(b.dataset.id.startsWith('nenrei|')&&S.has(b.dataset.id))goNext('年齢');}
+  if(b.dataset.id!==undefined){if(b.closest('#dres'))Q='';toggle(b.dataset.id);if(KEN)kPrune(kIndex());render();out();if(!KEN&&b.dataset.id.startsWith('nenrei|')&&S.has(b.dataset.id))goNext('年齢');}
   else if(b.dataset.next!==undefined)goNext(b.dataset.next);
   else if(b.dataset.add!==undefined){const z=document.getElementById('zenshin'),x=MADE.left.splice(b.dataset.add,1)[0];if(x){z.value=z.value.replace(/\s+$/,'')+x[1];renderLeft();out();check();}}
   else if(b.dataset.load!==undefined)loadSel(load()[b.dataset.load]);
@@ -957,7 +1052,12 @@ document.addEventListener('click',e=>{
   else if(b.id==='kznext')showStep(STEPS.length-1);
   else if(b.id==='kzback')showStep(STEPS.length-2);
   else if(b.id==='backsel')showStep(0);
-  else if(b.id==='mode'){WIZ=!WIZ;b.textContent=WIZ?'一覧で選ぶ':'1つずつ選ぶ';if(WIZ)showStep(0);else{setPhase('step');render();out();}}
+  else if(b.id==='mode'){KEN=!KEN;WIZ=true;b.textContent=KEN?'順に選ぶ':'検索で選ぶ';document.getElementById('hint').textContent=KEN?'言葉を探して追加し、「文章を作成する」。':'あてはまるものを選んで「次へ」。';showStep(0);}
+  else if(b.dataset.kadd!==undefined){const id=b.dataset.kadd;if(!S.has(id)){toggle(id);freqAdd(id);}KQ='';const i=document.getElementById('kq');i.value='';render();out();i.focus();}
+  else if(b.dataset.krem!==undefined){if(S.has(b.dataset.krem))toggle(b.dataset.krem);kPrune(kIndex());render();out();}
+  else if(b.dataset.kfree!==undefined){const w=KQ.trim().replace(/\n/g,' ');if(w){T.jiyu=jiyu().concat([w]).join('\n');}KQ='';const i=document.getElementById('kq');i.value='';render();out();i.focus();}
+  else if(b.dataset.kfreerem!==undefined){const a=jiyu();a.splice(b.dataset.kfreerem,1);T.jiyu=a.join('\n');render();out();}
+  else if(b.id==='kmake'){if(!gen().zenshin){document.getElementById('knote').textContent='まだ何も選ばれていません。';return;}document.getElementById('knote').textContent='';finish();}
   else if(b.dataset.copy)copy(document.getElementById(b.dataset.copy).value,b);
   else if(b.dataset.row!==undefined)copy(out.rows[b.dataset.row][1].replace(/^(✓|課題あり|課題なし)　?/,'')||out.rows[b.dataset.row][1],b);
   else if(b.dataset.kmore!==undefined){KOFF[b.dataset.kmore]=(KOFF[b.dataset.kmore]||0)+1;render();}
@@ -966,12 +1066,12 @@ document.addEventListener('click',e=>{
   else if(b.dataset.del!==undefined){if(confirm('この保存した文章を削除します。元に戻せません。よろしいですか？')){const a=load();a.splice(b.dataset.del,1);store(a);renderSaved();check();}}
   else if(b.id==='delall'){if(confirm('保存した文章を全部削除します。元に戻せません。よろしいですか？')){store([]);renderSaved();check();}}
   else if(b.id==='make')make();
-  else if(b.id==='reset'&&confirm('選んだ内容を全部消します。よろしいですか？')){S.clear();for(const k of Object.keys(T))delete T[k];OPEN.clear();OPEN.add('外出・過ごし方');setPhase('step');Q='';document.getElementById('nashi').checked=false;applyAge();MADE.key=null;MADE.left=[];renderLeft();document.getElementById('zenshin').value='';document.getElementById('renkei').value='';document.getElementById('renkeiCard').style.display='none';render();out();check();}
+  else if(b.id==='reset'&&confirm('選んだ内容を全部消します。よろしいですか？')){S.clear();for(const k of Object.keys(T))delete T[k];OPEN.clear();OPEN.add('外出・過ごし方');setPhase('step');Q='';KQ='';{const i=document.getElementById('kq');if(i)i.value='';}document.getElementById('nashi').checked=false;applyAge();MADE.key=null;MADE.left=[];renderLeft();document.getElementById('zenshin').value='';document.getElementById('renkei').value='';document.getElementById('renkeiCard').style.display='none';render();out();check();}
 });
 document.addEventListener('toggle',e=>{const k=e.target.dataset&&e.target.dataset.d;if(k){e.target.open?OPEN.add(k):OPEN.delete(k);
   if(!WIZ&&e.target.open&&e.target.classList.contains('slim'))document.querySelectorAll('details.slim[open]').forEach(d=>{if(d!==e.target){OPEN.delete(d.dataset.d);d.open=false;}});}},true); // 開くのは1つだけ
 document.addEventListener('change',e=>{if(e.target.id==='nashi'){e.target.checked?S.add('nashiAll'):S.delete('nashiAll');out();}if(e.target.id==='midashi'){HEAD=e.target.checked;out();}if(e.target.id==='kfirst'){KFIRST=e.target.checked;out();}if(e.target.id==='atama'){ATAMA=e.target.checked;out();}if(e.target.id==='nagai'){LONG=e.target.checked;out();}});
-document.addEventListener('input',e=>{const k=e.target.dataset&&e.target.dataset.t;if(e.target.id==='dq'){Q=e.target.value;document.getElementById('dres').innerHTML=resHtml();}else if(k!==undefined){T[k]=e.target.value;out();}else if(e.target.id==='zenshin')check();});
+document.addEventListener('input',e=>{const k=e.target.dataset&&e.target.dataset.t;if(e.target.id==='dq'){Q=e.target.value;document.getElementById('dres').innerHTML=resHtml();}else if(e.target.id==='kq'){KQ=e.target.value;renderKen();}else if(k!==undefined){T[k]=e.target.value;out();}else if(e.target.id==='zenshin')check();});
 OPEN.add('外出・過ごし方');setPhase('step');renderSaved();render();out();
 }
 </script>
