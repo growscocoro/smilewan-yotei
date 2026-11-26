@@ -817,14 +817,14 @@ function gen(seed){
       const sV=V.length?pv('homon',['訪問時は','訪問時、','本日の訪問では'])+V.map((p,i)=>i<V.length-1?p[0]:p[1]).join('、')+'。':'';
       // ④ 行ったこと
       const aa=all.slice(0,na);
-      const sD=aa.length?(sV?'':'訪問時は、')+aa.map((p,i)=>i<aa.length-1?p[0]:p[1]).join('、')+'。':'';
+      const sD=aa.length?(sV?pv('honjitsu',['本日は、','今回は、']):pv('jh',BANK.実施頭))+aa.map((p,i)=>i<aa.length-1?p[0]:p[1]).join('、')+'。':'';
       // ⑤ 今後（年代の特徴を踏まえて）
       const plan=kp.slice(0,np),stem=ATAMA&&age()?AGEHEAD[age()]:'';
       let sP='';
       if(plan.length)sP=(stem?stem.replace(/であり、$/,pv('fuma',['であることを踏まえ、','であることから、','であるため、'])):'')+pv('kongo',['今後は','今後は、','引き続き'])+chain(plan)+'。';
       else if(stem)sP=ag;
       const tk=taiou&&(!aa.length||body)?taiou:'';
-      const r=[['問題点',body+sA+sB+jy+sV],['実施したこと',sD||(txt('memo')?txt('memo').replace(/。$/,'')+'。':'')],['改善案',sP+tk]];
+      const r=[['問題点',body+sA+sB+jy+sV],['改善案',sP+tk],['実施したこと',sD||(txt('memo')?txt('memo').replace(/。$/,'')+'。':'')]]; // 順番は 問題点→改善案→実際やったこと（ユーザー指定）
       // 文章に入れなかったもの（押すと足せる）
       const left=[],L=(x,t)=>{if(x&&!used.has(x))left.push([x.replace(/。$/,''),t||fin(x)+'。']);};
       Object.keys(prob).forEach(k=>[prob[k].c1].concat(prob[k].rest).filter(x=>!STSET.has(x)&&!/のみ(がみられる|を認める)$/.test(x)).forEach(x=>L(x)));
