@@ -817,7 +817,7 @@ function gen(seed){
       // ② 経過：できていること「〜が、」残っていること「〜は依然〜で経過している。」
       const P=[];
       if(S.has('活動|外出|あり')){const f=gpk('あり','頻度')[0],sk=gpk('あり','先');P.push((sk.length?sk.join('・')+'への':'')+'外出は'+(f||'')+'できている');U('外出あり');}
-      if(S.has('kanri|自己管理')){P.push('服薬は自己管理できている');etc.filter(x=>/自己管理|自分で管理|本人が管理/.test(x)).forEach(x=>U(x.replace(/。$/,'')));}
+      if(S.has('kanri|自己管理')){P.push('服薬は自己管理できている');etc.filter(x=>/自己管理|自分で管理|本人が管理/.test(x)).forEach(x=>U(x));}
       if(gen_.includes('落ち着いた様子で会話')){P.push('落ち着いて会話はできている');U('落ち着いた様子で会話');}
       else if(hyo==='穏やか'||hyo==='明るい'){P.push('表情は'+(hyo==='穏やか'?'穏やかである':'明るい'));U('表情は'+hyo);}
       for(const k of ks)for(const x of prob[k].raw)if(YOI.test(x)&&P.length<2)P.push(U(x)==='促しにて更衣を実施'?'促しにより更衣はできている':x);
