@@ -831,7 +831,7 @@ async function setSetting(key, localKey, list, opt = {}) {
 const SUPA = { url: '', key: '' }; // 旧（使わない）
 const GAS = {"url": "https://script.google.com/macros/s/AKfycbxKEAUthQx9wiZKncHZR43jbSKjPfO2lYhlc2K5yXWJNXI_zA8wChdQTFlINEhLTDQO/exec"};           // 保存先（Googleドライブに保存するGAS）。build-site.sh が入れる
 // 版の確認：公開版が新しくなったら知らせ、古い版のままでは記録を保存しない（古い決まりで上書きしないため）
-const APP_VER = '20261127140223';
+const APP_VER = '20261127151237';
 let appOutdated = false;
 async function checkVer() {
   if (APP_VER === 'dev' || appOutdated) return appOutdated;
@@ -4108,13 +4108,15 @@ const SICK_NEXT = [
   '前日の様子を踏まえて体調を確認し、熱っぽさやだるさがないことを確かめた。',
 ];
 // 体調不良の日数（1か月）：入浴の日から選ぶ。11/2 ユーザー指示「もう少し増やして」で 2〜3日 → 3〜5日
+// 11/27 ユーザー「訪問が少ない人は半分まで」：体調不良の日は、その月の訪問日の半分（切り捨て）まで（塚本さん：月2回の訪問が2回とも体調不良になっていた）
+const sickHalf = on => Math.floor(new Set(on.filter(r => r.on !== false).map(r => ymd(r.date))).size / 2);
 const sickTarget = (name, ym) => { let seed = 0; for (const ch of seedName(name) + ym) seed = (seed * 31 + ch.charCodeAt(0)) >>> 0; return 3 + (seed % 3); };
 // 体調不良にしてよい日：共に行う訪問がある日以外のすべての日（11/2 ユーザー「共に以外だったら体調不良入れて大丈夫」。前は入浴の日だけ）
 function sickCands(on) { const tog = new Set(on.filter(r => r.kind !== '家事援助' && visTogether(r.e)).map(r => ymd(r.date))); return [...new Set(on.map(r => ymd(r.date)))].filter(d => !tog.has(d)).sort(); }
 const sickDates = on => new Set(on.filter(r => r.sick || r.sickDay).map(r => ymd(r.date))); // 体調不良の日（入浴をシャワー浴にした日・入浴の無い日で体調不良の文を入れた日）
 function sickNeed(rows, name, ym) { // 足せる日（体調不良の日・次の日の確認の日でない、共に以外の日）が無いぶんは求めない
   const on = rows.filter(r => r.on !== false && ymd(r.date).startsWith(ym)), have = sickDates(on), nx = new Set(on.filter(r => r.sickNext).map(r => ymd(r.date)));
-  const free = sickCands(on).filter(d => !have.has(d) && !nx.has(d)).length; return { have: have.size, want: Math.min(sickTarget(name, ym), have.size + free) };
+  const free = sickCands(on).filter(d => !have.has(d) && !nx.has(d)).length; return { have: have.size, want: Math.min(sickTarget(name, ym), have.size + free, sickHalf(on)) };
 }
 // 体調不良の日の入浴（シャワー浴の文）と、同じ日のほかの訪問（体調不良の様子の文）
 function sickMarkDays(on, sick, seed, K) {
@@ -4167,7 +4169,7 @@ function applySick(rows, name, ym) {
   const K = kubunOf(name) === '介護', on = rows.filter(r => r.on !== false && ymd(r.date).startsWith(ym));
   const cands = sickCands(on);
   let seed = 0; for (const ch of seedName(name) + ym) seed = (seed * 31 + ch.charCodeAt(0)) >>> 0;
-  const n = Math.min(cands.length, sickTarget(name, ym)), pickd = [];
+  const n = Math.min(cands.length, sickTarget(name, ym), sickHalf(on)), pickd = [];
   const pool = cands.slice(); while (pickd.length < n && pool.length) { seed = (seed * 1103515245 + 12345) >>> 0; pickd.push(pool.splice(seed % pool.length, 1)[0]); }
   const sick = new Set(pickd);
   const esc_ = x => x.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
