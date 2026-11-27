@@ -277,9 +277,10 @@ function check(D) {
     const sh = (D.shift[ym] || []).filter(x => nameKey(x.c) === nameKey(n) && !/通院/.test(x.v || '')); // 通院介助は記録しない（11/13）
     if (sh.length) {
       const slots = {}; sh.forEach(x => { const k = x.d + '|' + x.s; (slots[k] = slots[k] || { d: x.d, s: x.s, e: x.e, v: x.v, helpers: [] }).helpers.includes(x.h) || slots[k].helpers.push(x.h); });
-      const used = new Set();
+      const used = new Set(), exact = new Map(); // まず同じ開始時刻の記録を全部の枠に組にしてから、残りの枠を30分以内で組にする（11/27）
+      Object.values(slots).forEach(sl => { const day = byDay[`${ym}-${String(sl.d).padStart(2, '0')}`] || [], r = day.find(x => x.start === sl.s && !used.has(x)); if (r) { used.add(r); exact.set(sl, r); } });
       Object.values(slots).forEach(sl => { const date = `${ym}-${String(sl.d).padStart(2, '0')}`, day = byDay[date] || [], st = hm(sl.s);
-        let r = day.find(x => x.start === sl.s && !used.has(x)); if (!r) { r = day.filter(x => !used.has(x) && Math.abs((hm(x.start) ?? -999) - st) <= 30).sort((p, q) => Math.abs(hm(p.start) - st) - Math.abs(hm(q.start) - st))[0]; if (r) A('シフト：時刻が違う', r, `記録は${r.start}、シフトは${sl.s}`); }
+        let r = exact.get(sl); if (!r) { r = day.filter(x => !used.has(x) && Math.abs((hm(x.start) ?? -999) - st) <= 30).sort((p, q) => Math.abs(hm(p.start) - st) - Math.abs(hm(q.start) - st))[0]; if (r) A('シフト：時刻が違う', r, `記録は${r.start}、シフトは${sl.s}`); }
         if (!r) { add('シフト：記録が無い', n, ym, date, sl.s, `シフト ${sl.s}〜${sl.e}（担当 ${sl.helpers.join('・')}）の記録が無い`); return; }
         used.add(r); r._shift = sl; { const sf = /^家事|生活援助/.test(sl.v || '') ? '家事' : '身体', rf = r.kind === '家事援助' ? '家事' : '身体'; if (sl.v && sf !== rf) A('シフト：身体と家事が違う', r, `シフトは${sl.v}・記録は${r.type || r.kind}`); }
         const have = String(r.staff || '').split(/[・,、\/]+/).map(x => nameKey(x)).filter(Boolean), miss = sl.helpers.filter(h => !have.includes(nameKey(h)));
@@ -288,7 +289,11 @@ function check(D) {
       rows.filter(r => !used.has(r)).forEach(r => A('シフト：シフトに無い記録', r, `${r.start} の訪問がシフトに無い`));
     }
     const tmpls = (((D.settings.checkTemplates || {}).list) || []).filter(x => nameKey(x.name) === nameKey(n));
-    const tmplOf = r => { const dow = new Date(r.date + 'T00:00:00').getDay(), st = hm(r.start); if (st == null) return null; const c = tmpls.filter(x => (x.days || []).includes(dow) && Math.abs(hm(x.start) - st) <= 10); return c.find(x => /家事/.test(x.type || '') === (r.kind === '家事援助')) || c[0] || null; };
+    const tmplOf = r => { const dow = new Date(r.date + 'T00:00:00').getDay(), st = hm(r.start); if (st == null) return null; const c = tmpls.filter(x => (x.days || []).includes(dow) && Math.abs(hm(x.start) - st) <= 10); const same = c.find(x => /家事/.test(x.type || '') === (r.kind === '家事援助')); if (same) return same;
+      // 同じ種類（身体／家事／入浴／共に）の見本を、時刻が近い順に（90分以内）。見本の種別が「身体」でも中身が入浴・共に行うなら、その種類（ツールの tmplFor と同じ・11/27）
+      const vk = /共に|一緒/.test((r.type || '') + (r.detail || '')) ? '共に' : /入浴|シャワー/.test(r.type || '') ? '入浴' : r.kind === '家事援助' ? '家事' : '身体';
+      const tk = x => { const k = /共に|一緒/.test(x.type || '') ? '共に' : /入浴|シャワー/.test(x.type || '') ? '入浴' : /家事/.test(x.type || '') ? '家事' : '身体'; if (k !== '身体') return k; const ck = [...(x.checked || []), ...(x.circled || [])]; return ck.some(y => /^入浴・清拭\|(入浴介助|シャワー浴)$/.test(y)) ? '入浴' : ck.some(y => /^自立支援\|(掃除|洗濯|ベッドメイク|衣類の整理・被服の補修|一般的な調理・配下膳|買い物・薬の受け取り)$/.test(y)) ? '共に' : k; };
+      const near = tmpls.filter(x => tk(x) === vk && Math.abs(hm(x.start) - st) <= 90).sort((a, b) => Math.abs(hm(a.start) - st) - Math.abs(hm(b.start) - st))[0]; return near || c[0] || null; }; // 同じ種類の見本を優先（ツールと同じ・11/27）
     rows.forEach(r => {
       const kp = shown(r), v = vals(r), t = String(r.text || ''), off = r.kpOff || [], on = r.kpOn || [];
       { const m = t.match(/安定剤|睡眠薬|睡眠導入|眠剤|眠薬|抗不安|抗うつ|向精神|抗精神|精神薬|精神科|心療内科|精神疾患|精神障害|統合失調|うつ病|うつ状態|鬱|双極|躁うつ|認知症|知的障害|発達障害|自閉|ADHD|てんかん|パニック|幻聴|幻覚|妄想|依存症|自傷|自殺|希死|頓服|下剤|副作用/); if (m && r.on !== false) A('言葉：薬・病名・症状', r, `「${m[0]}」が文に入っている`); }
