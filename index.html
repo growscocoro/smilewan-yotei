@@ -831,7 +831,7 @@ async function setSetting(key, localKey, list, opt = {}) {
 const SUPA = { url: '', key: '' }; // 旧（使わない）
 const GAS = {"url": "https://script.google.com/macros/s/AKfycbxKEAUthQx9wiZKncHZR43jbSKjPfO2lYhlc2K5yXWJNXI_zA8wChdQTFlINEhLTDQO/exec"};           // 保存先（Googleドライブに保存するGAS）。build-site.sh が入れる
 // 版の確認：公開版が新しくなったら知らせ、古い版のままでは記録を保存しない（古い決まりで上書きしないため）
-const APP_VER = '20261127122151';
+const APP_VER = '20261127134941';
 let appOutdated = false;
 async function checkVer() {
   if (APP_VER === 'dev' || appOutdated) return appOutdated;
@@ -1067,7 +1067,7 @@ async function initCloud() {
 //   文の中は今までどおり「本人」で作る（文の決まりがこの言葉で動くため）。画面・コピー・Word・印刷・書き出しに出す時に「ご本人」に直す（介護の方は「利用者様」のまま）
 //   「ヘルパーが」「ヘルパーにて」などは書かない（作る時も、出す時も外す）
 const noHelper = t => String(t || '').replace(/ヘルパー(が|にて|では|で|は|と|も)?/g, '').replace(/、{2,}/g, '、').replace(/(^|。)、/g, '$1');
-function honor(t, name) { t = noHelper(t); return kubunOf(String(name || state.name || '').trim()) === '介護' ? t : t.replace(/(?<!ご)本人(?!様)/g, 'ご本人'); }
+function honor(t, name) { t = noHelper(t).replace(/(本人|利用者様)自身/g, 'ご自身').replace(/(?<!ご)自身/g, 'ご自身'); /* 11/27 ユーザー「自身もご自身にして」（介護の方も） */ return kubunOf(String(name || state.name || '').trim()) === '介護' ? t : t.replace(/(?<!ご)本人(?!様)/g, 'ご本人'); }
 const unhonor = t => String(t || '').replace(/ご本人/g, '本人');
 function guessKubun(days) { return (days || []).some(d => dayEntries(normDay(d)).some(e => /身体\s*\d|生活\s*\d/.test(e.type || ''))) ? '介護' : '障害'; }
 function kubunOf(name) {
