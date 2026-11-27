@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>大阪府の入札を開く</title>
+<style>
+body{margin:0;padding:28px 16px;background:#f1f3f4;color:#202124;font-family:-apple-system,"Hiragino Sans","Yu Gothic",Meiryo,sans-serif;font-size:16px;text-align:center;}
+.card{max-width:520px;margin:0 auto;background:#fff;border:1px solid #dadce0;border-radius:10px;padding:22px 16px;}
+button{width:100%;font-size:19px;font-weight:bold;font-family:inherit;color:#fff;background:#1a3a5f;border:0;border-radius:8px;padding:16px;margin-top:14px;cursor:pointer;}
+.no{font-size:20px;font-weight:bold;color:#1a3a5f;margin:6px 0;}
+.note{font-size:13px;color:#5f6368;margin-top:14px;line-height:1.7;}
+</style>
+</head>
+<body>
+<div class="card">
+  <div id="has" style="display:none">
+    <div>大阪府の入札 案件番号</div>
+    <div class="no" id="no"></div>
+    <form method="post" action="https://www.e-nyusatsu.pref.osaka.jp/CALS/Publish/EbController" accept-charset="Shift_JIS">
+      <input type="hidden" name="omeParameterID" value="P009CPCS09">
+      <input type="hidden" name="screenID" value="CPCS02">
+      <input type="hidden" name="clientKind" value="0">
+      <input type="hidden" name="searchKeiyakuKbn" value="00">
+      <input type="hidden" name="searchOrganNumber" value="00">
+      <input type="hidden" name="searchShiseiKikan" value="2">
+      <input type="hidden" name="searchShowRange" value="50">
+      <input type="hidden" name="projectNumber" id="pn" value="">
+      <button type="submit">大阪府のページを開く</button>
+    </form>
+    <div class="note">押すと、大阪府の電子入札のページで、この案件の中身と書類が開きます。<br>公告が終わった案件は開けないことがあります。</div>
+  </div>
+  <div id="none" style="display:none">案件番号がありません。</div>
+</div>
+<script>
+(function () {
+  var m = /[?&]no=(\d{1,20})/.exec(location.search), no = m ? m[1] : '';
+  if (no) { document.getElementById('no').textContent = no; document.getElementById('pn').value = no; document.getElementById('has').style.display = ''; }
+  else document.getElementById('none').style.display = '';
+})();
+</script>
+</body>
+</html>
