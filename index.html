@@ -831,7 +831,7 @@ async function setSetting(key, localKey, list, opt = {}) {
 const SUPA = { url: '', key: '' }; // 旧（使わない）
 const GAS = {"url": "https://script.google.com/macros/s/AKfycbxKEAUthQx9wiZKncHZR43jbSKjPfO2lYhlc2K5yXWJNXI_zA8wChdQTFlINEhLTDQO/exec"};           // 保存先（Googleドライブに保存するGAS）。build-site.sh が入れる
 // 版の確認：公開版が新しくなったら知らせ、古い版のままでは記録を保存しない（古い決まりで上書きしないため）
-const APP_VER = '20261124144853';
+const APP_VER = '20261127122151';
 let appOutdated = false;
 async function checkVer() {
   if (APP_VER === 'dev' || appOutdated) return appOutdated;
@@ -3723,6 +3723,7 @@ function vOf(r) { if (r.vFrozen && rowClosed(r)) return { ...r.vFrozen }; const 
   { const kp = kpAll(r); if (!m.整容 && !(v.整容 || []).length && kp.includes('身体整容|整容')) { const nm = (state.name || '').trim(), own = tmplList().find(x => x.name === nm && (x.checked || []).includes('身体整容|整容') && (x.seiyo || []).length), pick = seiyoBathOf() || (own && own.seiyo); if (pick) v.整容 = [...pick]; } }
   if (r.sick && Array.isArray(v.整容) && v.整容.includes('髭') && !/髭|ひげ/.test(r.text || '')) v.整容 = v.整容.filter(x => x !== '髭'); // 体調不良の日は髭の細目を付けない（11/10）
   if (sexOf() === '女' && Array.isArray(v.整容) && v.整容.includes('髭')) v.整容 = v.整容.filter(x => x !== '髭'); // 女性の方に髭は付けない（11/17）
+  if (sexOf() === '女' && !m.整容 && !r.sick && kpAll(r).includes('入浴・清拭|洗髪') && kpAll(r).includes('身体整容|整容')) v.整容 = [...new Set([...(v.整容 || []), '髪'])]; // 女性の方の洗髪の日は細目に髪（11/27）
   if (!m.整容 && Array.isArray(v.整容) && v.整容.length && !kpAll(r).includes('身体整容|整容')) v.整容 = []; // 整容にチェックが無い訪問（体調不良の日など）は細目も付けない（11/17 川瀬さんの髪）
   v.その他 = ['環境整備', '相談援助', '情報収集・提供', '記録']; return v; } // その他は毎回4つとも（事業所の決まり）
 // 買い物の見積り（決まり21・11/7）：買い物リストの品物を統計価格で計算する。乱数は使わない。内訳に「金額は見積り」と残す。手入力・献立買い物支援の実際の金額があれば、そちらを出す
@@ -4232,6 +4233,8 @@ function kpAll(r) {
   if (r.sick && !(r.kpOn || []).includes('身体整容|整容') && !SEIYO_OTHER.test(r.text || '')) { const i = o.indexOf('身体整容|整容'); if (i >= 0) o.splice(i, 1); }
   // 11/10 介護の方の入浴の訪問：トイレ介助・おむつ交換・パッド交換・整容（髭）・声掛け見守りの「排泄・食事」「清拭・入浴・身体整容」も付ける（体調不良の日の髭は付けない・手で外した物は外したまま）
   if (kubunOf((state.name || '').trim()) === '介護' && o.some(k => /^入浴・清拭\|(入浴介助|シャワー浴)$/.test(k))) KAIGO_BATH.forEach(k => { if (k === '身体整容|整容' && (r.sick || sexOf() === '女') && !(r.kpOn || []).includes(k)) return; /* この整容は髭のため（女性の方は付けない・11/17） */ if (!o.includes(k) && !(r.kpOff || []).includes(k)) o.push(k); });
+  // 11/27 ユーザー「洗髪の髪のとこ抜けてる？」→「女性だけ髪を付ける」：女性の方の洗髪の日は、整容（細目は髪）を付ける（体調不良の日・手で外した時は付けない）
+  if (sexOf() === '女' && !r.sick && o.includes('入浴・清拭|洗髪') && !o.includes('身体整容|整容') && !(r.kpOff || []).includes('身体整容|整容')) o.push('身体整容|整容');
   // 11/10 手書きメモ：「共に」の訪問は服薬確認にチェック・その日の最後が入浴の訪問は服薬の声かけ（声掛け・見守り：服薬）にチェック。手で外したとき・アセスメントで服薬の支援が無い人は付けない
   const off = r.kpOff || [], mzAri = minzenOf() === 'あり', noMed = k => { if (mzAri) return false; try { return !!assessBlock((state.name || '').trim(), k); } catch (e) { return false; } }; // 眠前薬「あり」の人はアセスメントに服薬が無くても付ける（11/10 金さん）
   if (r.kind !== '家事援助' && r.e && visTogether(r.e) && !o.includes('服薬・医療|服薬介助・確認') && !off.includes('服薬・医療|服薬介助・確認') && !noMed('服薬・医療|服薬介助・確認')) o.push('服薬・医療|服薬介助・確認');
