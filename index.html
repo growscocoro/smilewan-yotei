@@ -831,7 +831,7 @@ async function setSetting(key, localKey, list, opt = {}) {
 const SUPA = { url: '', key: '' }; // 旧（使わない）
 const GAS = {"url": "https://script.google.com/macros/s/AKfycbxKEAUthQx9wiZKncHZR43jbSKjPfO2lYhlc2K5yXWJNXI_zA8wChdQTFlINEhLTDQO/exec"};           // 保存先（Googleドライブに保存するGAS）。build-site.sh が入れる
 // 版の確認：公開版が新しくなったら知らせ、古い版のままでは記録を保存しない（古い決まりで上書きしないため）
-const APP_VER = '20261127134941';
+const APP_VER = '20261127140223';
 let appOutdated = false;
 async function checkVer() {
   if (APP_VER === 'dev' || appOutdated) return appOutdated;
@@ -1067,7 +1067,16 @@ async function initCloud() {
 //   文の中は今までどおり「本人」で作る（文の決まりがこの言葉で動くため）。画面・コピー・Word・印刷・書き出しに出す時に「ご本人」に直す（介護の方は「利用者様」のまま）
 //   「ヘルパーが」「ヘルパーにて」などは書かない（作る時も、出す時も外す）
 const noHelper = t => String(t || '').replace(/ヘルパー(が|にて|では|で|は|と|も)?/g, '').replace(/、{2,}/g, '、').replace(/(^|。)、/g, '$1');
-function honor(t, name) { t = noHelper(t).replace(/(本人|利用者様)自身/g, 'ご自身').replace(/(?<!ご)自身/g, 'ご自身'); /* 11/27 ユーザー「自身もご自身にして」（介護の方も） */ return kubunOf(String(name || state.name || '').trim()) === '介護' ? t : t.replace(/(?<!ご)本人(?!様)/g, 'ご本人'); }
+// 11/27 ユーザー「他にも丁寧語にするところ探して」→ ご希望・ご意向・お話・ご本人の動きは尊敬の形（自分で→ご自分で・着替えた→着替えられた・〜していた→〜されていた・起きた→起きられた・飲んだ→飲まれた）
+//   「」の中（ご本人の言葉）と、「自分のことは自分で行いたい」のようなご本人の気持ちの言い方は変えない
+function politeText(t) {
+  return String(t || '').split(/(「[^」]*」)/).map((seg, i) => i % 2 ? seg : seg.split(/(?<=。)/).map(x => {
+    let y = x.replace(/(?<!ご)希望/g, 'ご希望').replace(/(?<!ご)意向/g, 'ご意向').replace(/(?<![お会電対世])話(を|に|が)/g, 'お話$1');
+    if (!/自分のことは自分で|たい(という|との)|たいと(話|言|希望)/.test(y)) y = y.replace(/(?<!ご)自分で/g, 'ご自分で');
+    y = y.replace(/(本人|利用者様)が([^。、「」]{1,8}?)していた/g, '$1が$2されていた').replace(/(本人|利用者様)が(用意|準備|選択|選ん)(した|だ)(?=衣類|物|服)/g, (m0, a, b) => `${a}が${b === '選ん' ? '選ばれた' : b + 'された'}`).replace(/着替えた/g, '着替えられた').replace(/起きた/g, '起きられた').replace(/飲んだ/g, '飲まれた');
+    return y; }).join('')).join('');
+}
+function honor(t, name) { t = politeText(noHelper(t).replace(/(本人|利用者様)自身/g, 'ご自身').replace(/(?<!ご)自身/g, 'ご自身')); /* 11/27 ユーザー「自身もご自身にして」（介護の方も） */ return kubunOf(String(name || state.name || '').trim()) === '介護' ? t : t.replace(/(?<!ご)本人(?!様)/g, 'ご本人'); }
 const unhonor = t => String(t || '').replace(/ご本人/g, '本人');
 function guessKubun(days) { return (days || []).some(d => dayEntries(normDay(d)).some(e => /身体\s*\d|生活\s*\d/.test(e.type || ''))) ? '介護' : '障害'; }
 function kubunOf(name) {
