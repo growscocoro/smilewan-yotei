@@ -831,7 +831,7 @@ async function setSetting(key, localKey, list, opt = {}) {
 const SUPA = { url: '', key: '' }; // 旧（使わない）
 const GAS = {"url": "https://script.google.com/macros/s/AKfycbxKEAUthQx9wiZKncHZR43jbSKjPfO2lYhlc2K5yXWJNXI_zA8wChdQTFlINEhLTDQO/exec"};           // 保存先（Googleドライブに保存するGAS）。build-site.sh が入れる
 // 版の確認：公開版が新しくなったら知らせ、古い版のままでは記録を保存しない（古い決まりで上書きしないため）
-const APP_VER = '20261127151237';
+const APP_VER = '20261127160557';
 let appOutdated = false;
 async function checkVer() {
   if (APP_VER === 'dev' || appOutdated) return appOutdated;
@@ -4749,8 +4749,10 @@ async function buildRecords() {
         else { // 予定表に無い訪問：ほかの曜日の、時間が近い予定を手本にする
           const wrong = famElse ? near(15, false)[0] : null; if (wrong) used.add(wrong); // 同じ時刻にある種類違いの予定（予定表の種類の入れ違い・曜日の入れ替え）は、この訪問の物として使い切る
           const tpl = allEntries.filter(x => !g.v || entFam(x) === svcFam(g.v)).sort((a, b) => Math.abs(hm(entryTime(a).s) - st) - Math.abs(hm(entryTime(b).s) - st))[0];
-          e = tpl && Math.abs(hm(entryTime(tpl).s) - st) <= 60 ? tpl : { ...emptyEntry(), type: svcFam(g.v) === '家事' ? '家事' : svcFam(g.v) === '通院' ? '通院介助' : '身体', detail: '' };
-          flag = wrong ? `予定表と種類が違う訪問（シフトの${fam}で作った・予定表は${wrong.type || '種別なし'}）` : '予定表に無い訪問（シフトから）'; nAdd++;
+          // 11/27 鷲尾さん11/22：日曜11:00の家事がシフトでは20:00に移っていた。近い予定が無いときは、その日のまだ使っていない同じ種類の予定（時刻がずれた訪問）を使う（中身の無い記録にしない）
+          const moved = !(tpl && Math.abs(hm(entryTime(tpl).s) - st) <= 60) && g.v && fam !== '通院' ? entries.filter(x => entryTime(x).s && !used.has(x) && entFam(x) === fam).sort((a, b) => Math.abs(hm(entryTime(a).s) - st) - Math.abs(hm(entryTime(b).s) - st))[0] : null; if (moved) used.add(moved);
+          e = tpl && Math.abs(hm(entryTime(tpl).s) - st) <= 60 ? tpl : moved || { ...emptyEntry(), type: svcFam(g.v) === '家事' ? '家事' : svcFam(g.v) === '通院' ? '通院介助' : '身体', detail: '' };
+          flag = wrong ? `予定表と種類が違う訪問（シフトの${fam}で作った・予定表は${wrong.type || '種別なし'}）` : e === moved ? `時刻がずれた訪問（予定表の${entryTime(moved).s}の予定を${g.s}に）` : '予定表に無い訪問（シフトから）'; nAdd++;
         }
         plan.push({ e: { ...e, start: g.s, end: g.e || e.end }, staff: g.helpers.join('・'), fromShift: true, on: true, flag }); nShift++;
       }
